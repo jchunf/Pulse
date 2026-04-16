@@ -29,7 +29,9 @@ Pulse 是一个 **macOS 本地优先（local-first）** 的后台常驻应用，
 | 06 | [启动引导 Onboarding](docs/06-onboarding-permissions.md) | 首次启动流程、权限申请、自检恢复 |
 | 07 | [分发与更新 Distribution](docs/07-distribution.md) | 签名、公证、Sparkle、为什么不上 App Store |
 | 08 | [路线图 Roadmap](docs/08-roadmap.md) | MVP 范围、里程碑、后续版本队列 |
-| 09 | [待决策问题 Open Questions](docs/09-open-questions.md) | 设计阶段遗留问题、建议答案 |
+| 09 | [待决策问题 Open Questions](docs/09-open-questions.md) | 设计阶段遗留问题、建议答案、**优先级快查表** |
+| 10 | [测试与 CI Testing & CI](docs/10-testing-and-ci.md) | TDD 工作流、测试金字塔、CI 流水线、性能基准 |
+| 11 | [用户中心设计原则 UX Principles](docs/11-ux-principles.md) | 3 分钟哇、≤3 次点击、数据故事化、无障碍、可用性测试 |
 
 ---
 
@@ -40,6 +42,8 @@ Pulse 是一个 **macOS 本地优先（local-first）** 的后台常驻应用，
 3. **隐私默认保守** —— 中/高敏感项默认关闭
 4. **有趣 > 有用** —— 把枯燥统计变成戏剧性可视化
 5. **可审计** —— 代码结构经得起隐私审查
+6. **TDD + CI** —— 测试先行，每次推送自动验证
+7. **用户中心** —— 3 分钟哇、≤3 次点击、无障碍全覆盖
 
 ---
 
