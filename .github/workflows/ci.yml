@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel in-progress runs on the same PR when a new push arrives.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build + test the PulseCore / PulseTestSupport targets on macOS 14 and 15.
+  # Matches the support matrix nailed down in docs/09-open-questions.md Q-13.
+  # ---------------------------------------------------------------------------
+  build-and-test:
+    name: build-and-test (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-14, macos-15]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode / Swift versions
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Cache SwiftPM build
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-${{ matrix.runner }}-${{ hashFiles('**/Package.resolved', '**/Package.swift') }}
+          restore-keys: |
+            spm-${{ matrix.runner }}-
+
+      - name: Resolve packages
+        run: swift package resolve
+
+      - name: Build (all targets)
+        run: swift build --build-tests
+
+      - name: Test (with coverage)
+        run: swift test --parallel --enable-code-coverage 2>&1 | tee test-output.log
+
+      - name: Generate coverage report
+        id: coverage
+        run: |
+          BIN_PATH=$(swift build --show-bin-path)
+          # Locate the xctest bundle SPM produces; name varies by package.
+          XCTEST_BUNDLE=$(find "$BIN_PATH" -maxdepth 1 -name "*.xctest" -type d | head -n 1 || true)
+          PROFDATA="$BIN_PATH/codecov/default.profdata"
+          if [ -z "$XCTEST_BUNDLE" ] || [ ! -f "$PROFDATA" ]; then
+            echo "Coverage outputs missing; skipping llvm-cov report."
+            echo "percent=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          BUNDLE_NAME=$(basename "$XCTEST_BUNDLE" .xctest)
+          BINARY="$XCTEST_BUNDLE/Contents/MacOS/$BUNDLE_NAME"
+          if [ ! -f "$BINARY" ]; then
+            echo "Test binary not found at $BINARY; skipping."
+            echo "percent=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          xcrun llvm-cov report \
+            "$BINARY" \
+            -instr-profile="$PROFDATA" \
+            -ignore-filename-regex='\.build|Tests|TestSupport|\.swiftpm' \
+            | tee coverage.txt
+          PERCENT=$(awk '/^TOTAL/ {gsub("%","",$NF); print $NF}' coverage.txt || echo "0")
+          echo "percent=${PERCENT:-0}" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce coverage threshold
+        if: matrix.runner == 'macos-15'
+        env:
+          MIN_COVERAGE: 85
+        run: |
+          PCT="${{ steps.coverage.outputs.percent }}"
+          if [ -z "$PCT" ] || [ "$(printf '%.0f' "$PCT")" -lt "$MIN_COVERAGE" ]; then
+            echo "::warning::coverage ${PCT}% below target ${MIN_COVERAGE}% — see docs/10-testing-and-ci.md#四"
+          else
+            echo "coverage ${PCT}% OK (>= ${MIN_COVERAGE}%)"
+          fi
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.runner }}
+          path: coverage.txt
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # Lightweight lint pass — fast, independent, runs on every PR.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: lint
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run lint script
+        run: bash scripts/lint.sh
