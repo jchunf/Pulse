@@ -1,0 +1,46 @@
+# Swift / Xcode
+.build/
+.swiftpm/
+.derived-data/
+DerivedData/
+*.xcodeproj/project.xcworkspace/
+*.xcodeproj/xcuserdata/
+xcuserdata/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+
+# SwiftPM package resolution (kept; do NOT ignore Package.resolved at root)
+# If you want to ignore it inside .swiftpm, that's already covered above.
+
+# Build outputs
+build/
+.build-release/
+
+# macOS
+.DS_Store
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Pulse runtime data (never commit)
+*.pulse
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Coverage
+*.xccovreport
+*.xccovarchive
+coverage.txt
+coverage.lcov
+*.profdata
+
+# Secrets (belt and suspenders)
+*.p12
+*.pem
+AppleID.txt

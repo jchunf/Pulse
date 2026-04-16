@@ -1,0 +1,16 @@
+# swiftformat configuration for Pulse.
+# Applied in editor / pre-commit; CI does not block on style (yet).
+
+--swiftversion 5.10
+--indent 4
+--maxwidth 120
+--wraparguments after-first
+--wrapparameters after-first
+--wrapcollections before-first
+--stripunusedargs closure-only
+--disable redundantSelf
+--enable isEmpty
+--enable redundantParens
+--enable trailingSpace
+--enable consecutiveBlankLines
+--enable blankLinesAtStartOfScope
