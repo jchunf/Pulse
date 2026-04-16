@@ -6,8 +6,10 @@
 
 | 领域 | 选择 | 备选 | 放弃备选的原因 |
 |---|---|---|---|
-| 主语言 | **Swift 5.9+** | Swift + Rust 混合 | Rust 在 MVP 阶段没有性能瓶颈值得 FFI；CGEventTap 必须 Swift/ObjC |
-| UI 框架 | **SwiftUI**（macOS 13+） | AppKit 原生 | SwiftUI 迭代快、Charts 直接可用；AppKit 只在需要精细控制的视图（鼠标热力图）里内嵌 |
+| 主语言 | **Swift 5.10+**（Swift 6 准备） | Swift + Rust 混合 | Rust 在 MVP 阶段没有性能瓶颈值得 FFI；CGEventTap 必须 Swift/ObjC |
+| UI 框架 | **SwiftUI**（macOS 14+） | AppKit 原生 | SwiftUI 迭代快、Charts 直接可用；AppKit 只在需要精细控制的视图（鼠标热力图）里内嵌 |
+| 支持系统 | **macOS 14 + 15**（Q-13 决策） | 13 / 16 beta | 14 是 SMAppService 稳定版起点，15 最新；CI 矩阵双版本并跑 |
+| 测试框架 | **Swift Testing**（新代码） + **XCTest**（UI/老代码）（Q-11 决策） | 纯 XCTest | Swift Testing 参数化/宏支持更好；XCUITest 只能 XCTest，共存即可 |
 | 图表 | **Swift Charts** | Core Plot / 自绘 | 原生、与 SwiftUI 无缝、够用 |
 | 鼠标热力图渲染 | **Metal**（可选 `MetalKit.MTKView` 内嵌 SwiftUI） | Core Graphics | 数据量大（数十万点）时只有 Metal 够快；CG 作为 fallback |
 | 数据库 | **SQLite + GRDB.swift** | SQLite.swift / Core Data | GRDB 原生、写性能好、有事务与 WAL 良好支持；Core Data 对裸 SQL 聚合不友好 |

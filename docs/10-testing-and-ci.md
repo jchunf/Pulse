@@ -129,7 +129,7 @@ jobs:
     runs-on: macos-14   # 含 Xcode 15+
     strategy:
       matrix:
-        macos: [macos-13, macos-14, macos-15]
+        macos: [macos-14, macos-15]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
@@ -175,14 +175,18 @@ Secrets 配置：
 - 替代：**self-hosted Mac mini**（M1/M2） + `actions-runner` daemon
 - 建议：**初期用 GitHub 公共 runner**，发布后视成本切 self-hosted
 
-## 七、Swift Testing vs XCTest（需拍板，见 Q-11）
+## 七、Swift Testing vs XCTest（Q-11 已关闭）
 
-Apple 在 Xcode 16 / Swift 6 推出 **Swift Testing**：
+**已决定：新代码用 Swift Testing，XCUITest / 不支持场景保留 XCTest。**
 
-- 优点：宏驱动的 `@Test`、参数化测试语法更自然、并发友好
-- 缺点：Swift 6 只支持 macOS 14+；老项目/库还在 XCTest；混用两种框架会增加心智负担
+- 业务逻辑（单元/集成测试）一律走 **Swift Testing**：宏驱动的 `@Test`、参数化语法天然、并发友好
+- UI 测试（XCUITest）目前仅支持 **XCTest**，保持
+- 两种框架在同一工程共存，按目录划分：
+  - `PulseTests/Unit/*` → Swift Testing
+  - `PulseTests/Integration/*` → Swift Testing
+  - `PulseUITests/*` → XCTest（XCUITest）
 
-**建议**：新代码用 **Swift Testing**，无法迁移的系统库测试（如 XCUITest 不支持）保持 XCTest。混合在同一工程可以共存。
+最低系统版本 macOS 14（Q-13 决策），Swift Testing 完全可用。
 
 ## 八、用户手动参与的测试
 
