@@ -10,9 +10,9 @@ Pulse 是一个 **macOS 本地优先（local-first）** 的后台常驻应用，
 
 ## 这是什么阶段？
 
-已进入 **B1 · 数据底子**：SPM 工程骨架 + 核心协议 + 降采样规则 + Fake 测试替身 + CI 全部就绪。详见 [docs/B1-PROGRESS.md](docs/B1-PROGRESS.md)。
+已进入 **B2 · 实时采集**：CGEventTap → CollectorRuntime → EventWriter → SQLite 全链路打通；菜单栏 HealthPanel 显示采集计数、最近写入时间、DB 大小、权限状态。详见 [docs/B2-PROGRESS.md](docs/B2-PROGRESS.md)。
 
-路线 **B → A → C**：先打数据底子（B1 ✓，B2 进行中），再串通 MVP（三件套：应用排行 + 时段热力 + 鼠标里程表），最后扩展 UI 与长尾功能。
+路线 **B → A → C**：先打数据底子（B1 ✓ B2 ✓，B3 之后即可进入 A 阶段做仪表盘三件套），再串通 MVP，最后扩展 UI 与长尾功能。
 
 ## 本地构建
 
@@ -51,7 +51,8 @@ open Package.swift
 | 09 | [待决策问题 Open Questions](docs/09-open-questions.md) | 设计阶段遗留问题、建议答案、**优先级快查表** |
 | 10 | [测试与 CI Testing & CI](docs/10-testing-and-ci.md) | TDD 工作流、测试金字塔、CI 流水线、性能基准 |
 | 11 | [用户中心设计原则 UX Principles](docs/11-ux-principles.md) | 3 分钟哇、≤3 次点击、数据故事化、无障碍、可用性测试 |
-| B1 | [B1 进度 B1 Progress](docs/B1-PROGRESS.md) | 当前阶段交付的模块、测试、CI；下一 PR 的范围 |
+| B1 | [B1 进度 B1 Progress](docs/B1-PROGRESS.md) | 数据底子：SPM 骨架 + 协议 + V1 schema + CI |
+| B2 | [B2 进度 B2 Progress](docs/B2-PROGRESS.md) | 实时采集：runtime + writer + scheduler + HealthPanel |
 
 ---
 
