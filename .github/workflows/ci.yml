@@ -175,12 +175,14 @@ jobs:
             echo ""
             for log in resolve.log build.log test.log; do
               [ -s "$log" ] || continue
-              errors=$(grep -nE '^[^[:space:]].*\.swift:[0-9]+:[0-9]+: error:|FAIL|Test Suite .* failed|Process completed with exit code' "$log" || true)
+              # Match the same patterns as the truthfulness guard so the
+              # PR comment always shows exactly what the guard tripped on.
+              errors=$(grep -nE '^[^[:space:]].*\.swift:[0-9]+:[0-9]+: error:|recorded an issue at|Expectation failed:|^.{0,6}Test Case .* failed|^✘ |FAIL|Test Suite .* failed|Process completed with exit code' "$log" || true)
               if [ -n "$errors" ]; then
-                echo "### \`$log\` — error lines"
+                echo "### \`$log\` — flagged lines"
                 echo ""
                 echo '```'
-                echo "$errors" | head -40
+                echo "$errors" | head -80
                 echo '```'
                 echo ""
               fi
