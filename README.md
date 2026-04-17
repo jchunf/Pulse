@@ -10,13 +10,19 @@ Pulse 是一个 **macOS 本地优先（local-first）** 的后台常驻应用，
 
 ## 这是什么阶段？
 
-已进入 **B2 · 实时采集**：CGEventTap → CollectorRuntime → EventWriter → SQLite 全链路打通；菜单栏 HealthPanel 显示采集计数、最近写入时间、DB 大小、权限状态。详见 [docs/B2-PROGRESS.md](docs/B2-PROGRESS.md)。
+**数据底子 B1–B8 + MVP 串通 A1–A15 均已落地**。仓库里现在能跑的东西：
 
-路线 **B → A → C**：先打数据底子（B1 ✓ B2 ✓，B3 之后即可进入 A 阶段做仪表盘三件套），再串通 MVP，最后扩展 UI 与长尾功能。
+- **采集 (B 段)** — CGEventTap 实时事件流 · 多显示器归一化坐标 · 距离累加 (F-07) · 系统事件 (sleep/wake/lock/lid/power) · AX 窗口标题哈希 · 每秒/每分/每小时 rollup · 前台 app 使用时长 + 切换计数 · idle 时间 · 滚轮计数 · 全保留 WAL SQLite。
+- **MVP 三件套 (A 段)** — 应用排行 (F-02) · 24h × N-day 热力图 (F-03, 3/7/14/30 天可调) · 鼠标里程戏剧 (F-07) + Landmark 里程碑横幅 (F-25)。
+- **其他 A 段** — 7 日趋势折线 (F-01) · 暂停控件 15/30/60 min (F-46) · 权限恢复助手 (菜单栏 + Dashboard 两处) · Settings 偏好 (刷新频率 + 热力图天数) · 运行健康诊断卡 (F-49) · 6 张 summary 卡 (距离/点击/滚轮/按键/活跃/空闲) · 应用显示名自动翻译。
+
+路线 **B → A → C**：B 段数据管线与 A 段 MVP 可视化已完成；剩下的 A 段主要是 **分发与打包**（Developer ID 签名、notarization、Sparkle）——这些需要完整 Xcode 项目，超出了当前 SPM 工程范围。C 段长尾功能按 `docs/08-roadmap.md` 队列推进。
+
+各 slice 的详细交付 / 推迟清单见下方 `A*-PROGRESS.md` / `B*-PROGRESS.md` 链接。
 
 ## 本地构建
 
-需要 macOS 14+、Xcode 15+。
+需要 macOS 14+、Xcode 16+（Swift Testing 依赖）。
 
 ```bash
 git clone <this repo> && cd Pulse
@@ -51,9 +57,28 @@ open Package.swift
 | 09 | [待决策问题 Open Questions](docs/09-open-questions.md) | 设计阶段遗留问题、建议答案、**优先级快查表** |
 | 10 | [测试与 CI Testing & CI](docs/10-testing-and-ci.md) | TDD 工作流、测试金字塔、CI 流水线、性能基准 |
 | 11 | [用户中心设计原则 UX Principles](docs/11-ux-principles.md) | 3 分钟哇、≤3 次点击、数据故事化、无障碍、可用性测试 |
-| B1 | [B1 进度 B1 Progress](docs/B1-PROGRESS.md) | 数据底子：SPM 骨架 + 协议 + V1 schema + CI |
-| B2 | [B2 进度 B2 Progress](docs/B2-PROGRESS.md) | 实时采集：runtime + writer + scheduler + HealthPanel |
-| B3 | [B3 进度 B3 Progress](docs/B3-PROGRESS.md) | 采集补完：距离累加 + idle-tick 钩子 + 系统事件 emitter |
+| B1 | [B1-PROGRESS](docs/B1-PROGRESS.md) | 数据底子：SPM 骨架 + 协议 + V1 schema + CI |
+| B2 | [B2-PROGRESS](docs/B2-PROGRESS.md) | 实时采集：runtime + writer + scheduler + HealthPanel |
+| B3 | [B3-PROGRESS](docs/B3-PROGRESS.md) | 采集补完：距离累加 + idle-tick 钩子 + 系统事件 emitter |
+| B4 | [B4-PROGRESS](docs/B4-PROGRESS.md) | IOKit lid/power observer + AX 标题变更监听 |
+| B5 | [B5-PROGRESS](docs/B5-PROGRESS.md) | App 使用 rollup 管线（system_events → min_app → hour_app）|
+| B6 | —（见下方"未单独立档的 slice"）| 空闲时长 rollup（system_events → min_idle → hour_summary.idle_seconds）|
+| B7 | —（见下方"未单独立档的 slice"）| 滚轮 rollup 全管线 + V3 迁移 + 第 6 张 summary 卡 |
+| B8 | —（见下方"未单独立档的 slice"）| foregroundAppToMin 顺带填 min_switches.app_switch_count |
+| A1 | [A1-PROGRESS](docs/A1-PROGRESS.md) | Dashboard 窗口 + 应用使用排行 + 读侧查询层 |
+| A2 | [A2-PROGRESS](docs/A2-PROGRESS.md) | 24h × 7d 热力图（F-03，三件套完工）|
+| A3 | [A3-PROGRESS](docs/A3-PROGRESS.md) | 鼠标里程 hero card（F-07 "核心上瘾点"）|
+| A4 | [A4-PROGRESS](docs/A4-PROGRESS.md) | 7 日趋势折线 (F-01 基础版) |
+| A5 | [A5-PROGRESS](docs/A5-PROGRESS.md) | 暂停控件 15/30/60 min + Resume (F-46 基础版) |
+| A6 | [A6-PROGRESS](docs/A6-PROGRESS.md) | 菜单栏权限恢复助手 (F-49 深化) |
+| A7 | [A7-PROGRESS](docs/A7-PROGRESS.md) | 应用排行查询切到 min_app / hour_app |
+
+### 未单独立档的 slice
+
+早期 slice 每一个都写了 PROGRESS 文档；后续小步快跑节奏下，若改动本身已在 PR 描述 + commit message 里讲清，就直接合入 main 而不再新增 `Ai-PROGRESS.md`。完整列表（按合入顺序）：
+
+- A8 Dashboard 权限警告横幅 · A9 应用激活时刷新 · A10 Settings 面板 + 刷新频率偏好 · A11 诊断卡 (F-49) · A12 热力图天数可配置 · A13 里程碑成就横幅 (F-25) · A14 应用排行显示名解析 · A15 Dashboard idle 时长 · B6 idle rollup · B7 scroll rollup + V3 · B8 min_switches 填充
+- 一次修复：`todaySummary` 分层查询漏掉 `hour_summary` 层导致跨小时数据被丢
 
 ---
 
@@ -77,7 +102,7 @@ open Package.swift
 
 ## 平台
 
-macOS 13+（Ventura 及以后）。不上 Mac App Store（原因见 [07-distribution.md](docs/07-distribution.md)）。
+macOS 14+（Sonoma 及以后；Swift Testing + SwiftUI Charts 的最低要求）。不上 Mac App Store（原因见 [07-distribution.md](docs/07-distribution.md)）。
 
 ## 贡献与反馈
 
