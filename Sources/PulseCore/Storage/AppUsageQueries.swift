@@ -180,6 +180,79 @@ public extension EventStore {
         }
     }
 
+    // MARK: - Daily trend
+
+    /// Returns one `DailyTrendPoint` per calendar day in the `days`-day
+    /// window ending at `endingAt`. Days with no rolled-up activity get a
+    /// zero-filled point so the returned array is always `days` long and
+    /// the UI chart has a continuous x-axis. Source table is `hour_summary`
+    /// (L3), same staleness caveat as `hourlyHeatmap` — the in-progress
+    /// hour is not reflected until it rolls up.
+    ///
+    /// Points are ordered oldest → newest so a LineMark reads left to right.
+    func dailyTrend(
+        endingAt: Date,
+        days: Int,
+        calendar: Calendar = .current
+    ) throws -> [DailyTrendPoint] {
+        precondition(days >= 1, "days must be at least 1")
+        let endDay = calendar.startOfDay(for: endingAt)
+        guard let startDay = calendar.date(byAdding: .day, value: -(days - 1), to: endDay) else {
+            return []
+        }
+        guard let rangeEnd = calendar.date(byAdding: .day, value: 1, to: endDay) else {
+            return []
+        }
+        let rangeStartSec = Int64(startDay.timeIntervalSince1970)
+        let rangeEndSec = Int64(rangeEnd.timeIntervalSince1970)
+
+        let rows = try database.queue.read { db -> [(Int64, Int, Double, Int)] in
+            try Row.fetchAll(db, sql: """
+                SELECT ts_hour,
+                       key_press_total,
+                       mouse_distance_mm,
+                       mouse_click_total
+                FROM hour_summary
+                WHERE ts_hour >= ? AND ts_hour < ?
+                """, arguments: [rangeStartSec, rangeEndSec]).map { row in
+                (
+                    row["ts_hour"] as Int64,
+                    row["key_press_total"] as Int,
+                    row["mouse_distance_mm"] as Double,
+                    row["mouse_click_total"] as Int
+                )
+            }
+        }
+
+        // Aggregate hourly rows into per-day buckets.
+        var buckets: [Int: (keys: Int, distance: Double, clicks: Int)] = [:]
+        for (tsHour, keys, distance, clicks) in rows {
+            let date = Date(timeIntervalSince1970: TimeInterval(tsHour))
+            let dayStart = calendar.startOfDay(for: date)
+            guard let daysFromStart = calendar.dateComponents([.day], from: startDay, to: dayStart).day else {
+                continue
+            }
+            let current = buckets[daysFromStart] ?? (0, 0.0, 0)
+            buckets[daysFromStart] = (
+                keys: current.keys + keys,
+                distance: current.distance + distance,
+                clicks: current.clicks + clicks
+            )
+        }
+
+        // Emit points for every day in the window, padding zeros.
+        return (0..<days).compactMap { index in
+            guard let day = calendar.date(byAdding: .day, value: index, to: startDay) else { return nil }
+            let agg = buckets[index] ?? (0, 0.0, 0)
+            return DailyTrendPoint(
+                day: day,
+                keyPresses: agg.keys,
+                mouseClicks: agg.clicks,
+                mouseDistanceMillimeters: agg.distance
+            )
+        }
+    }
+
     // MARK: - Hourly heatmap
 
     /// Returns one `HeatmapCell` per hour with non-zero activity in the
@@ -277,6 +350,33 @@ public struct AppUsageRow: Sendable, Equatable, Identifiable {
 /// yesterday, … The producing query only emits cells with non-zero
 /// activity; UI layers should default missing `(dayOffset, hour)`
 /// combinations to zero.
+/// One calendar day's activity totals, used by the weekly trend chart.
+/// `keyPresses` + `mouseClicks` are count metrics; `mouseDistanceMillimeters`
+/// is the physical-distance total used by the mileage storyline.
+public struct DailyTrendPoint: Sendable, Equatable, Identifiable {
+    public let day: Date
+    public let keyPresses: Int
+    public let mouseClicks: Int
+    public let mouseDistanceMillimeters: Double
+
+    public var id: TimeInterval { day.timeIntervalSince1970 }
+
+    public init(
+        day: Date,
+        keyPresses: Int,
+        mouseClicks: Int,
+        mouseDistanceMillimeters: Double
+    ) {
+        self.day = day
+        self.keyPresses = keyPresses
+        self.mouseClicks = mouseClicks
+        self.mouseDistanceMillimeters = mouseDistanceMillimeters
+    }
+
+    /// Convenience: total "intentional event" count for single-metric charts.
+    public var totalEvents: Int { keyPresses + mouseClicks }
+}
+
 public struct HeatmapCell: Sendable, Equatable {
     public let dayOffset: Int
     public let hour: Int
