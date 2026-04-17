@@ -460,6 +460,7 @@ struct DashboardView: View {
                     WeekTrendChart(points: model.trendPoints)
                     WeekHourlyHeatmap(cells: model.heatmapCells, days: DashboardModel.heatmapDays)
                     AppRankingChart(rows: summary.topApps)
+                    DiagnosticsCard(snapshot: healthModel.snapshot)
                 } else if model.errorMessage != nil {
                     Text(model.errorMessage ?? "")
                         .foregroundStyle(.red)
@@ -809,6 +810,91 @@ struct WeekHourlyHeatmap: View {
             result[cellKey(day: cell.dayOffset, hour: cell.hour)] = cell.activityCount
         }
         return result
+    }
+}
+
+/// Foot-of-Dashboard diagnostics panel (F-49 "自检状态页" deepening).
+/// Surfaces the data already carried in `HealthSnapshot` so users can
+/// answer "Is Pulse actually working?" without opening the menu bar.
+/// Highlights a prominent warning row if `isSilentlyFailing` triggers —
+/// the most actionable signal after permissions.
+struct DiagnosticsCard: View {
+
+    let snapshot: HealthSnapshot
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Diagnostics")
+                .font(.headline)
+
+            if snapshot.isSilentlyFailing {
+                Label("No writes in the last minute — Pulse may have lost permission or stopped.", systemImage: "exclamationmark.circle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+                    .padding(8)
+                    .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+            }
+
+            metricRow(label: "Last data point",
+                      value: snapshot.lastWriteAt.map { ago(from: $0, to: snapshot.capturedAt) } ?? "never")
+            metricRow(label: "Last rollup",
+                      value: mostRecentRollup.map { ago(from: $0, to: snapshot.capturedAt) } ?? "never")
+            metricRow(label: "Database size",
+                      value: snapshot.databaseFileSizeBytes.map {
+                          ByteCountFormatter.string(fromByteCount: $0, countStyle: .file)
+                      } ?? "unknown")
+            metricRow(label: "Total ingest batches",
+                      value: "\(snapshot.writer.totalFlushes)")
+
+            if let error = snapshot.writer.lastErrorDescription,
+               let errorAt = snapshot.writer.lastErrorAt {
+                Divider()
+                VStack(alignment: .leading, spacing: 2) {
+                    Label("Last writer error", systemImage: "exclamationmark.triangle")
+                        .font(.footnote.bold())
+                        .foregroundStyle(.orange)
+                    Text("\(ago(from: errorAt, to: snapshot.capturedAt)): \(error)")
+                        .font(.footnote.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .lineLimit(3)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    @ViewBuilder
+    private func metricRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.footnote)
+            Spacer()
+            Text(value)
+                .font(.footnote.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var mostRecentRollup: Date? {
+        [
+            snapshot.rollupStamps.rawToSecond,
+            snapshot.rollupStamps.secondToMinute,
+            snapshot.rollupStamps.minuteToHour,
+            snapshot.rollupStamps.foregroundAppToMin,
+            snapshot.rollupStamps.minAppToHour,
+            snapshot.rollupStamps.purgeExpired
+        ].compactMap { $0 }.max()
+    }
+
+    private func ago(from instant: Date, to now: Date) -> String {
+        let seconds = Int(now.timeIntervalSince(instant))
+        if seconds < 1 { return "just now" }
+        if seconds < 60 { return "\(seconds)s ago" }
+        if seconds < 3_600 { return "\(seconds / 60)m ago" }
+        return "\(seconds / 3_600)h ago"
     }
 }
 
