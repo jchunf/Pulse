@@ -162,6 +162,51 @@ struct AppUsageQueriesTests {
         #expect(summary.topApps.first?.bundleId == "com.apple.Safari")
     }
 
+    @Test("dailyTrend returns `days` points with zero-padding and oldest-first order")
+    func trendPadsAndOrders() async throws {
+        let (store, db) = try makeStore()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let endingAt = calendar.date(from: DateComponents(timeZone: calendar.timeZone, year: 2026, month: 1, day: 10, hour: 14))!
+        let endDay = calendar.startOfDay(for: endingAt)
+
+        // Activity only on today (10:00) and 3 days ago (22:00).
+        try insertHourSummary(into: db, hourStart: endDay.addingTimeInterval(10 * 3600), keys: 50, clicks: 20)
+        try insertHourSummary(into: db, hourStart: endDay.addingTimeInterval(-3 * 86_400 + 22 * 3600), keys: 5, clicks: 5)
+
+        let points = try store.dailyTrend(endingAt: endingAt, days: 7, calendar: calendar)
+        #expect(points.count == 7)
+
+        // Oldest → newest: index 0 = 6 days ago, index 6 = today.
+        for i in 0..<7 {
+            let expectedDay = calendar.date(byAdding: .day, value: i - 6, to: endDay)!
+            #expect(calendar.isDate(points[i].day, inSameDayAs: expectedDay))
+        }
+        // Total events per day.
+        #expect(points[0].totalEvents == 0)   // 6 days ago
+        #expect(points[3].totalEvents == 10)  // 3 days ago (22:00 = 5+5)
+        #expect(points[6].totalEvents == 70)  // today (10:00 = 50+20)
+    }
+
+    @Test("dailyTrend aggregates multiple hours into one day bucket")
+    func trendSumsHoursPerDay() async throws {
+        let (store, db) = try makeStore()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let endingAt = calendar.date(from: DateComponents(timeZone: calendar.timeZone, year: 2026, month: 1, day: 10, hour: 14))!
+        let endDay = calendar.startOfDay(for: endingAt)
+
+        try insertHourSummary(into: db, hourStart: endDay.addingTimeInterval(9 * 3600), keys: 10, clicks: 5)
+        try insertHourSummary(into: db, hourStart: endDay.addingTimeInterval(10 * 3600), keys: 20, clicks: 15)
+        try insertHourSummary(into: db, hourStart: endDay.addingTimeInterval(11 * 3600), keys: 30, clicks: 0)
+
+        let points = try store.dailyTrend(endingAt: endingAt, days: 3, calendar: calendar)
+        let today = points.last!
+        #expect(today.keyPresses == 60)
+        #expect(today.mouseClicks == 20)
+        #expect(today.totalEvents == 80)
+    }
+
     @Test("hourlyHeatmap maps ts_hour rows to dayOffset + hour cells")
     func heatmapMapsRows() async throws {
         let (store, db) = try makeStore()

@@ -242,15 +242,17 @@ final class DashboardModel: ObservableObject {
 
     @Published private(set) var summary: TodaySummary?
     @Published private(set) var heatmapCells: [HeatmapCell] = []
+    @Published private(set) var trendPoints: [DailyTrendPoint] = []
     @Published private(set) var lastRefreshAt: Date?
     @Published private(set) var errorMessage: String?
 
     private let store: EventStore?
     private var refreshTask: Task<Void, Never>?
 
-    /// Number of calendar days the week heatmap spans. Includes today as
-    /// the most recent day (`dayOffset == 0`).
+    /// Number of calendar days the week heatmap and trend chart span.
+    /// Today is always the most recent day.
     static let heatmapDays = 7
+    static let trendDays = 7
 
     init(store: EventStore?) {
         self.store = store
@@ -283,8 +285,10 @@ final class DashboardModel: ObservableObject {
         do {
             let summary = try store.todaySummary(start: dayStart, end: dayEnd, capUntil: now)
             let heatmap = try store.hourlyHeatmap(endingAt: now, days: Self.heatmapDays)
+            let trend = try store.dailyTrend(endingAt: now, days: Self.trendDays)
             self.summary = summary
             self.heatmapCells = heatmap
+            self.trendPoints = trend
             self.lastRefreshAt = now
             self.errorMessage = nil
         } catch {
@@ -354,6 +358,7 @@ struct DashboardView: View {
                 if let summary = model.summary {
                     MileageHeroCard(distanceMillimeters: summary.totalMouseDistanceMillimeters)
                     SummaryCardsView(summary: summary)
+                    WeekTrendChart(points: model.trendPoints)
                     WeekHourlyHeatmap(cells: model.heatmapCells, days: DashboardModel.heatmapDays)
                     AppRankingChart(rows: summary.topApps)
                 } else if model.errorMessage != nil {
@@ -510,6 +515,61 @@ struct SummaryCardsView: View {
         let hours = minutes / 60
         let remMinutes = minutes % 60
         return "\(hours)h \(remMinutes)m"
+    }
+}
+
+/// 7-day trend line (F-01, basic). Plots total intentional events
+/// (`keyPresses + mouseClicks`) per calendar day so the user can see
+/// whether today trends with or against their recent rhythm. Empty days
+/// render as a 0 point so the line stays continuous.
+struct WeekTrendChart: View {
+
+    let points: [DailyTrendPoint]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Weekly trend")
+                .font(.headline)
+            if points.allSatisfy({ $0.totalEvents == 0 }) {
+                Text("No rolled-up activity yet. Check back once hourly roll-ups have run.")
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 12)
+            } else {
+                Chart(points) { point in
+                    LineMark(
+                        x: .value("Day", point.day, unit: .day),
+                        y: .value("Events", point.totalEvents)
+                    )
+                    .interpolationMethod(.monotone)
+
+                    PointMark(
+                        x: .value("Day", point.day, unit: .day),
+                        y: .value("Events", point.totalEvents)
+                    )
+                    .symbolSize(40)
+                }
+                .chartYAxis {
+                    AxisMarks(position: .leading)
+                }
+                .chartXAxis {
+                    AxisMarks(values: .stride(by: .day)) { value in
+                        if let date = value.as(Date.self) {
+                            AxisValueLabel {
+                                Text(shortDay(date))
+                                    .font(.caption2)
+                            }
+                        }
+                    }
+                }
+                .frame(height: 160)
+            }
+        }
+    }
+
+    private func shortDay(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        return formatter.string(from: date)
     }
 }
 
