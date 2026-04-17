@@ -53,6 +53,7 @@ open Package.swift
 | 11 | [用户中心设计原则 UX Principles](docs/11-ux-principles.md) | 3 分钟哇、≤3 次点击、数据故事化、无障碍、可用性测试 |
 | B1 | [B1 进度 B1 Progress](docs/B1-PROGRESS.md) | 数据底子：SPM 骨架 + 协议 + V1 schema + CI |
 | B2 | [B2 进度 B2 Progress](docs/B2-PROGRESS.md) | 实时采集：runtime + writer + scheduler + HealthPanel |
+| B3 | [B3 进度 B3 Progress](docs/B3-PROGRESS.md) | 采集补完：距离累加 + idle-tick 钩子 + 系统事件 emitter |
 
 ---
 

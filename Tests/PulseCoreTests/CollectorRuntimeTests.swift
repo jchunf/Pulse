@@ -149,4 +149,46 @@ struct CollectorRuntimeTests {
         #expect(snap.pause.reason == .sensitivePeriod)
         #expect(snap.permissions.isAllRequiredGranted == true)
     }
+
+    @Test("idle-tick hook persists idleEntered into system_events")
+    func idleTickPersistsIdleEntered() async throws {
+        let (runtime, db, clock, _) = try makeRuntime()
+        await runtime.setRunningForTesting()
+        // Seed lastActivity with a keypress so the idle timer has a
+        // reference point, then jump past the 300s IdleDetector default.
+        await runtime.ingestForTesting(.keyPress(keyCode: nil, at: clock.now))
+        clock.advance(301)
+        await runtime.tickIdleForTesting(now: clock.now)
+        await runtime.flushForTesting()
+
+        let categories = try await db.queue.read { db in
+            try String.fetchAll(
+                db,
+                sql: "SELECT category FROM system_events WHERE category IN ('idle_entered','idle_exited') ORDER BY ts"
+            )
+        }
+        #expect(categories.contains("idle_entered"))
+    }
+
+    @Test("ingestExternalEvent routes through the same gates as primary source")
+    func externalIngestRespectsPause() async throws {
+        let (runtime, db, clock, _) = try makeRuntime()
+        await runtime.setRunningForTesting()
+        await runtime.pause(reason: .userPause, duration: 60)
+        await runtime.ingestExternalEvent(.systemSleep(at: clock.now))
+        await runtime.flushForTesting()
+        let sleepRows = try await db.queue.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM system_events WHERE category = 'sleep'") ?? -1
+        }
+        #expect(sleepRows == 0)
+
+        // Resume and ingest again — now it lands.
+        await runtime.resume()
+        await runtime.ingestExternalEvent(.systemSleep(at: clock.now))
+        await runtime.flushForTesting()
+        let afterResume = try await db.queue.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM system_events WHERE category = 'sleep'") ?? -1
+        }
+        #expect(afterResume == 1)
+    }
 }

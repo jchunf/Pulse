@@ -39,6 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let database: PulseDatabase?
     private let runtime: CollectorRuntime?
+    private let systemEventEmitter: SystemEventEmitter
+    private let appWatcher: NSWorkspaceAppWatcher
     private var pollTask: Task<Void, Never>?
 
     override init() {
@@ -62,6 +64,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.runtime = nil
         }
 
+        self.systemEventEmitter = SystemEventEmitter()
+        self.appWatcher = NSWorkspaceAppWatcher()
+
         self.healthModel = HealthModel(
             permissionService: permissions,
             errorMessage: dbResult.errorMessage
@@ -77,6 +82,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         pollTask?.cancel()
+        systemEventEmitter.stop()
+        appWatcher.stop()
         Task { [runtime] in await runtime?.stop() }
     }
 
@@ -88,7 +95,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             try await runtime.start()
         } catch {
             await MainActor.run { healthModel.recordStartupError(error) }
+            return
         }
+        // Start auxiliary sources and pipe them into the runtime.
+        let feed: @Sendable (DomainEvent) -> Void = { event in
+            Task.detached {
+                await runtime.ingestExternalEvent(event)
+            }
+        }
+        systemEventEmitter.start(handler: feed)
+        appWatcher.start(handler: feed)
     }
 
     private func startHealthPolling() {
