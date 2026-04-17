@@ -228,6 +228,28 @@ struct RollupSchedulerTests {
         }
     }
 
+    @Test("rollMinuteToHour promotes scroll_ticks into hour_summary")
+    func minuteToHourCarriesScrollTicks() throws {
+        let (scheduler, db, clock) = try makeScheduler()
+        let hourStart: Int64 = 1_700_000_000 - (1_700_000_000 % 3_600)
+        try db.queue.write { db in
+            try db.execute(sql: "INSERT INTO min_mouse (ts_minute, scroll_ticks) VALUES (?, 5)", arguments: [hourStart])
+            try db.execute(sql: "INSERT INTO min_mouse (ts_minute, scroll_ticks) VALUES (?, 7)", arguments: [hourStart + 60])
+        }
+
+        clock.advance(3_700)
+        try scheduler.runOnce(.minuteToHour, now: clock.now)
+
+        let row: (Int64, Int64)? = try db.queue.read { db in
+            guard let row = try Row.fetchOne(db, sql: "SELECT ts_hour, scroll_ticks FROM hour_summary") else {
+                return nil
+            }
+            return (row["ts_hour"] as Int64, row["scroll_ticks"] as Int64)
+        }
+        #expect(row?.0 == hourStart)
+        #expect(row?.1 == 12)
+    }
+
     @Test("idleEventsToMin attributes paired idle intervals to minute buckets")
     func idleEventsToMinBasic() throws {
         let (scheduler, db, clock) = try makeScheduler()

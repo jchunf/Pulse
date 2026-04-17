@@ -98,6 +98,20 @@ public extension EventStore {
                 WHERE ts_minute >= ? AND ts_minute < ?
                 """, arguments: [startSec, endSec]) ?? 0
 
+            // Scroll ticks — same L3 + L2 + L1 layering as mouse clicks.
+            let scrollsHour = try Int.fetchOne(db, sql: """
+                SELECT COALESCE(SUM(scroll_ticks), 0) FROM hour_summary
+                WHERE ts_hour >= ? AND ts_hour < ?
+                """, arguments: [startSec, endSec]) ?? 0
+            let scrollsMin = try Int.fetchOne(db, sql: """
+                SELECT COALESCE(SUM(scroll_ticks), 0) FROM min_mouse
+                WHERE ts_minute >= ? AND ts_minute < ?
+                """, arguments: [startSec, endSec]) ?? 0
+            let scrollsSec = try Int.fetchOne(db, sql: """
+                SELECT COALESCE(SUM(scroll_ticks), 0) FROM sec_mouse
+                WHERE ts_second >= ? AND ts_second < ?
+                """, arguments: [startSec, endSec]) ?? 0
+
             // App ranking — run the interval query then sum its result.
             let topApps = try Self.runAppUsageQuery(
                 db: db,
@@ -113,6 +127,7 @@ public extension EventStore {
                 totalMouseClicks: mouseClicksHour + mouseClicksMin + mouseClicksSec + rawClicks,
                 totalMouseMovesRaw: rawMoves,
                 totalMouseDistanceMillimeters: mouseDistanceHour + mouseDistanceMin + mouseDistanceSec,
+                totalScrollTicks: scrollsHour + scrollsMin + scrollsSec,
                 totalActiveSeconds: totalActiveSeconds,
                 totalIdleSeconds: idleHour + idleMin,
                 topApps: topApps
@@ -413,6 +428,7 @@ public struct TodaySummary: Sendable, Equatable {
     public let totalMouseClicks: Int
     public let totalMouseMovesRaw: Int
     public let totalMouseDistanceMillimeters: Double
+    public let totalScrollTicks: Int
     public let totalActiveSeconds: Int
     public let totalIdleSeconds: Int
     public let topApps: [AppUsageRow]
@@ -422,6 +438,7 @@ public struct TodaySummary: Sendable, Equatable {
         totalMouseClicks: Int,
         totalMouseMovesRaw: Int,
         totalMouseDistanceMillimeters: Double,
+        totalScrollTicks: Int,
         totalActiveSeconds: Int,
         totalIdleSeconds: Int,
         topApps: [AppUsageRow]
@@ -430,6 +447,7 @@ public struct TodaySummary: Sendable, Equatable {
         self.totalMouseClicks = totalMouseClicks
         self.totalMouseMovesRaw = totalMouseMovesRaw
         self.totalMouseDistanceMillimeters = totalMouseDistanceMillimeters
+        self.totalScrollTicks = totalScrollTicks
         self.totalActiveSeconds = totalActiveSeconds
         self.totalIdleSeconds = totalIdleSeconds
         self.topApps = topApps

@@ -776,6 +776,7 @@ struct SummaryCardsView: View {
         LazyVGrid(columns: columns, spacing: 12) {
             metric(title: "Distance", value: formatMeters(summary.totalMouseDistanceMillimeters))
             metric(title: "Clicks", value: format(summary.totalMouseClicks))
+            metric(title: "Scrolls", value: format(summary.totalScrollTicks))
             metric(title: "Keystrokes", value: format(summary.totalKeyPresses))
             metric(title: "Active time", value: formatDuration(summary.totalActiveSeconds))
             metric(title: "Idle time", value: formatDuration(summary.totalIdleSeconds))

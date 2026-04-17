@@ -34,6 +34,23 @@ struct EventWriterTests {
         #expect(postFlush.mouseMoves == 1)
     }
 
+    @Test("scroll events accumulate into sec_mouse.scroll_ticks on flush")
+    func scrollEventsAggregate() async throws {
+        let (writer, _, db) = try makeWriter()
+        let instant = Date(timeIntervalSince1970: 1_700_000_000)
+        // Three scroll events in the same second should yield one
+        // sec_mouse row with scroll_ticks == 3.
+        _ = await writer.enqueue(.mouseScroll(delta: 1.0, horizontal: false, at: instant))
+        _ = await writer.enqueue(.mouseScroll(delta: 1.0, horizontal: false, at: instant.addingTimeInterval(0.2)))
+        _ = await writer.enqueue(.mouseScroll(delta: 1.0, horizontal: true, at: instant.addingTimeInterval(0.5)))
+        await writer.flush()
+
+        let ticks: Int? = try await db.queue.read { db in
+            try Int.fetchOne(db, sql: "SELECT scroll_ticks FROM sec_mouse WHERE ts_second = ?", arguments: [Int64(instant.timeIntervalSince1970)])
+        }
+        #expect(ticks == 3)
+    }
+
     @Test("flush is a no-op when buffer is empty")
     func emptyFlush() async throws {
         let (writer, _, _) = try makeWriter()

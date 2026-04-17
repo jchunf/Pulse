@@ -37,6 +37,12 @@ public actor EventWriter {
     /// rows get distance_mm incremented atomically.
     private var distanceBuffer: [Int64: Double] = [:]
 
+    /// Per-second accumulator for scroll ticks. Same shape + flush rhythm
+    /// as `distanceBuffer`; drains into `sec_mouse.scroll_ticks` via an
+    /// INSERT … ON CONFLICT UPSERT so concurrent contributions to the
+    /// same second compose without clobbering the row.
+    private var scrollTickBuffer: [Int64: Int64] = [:]
+
     public init(
         store: EventStore,
         displayProvider: @escaping @Sendable () -> [DisplayInfo],
@@ -69,6 +75,7 @@ public actor EventWriter {
     /// batch of UPSERT operations against sec_mouse.
     public func flush() async {
         drainDistanceBuffer()
+        drainScrollTickBuffer()
         guard !pending.isEmpty else {
             stats = stats.recordingFlush(rows: 0, at: Date())
             lastFlushAt = Date()
@@ -108,11 +115,15 @@ public actor EventWriter {
             return .mouseMove(tsMillis: ts, displayId: point.displayId, xNorm: point.x, yNorm: point.y)
         case let .mouseClick(button, point, doubleClick, _):
             return .mouseClick(tsMillis: ts, displayId: point.displayId, xNorm: point.x, yNorm: point.y, button: button, isDouble: doubleClick)
-        case let .mouseScroll(delta, horizontal, _):
-            // Scroll events are recorded as system_events rather than a
-            // dedicated raw table in V1. Payload encodes "<axis>:<delta>".
-            // A dedicated raw_mouse_scroll table can arrive in a later
-            // schema version if we need finer-grained analytics.
+        case let .mouseScroll(delta, horizontal, at):
+            // Each scroll event also bumps the per-second scroll-tick
+            // accumulator so `sec_mouse.scroll_ticks` (V1) finally gets a
+            // producer. The primary record remains a `system_events` row
+            // for the payload ("h:<delta>" / "v:<delta>"); a dedicated
+            // `raw_mouse_scroll` table can still arrive if we ever need
+            // sub-second granularity. Flush batches the accumulator into
+            // UPSERTs below.
+            scrollTickBuffer[Int64(AggregationRules.secondBucket(for: at).timeIntervalSince1970), default: 0] += 1
             let axis = horizontal ? "h" : "v"
             return .systemEvent(tsMillis: ts, category: "mouse_scroll", payload: "\(axis):\(delta)")
         case let .keyPress(keyCode, _):
@@ -178,6 +189,15 @@ public actor EventWriter {
             pending.append(.secMouseDistanceDelta(tsSecond: tsSecond, mm: mm))
         }
         distanceBuffer.removeAll(keepingCapacity: true)
+    }
+
+    /// Same flush model as `drainDistanceBuffer` but for scroll ticks.
+    private func drainScrollTickBuffer() {
+        guard !scrollTickBuffer.isEmpty else { return }
+        for (tsSecond, ticks) in scrollTickBuffer {
+            pending.append(.secMouseScrollDelta(tsSecond: tsSecond, ticks: ticks))
+        }
+        scrollTickBuffer.removeAll(keepingCapacity: true)
     }
 
     // MARK: - Test hooks
