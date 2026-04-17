@@ -52,7 +52,7 @@ struct PulseApp: App {
         .windowResizability(.contentSize)
 
         Settings {
-            SettingsView()
+            SettingsView(goalsStore: appDelegate.goalsStore)
         }
     }
 }
@@ -98,6 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let dashboardModel: DashboardModel
     let briefingModel: DailyBriefingModel
     let anomalyMonitor: AnomalyMonitor
+    let goalsStore: GoalsStore
 
     /// Passthrough channel the MenuBarLabel listens on to open the
     /// briefing window. AppDelegate fires this on first-wake-of-day and
@@ -147,8 +148,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             permissionService: permissions,
             errorMessage: dbResult.errorMessage
         )
+        self.goalsStore = GoalsStore()
         self.dashboardModel = DashboardModel(
-            store: dbResult.database.map { EventStore(database: $0) }
+            store: dbResult.database.map { EventStore(database: $0) },
+            goalsStore: self.goalsStore
         )
         self.briefingModel = DailyBriefingModel(
             store: dbResult.database.map { EventStore(database: $0) }
@@ -446,11 +449,13 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var heatmapDays: Int = DashboardModel.defaultHeatmapDays
     @Published private(set) var trendPoints: [DailyTrendPoint] = []
     @Published private(set) var longestFocus: FocusSegment?
+    @Published private(set) var goalProgress: [GoalProgress] = []
     @Published private(set) var lastRefreshAt: Date?
     @Published private(set) var errorMessage: String?
     @Published private(set) var recentAchievement: LandmarkAchievement?
 
     private let store: EventStore?
+    private let goalsStore: GoalsStore
     private var refreshTask: Task<Void, Never>?
 
     /// Default heatmap window (in days). The user can override via the
@@ -460,8 +465,9 @@ final class DashboardModel: ObservableObject {
     /// Weekly trend chart span — fixed at 7 days for MVP; not user-tunable.
     static let trendDays = 7
 
-    init(store: EventStore?) {
+    init(store: EventStore?, goalsStore: GoalsStore = GoalsStore()) {
         self.store = store
+        self.goalsStore = goalsStore
     }
 
     /// Begin polling. Idempotent — calling twice is a no-op. Cadence is
@@ -513,11 +519,19 @@ final class DashboardModel: ObservableObject {
             let heatmap = try store.hourlyHeatmap(endingAt: now, days: days)
             let trend = try store.dailyTrend(endingAt: now, days: Self.trendDays)
             let focus = try store.longestFocusSegment(on: dayStart, now: now)
+            let switches = try store.appSwitchCount(on: dayStart, capUntil: now)
+            let progress = GoalEvaluator.evaluate(
+                goals: goalsStore.enabledGoals(),
+                summary: summary,
+                longestFocus: focus,
+                appSwitchesToday: switches
+            )
             self.summary = summary
             self.heatmapCells = heatmap
             self.heatmapDays = days
             self.trendPoints = trend
             self.longestFocus = focus
+            self.goalProgress = progress
             self.lastRefreshAt = now
             self.errorMessage = nil
             updateAchievementIfNeeded(
@@ -801,6 +815,9 @@ struct DashboardView: View {
                     )
                 }
                 if let summary = model.summary {
+                    if !model.goalProgress.isEmpty {
+                        GoalsCard(progress: model.goalProgress)
+                    }
                     MileageHeroCard(distanceMillimeters: summary.totalMouseDistanceMillimeters)
                     LandmarkProgressPanel(distanceMillimeters: summary.totalMouseDistanceMillimeters)
                     SummaryCardsView(summary: summary, trend: model.trendPoints)
@@ -1027,6 +1044,114 @@ struct MileageHeroCard: View {
 /// stable week to week (progress bars re-fill smoothly instead of
 /// re-ordering). The four picked span four orders of magnitude
 /// (1 km → 15 500 km) so every user sees movement on at least one bar.
+/// Top-of-Dashboard card that renders whichever preset goals the user
+/// has opted into from Settings. When nobody has opted in the parent
+/// hides this whole card — per review §2.3, users without intent see
+/// nothing, users with intent get a feedback loop.
+struct GoalsCard: View {
+
+    let progress: [GoalProgress]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Today I want to", bundle: .module)
+                .font(.headline)
+            VStack(spacing: 6) {
+                ForEach(progress) { row in
+                    GoalProgressRow(progress: row)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [Color.accentColor.opacity(0.14), Color.accentColor.opacity(0.04)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+struct GoalProgressRow: View {
+
+    let progress: GoalProgress
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(GoalPresetLocalizer.title(for: progress.definition), bundle: .module)
+                    .font(.footnote)
+                Spacer()
+                if progress.isAchieved {
+                    Label {
+                        Text("Achieved", bundle: .module)
+                    } icon: {
+                        Image(systemName: "checkmark.circle.fill")
+                    }
+                    .font(.caption.bold())
+                    .foregroundStyle(.green)
+                } else {
+                    Text(GoalPresetLocalizer.progressText(for: progress))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.accentColor.opacity(0.12))
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(progress.isAchieved ? Color.green : Color.accentColor)
+                        .frame(width: geo.size.width * CGFloat(progress.fractionTowardsTarget))
+                }
+            }
+            .frame(height: 6)
+        }
+    }
+}
+
+/// Translates a `GoalDefinition` into the presentation strings shown in
+/// the Dashboard card and the Settings toggle. Lives in the app layer
+/// so PulseCore stays locale-free.
+enum GoalPresetLocalizer {
+
+    static func title(for goal: GoalDefinition) -> LocalizedStringKey {
+        switch goal.id {
+        case "focus.active.3h":      return "goal.active.3h.title"
+        case "focus.longest.45m":    return "goal.longest.45m.title"
+        case "switches.under30":     return "goal.switches.under30.title"
+        case "keystrokes.5k":        return "goal.keystrokes.5k.title"
+        default:                     return LocalizedStringKey(goal.id)
+        }
+    }
+
+    static func subtitle(for goal: GoalDefinition) -> LocalizedStringKey {
+        switch goal.id {
+        case "focus.active.3h":      return "goal.active.3h.subtitle"
+        case "focus.longest.45m":    return "goal.longest.45m.subtitle"
+        case "switches.under30":     return "goal.switches.under30.subtitle"
+        case "keystrokes.5k":        return "goal.keystrokes.5k.subtitle"
+        default:                     return LocalizedStringKey("")
+        }
+    }
+
+    /// "1h 23m / 3h" style progress string, locale-aware. For "at most"
+    /// goals, flips to "12 / 30 (below threshold)" shape.
+    static func progressText(for progress: GoalProgress) -> String {
+        let actual = progress.actualValue
+        let target = progress.definition.target
+        switch progress.definition.metric {
+        case .activeSeconds, .longestFocusSeconds:
+            return "\(PulseFormat.duration(seconds: Int(actual))) / \(PulseFormat.duration(seconds: Int(target)))"
+        case .appSwitches, .keystrokes:
+            return "\(PulseFormat.integer(Int(actual))) / \(PulseFormat.integer(Int(target)))"
+        }
+    }
+}
+
 struct LandmarkProgressPanel: View {
 
     let distanceMillimeters: Double
@@ -1853,6 +1978,7 @@ struct SettingsView: View {
     private var refreshIntervalSeconds: Double = DashboardModel.defaultRefreshIntervalSeconds
     @AppStorage(PulsePreferenceKey.heatmapDays)
     private var heatmapDays: Int = DashboardModel.defaultHeatmapDays
+    @ObservedObject var goalsStore: GoalsStore
 
     var body: some View {
         Form {
@@ -1884,6 +2010,28 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             } header: {
                 Text("Dashboard", bundle: .module)
+            }
+
+            Section {
+                ForEach(GoalPresets.all) { preset in
+                    Toggle(isOn: Binding(
+                        get: { goalsStore.isEnabled(preset.id) },
+                        set: { goalsStore.setEnabled(preset.id, enabled: $0) }
+                    )) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(GoalPresetLocalizer.title(for: preset), bundle: .module)
+                            Text(GoalPresetLocalizer.subtitle(for: preset), bundle: .module)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } header: {
+                Text("Goals", bundle: .module)
+            } footer: {
+                Text("Toggled goals appear at the top of the Dashboard with a progress bar. Nothing here triggers notifications.", bundle: .module)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             Section {

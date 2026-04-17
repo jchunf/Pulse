@@ -2129,6 +2129,198 @@
           }
         }
       }
+    },
+    "Today I want to": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today I want to"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天我想"
+          }
+        }
+      }
+    },
+    "Goals": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Goals"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目标"
+          }
+        }
+      }
+    },
+    "Achieved": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Achieved"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已达成"
+          }
+        }
+      }
+    },
+    "Toggled goals appear at the top of the Dashboard with a progress bar. Nothing here triggers notifications.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toggled goals appear at the top of the Dashboard with a progress bar. Nothing here triggers notifications."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开启的目标会出现在仪表盘顶部，带进度条。这里的任何选项都不会发送通知。"
+          }
+        }
+      }
+    },
+    "goal.active.3h.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Focus for 3 hours"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "专注 3 小时"
+          }
+        }
+      }
+    },
+    "goal.active.3h.subtitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total active time today ≥ 3 hours"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日活跃时长 ≥ 3 小时"
+          }
+        }
+      }
+    },
+    "goal.longest.45m.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One 45-minute stretch"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "单次专注 ≥ 45 分钟"
+          }
+        }
+      }
+    },
+    "goal.longest.45m.subtitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Longest uninterrupted run ≥ 45 minutes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最长无中断片段 ≥ 45 分钟"
+          }
+        }
+      }
+    },
+    "goal.switches.under30.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fewer than 30 app switches"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用切换少于 30 次"
+          }
+        }
+      }
+    },
+    "goal.switches.under30.subtitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stay below 30 foreground-app switches today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日前台应用切换 ≤ 30 次"
+          }
+        }
+      }
+    },
+    "goal.keystrokes.5k.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5,000 keystrokes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "敲满 5,000 键"
+          }
+        }
+      }
+    },
+    "goal.keystrokes.5k.subtitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total keystrokes today ≥ 5,000"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日按键 ≥ 5,000 次"
+          }
+        }
+      }
     }
   }
 }
