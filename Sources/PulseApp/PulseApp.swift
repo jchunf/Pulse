@@ -41,6 +41,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let runtime: CollectorRuntime?
     private let systemEventEmitter: SystemEventEmitter
     private let appWatcher: NSWorkspaceAppWatcher
+    private let lidPowerObserver: LidPowerObserver
+    private let titleObserver: AccessibilityTitleObserver
     private var pollTask: Task<Void, Never>?
 
     override init() {
@@ -66,6 +68,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         self.systemEventEmitter = SystemEventEmitter()
         self.appWatcher = NSWorkspaceAppWatcher()
+        self.lidPowerObserver = LidPowerObserver()
+        self.titleObserver = AccessibilityTitleObserver()
 
         self.healthModel = HealthModel(
             permissionService: permissions,
@@ -84,6 +88,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pollTask?.cancel()
         systemEventEmitter.stop()
         appWatcher.stop()
+        lidPowerObserver.stop()
+        titleObserver.stop()
         Task { [runtime] in await runtime?.stop() }
     }
 
@@ -105,6 +111,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         systemEventEmitter.start(handler: feed)
         appWatcher.start(handler: feed)
+        lidPowerObserver.start(handler: feed)
+        titleObserver.start(handler: feed)
     }
 
     private func startHealthPolling() {

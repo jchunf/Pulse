@@ -30,7 +30,7 @@ public enum PulsePlatform {
     }
 
     /// Static build fingerprint useful for health diagnostics.
-    public static let buildFingerprint: String = "pulse-b3-collector-completion"
+    public static let buildFingerprint: String = "pulse-b4-platform-observers"
 }
 
 /// Fallback service used on unsupported platforms.
