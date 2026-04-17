@@ -179,7 +179,6 @@ public extension EventStore {
             )
         }
     }
-}
 
     // MARK: - Hourly heatmap
 
