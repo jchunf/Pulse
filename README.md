@@ -10,13 +10,16 @@ Pulse 是一个 **macOS 本地优先（local-first）** 的后台常驻应用，
 
 ## 这是什么阶段？
 
-**数据底子 B1–B8 + MVP 串通 A1–A15 均已落地**。仓库里现在能跑的东西：
+**B1–B8 数据底子 + A1–A23 MVP + 留存 / 叙事 / 目标 / 隐私自证全部落地**。`reviews/2026-04-17-product-direction.md` 列出的 v1.0 三大缺口（§2.1 留存钩子、§2.2 叙事引擎、§2.3 目标层）已经封口，§3.5 导出、§3.6 会话姿势、§3.7 隐私自审也陆续随附送交付。仓库里现在能跑的东西：
 
 - **采集 (B 段)** — CGEventTap 实时事件流 · 多显示器归一化坐标 · 距离累加 (F-07) · 系统事件 (sleep/wake/lock/lid/power) · AX 窗口标题哈希 · 每秒/每分/每小时 rollup · 前台 app 使用时长 + 切换计数 · idle 时间 · 滚轮计数 · 全保留 WAL SQLite。
 - **MVP 三件套 (A 段)** — 应用排行 (F-02) · 24h × N-day 热力图 (F-03, 3/7/14/30 天可调) · 鼠标里程戏剧 (F-07) + Landmark 里程碑横幅 (F-25)。
-- **其他 A 段** — 7 日趋势折线 (F-01) · 暂停控件 15/30/60 min (F-46) · 权限恢复助手 (菜单栏 + Dashboard 两处) · Settings 偏好 (刷新频率 + 热力图天数) · 运行健康诊断卡 (F-49) · 6 张 summary 卡 (距离/点击/滚轮/按键/活跃/空闲) · 应用显示名自动翻译。
+- **A 段其他 Dashboard / 菜单栏** — 7 日趋势折线 (F-01) · 暂停控件 15/30/60 min (F-46) · 权限恢复助手 (菜单栏 + Dashboard 两处) · Settings 偏好 (刷新频率 + 热力图天数) · 运行健康诊断卡 (F-49) · 6 张 summary 卡 (距离 / 点击 / 滚轮 / 按键 / 活跃 / 空闲) 带 sparkline + delta · 应用显示名自动翻译 · 多 Landmark 进度条 · 热力图渐变 + 峰值时段洞察。
+- **A 段留存与叙事（评审 §2）** — **A16** `NarrativeEngine` + 深度专注卡 · **A17** 多 landmark 进度 + summary sparkline / delta · **A18** 首次解锁时弹昨日简报（`NSWorkspace.didWakeNotification` + 当日 UserDefaults 门闩）· **A19 / A19b** 周一自动生成 HTML 周报 + 菜单栏异常红点 (±30% 偏离 7 日中位数)。
+- **A 段目标 / 导出 / 隐私（评审 §2.3 / §3.5 / §3.7 / §3.6）** — **A20** 目标 / 意图层 (4 预设 × atLeast/atMost，Dashboard 顶部进度条) · **A21** `ExportBundle` JSON 导出 (菜单栏一键落盘并高亮 Finder) · **A22** 「Show what Pulse has recorded」隐私自审窗 (Settings 入口，直读 SQLite 原始行 + 最近 1h 系统事件账本) · **A23** 今日会话节奏卡 (sessions / 中位数 / 平均 / 最长 + 「Deep-worker / Steady flow / Short-form / Checker」分档标签)。
+- **i18n** — String Catalog 跨 A / B 全面本地化，en + zh-Hans 双语随系统语言切换。
 
-路线 **B → A → C**：B 段数据管线与 A 段 MVP 可视化已完成；剩下的 A 段主要是 **分发与打包**（Developer ID 签名、notarization、Sparkle）——这些需要完整 Xcode 项目，超出了当前 SPM 工程范围。C 段长尾功能按 `docs/08-roadmap.md` 队列推进。
+路线 **B → A → C**：B 段数据管线 + A 段 MVP + 留存 / 叙事 / 目标 / 隐私自证均已完成；剩下的 A 段主要是 **分发与打包**（Developer ID 签名、notarization、Sparkle）——这些需要完整 Xcode 项目，超出了当前 SPM 工程范围。C 段长尾功能按 `docs/08-roadmap.md` 队列推进。
 
 各 slice 的详细交付 / 推迟清单见下方 `A*-PROGRESS.md` / `B*-PROGRESS.md` 链接。
 
@@ -78,6 +81,8 @@ open Package.swift
 早期 slice 每一个都写了 PROGRESS 文档；后续小步快跑节奏下，若改动本身已在 PR 描述 + commit message 里讲清，就直接合入 main 而不再新增 `Ai-PROGRESS.md`。完整列表（按合入顺序）：
 
 - A8 Dashboard 权限警告横幅 · A9 应用激活时刷新 · A10 Settings 面板 + 刷新频率偏好 · A11 诊断卡 (F-49) · A12 热力图天数可配置 · A13 里程碑成就横幅 (F-25) · A14 应用排行显示名解析 · A15 Dashboard idle 时长 · B6 idle rollup · B7 scroll rollup + V3 · B8 min_switches 填充
+- A16 `NarrativeEngine` + 深度专注卡 · A17 多 landmark 进度 / summary sparkline + delta / 热力图渐变 · A18 首次解锁时弹昨日简报 · A19 / A19b 每周一自动生成 HTML 周报 + 菜单栏异常红点 · A20 目标 / 意图层 · A21 JSON 数据导出 + Swift 6 并发告警清理 · A22 隐私自审窗口 · A23 今日节奏 / 会话姿势卡
+- i18n PR #31 引入 String Catalog；后续 A16–A23 每个 PR 顺带补充双语 key
 - 一次修复：`todaySummary` 分层查询漏掉 `hour_summary` 层导致跨小时数据被丢
 
 ---
