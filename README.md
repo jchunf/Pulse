@@ -42,6 +42,26 @@ open Package.swift
 
 其他常用命令见 `Makefile`（`make help`）。
 
+## 在自己的 Mac 上跑（无需 Apple Developer 账号）
+
+`swift run PulseApp` 出来的是裸二进制，没有 `Info.plist` / bundle ID，macOS 不会给它授予 Input Monitoring / Accessibility 权限，采集管线形同虚设。要真正验证功能，用本仓库的打包脚本生成一个 **ad-hoc 签名的 `.app` bundle**：
+
+```bash
+make app          # dist/Pulse.app (native arch)
+make run          # 上一步 + 直接 open
+```
+
+首次打开时：
+
+1. Finder 里 **右键 Pulse.app → 打开 → 打开** 一次（绕过 Gatekeeper 的"无法验证"提示，后续双击即可）。  
+   或者 `xattr -dr com.apple.quarantine dist/Pulse.app` 一键清除检疫属性。
+2. 菜单栏出现 Pulse 图标。打开 Dashboard 后，权限横幅 (A8) 会深链到系统设置；依次给 **Input Monitoring** 和 **Accessibility** 勾选。
+3. 授权 Input Monitoring 后 macOS 会重启 Pulse，正常现象。
+
+> **注意**：ad-hoc 签名没有稳定的 Team ID；如果你重新 `make app` 且 Gatekeeper 认为 codesign identity 变了，可能需要再授权一次权限。正式 Developer ID 签名后就会稳定下来（见 `docs/07-distribution.md`，仍是 v1.0 blocker）。
+
+完整的 v1.0 回归清单见 [`docs/V1-REGRESSION.md`](docs/V1-REGRESSION.md)。
+
 ---
 
 ## 文档索引
