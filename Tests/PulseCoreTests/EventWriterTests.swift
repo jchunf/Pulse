@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import GRDB
 @testable import PulseCore
 import PulseTestSupport
 
@@ -95,6 +96,24 @@ struct EventWriterTests {
             try String.fetchOne(db, sql: "SELECT payload FROM system_events WHERE category = 'power' LIMIT 1")
         }
         #expect(powerPayload == "battery:80")
+    }
+
+    @Test("scroll events are recorded as system events with axis+delta payload")
+    func scrollEventsPersist() async throws {
+        let (writer, _, db) = try makeWriter()
+        let now = Date(timeIntervalSince1970: 4_000)
+        _ = await writer.enqueue(.mouseScroll(delta: 3.5, horizontal: false, at: now))
+        _ = await writer.enqueue(.mouseScroll(delta: -1.0, horizontal: true, at: now))
+        await writer.flush()
+        let rows = try db.queue.read { db in
+            try Row.fetchAll(
+                db,
+                sql: "SELECT category, payload FROM system_events WHERE category = 'mouse_scroll' ORDER BY rowid"
+            )
+        }
+        #expect(rows.count == 2)
+        #expect((rows[0][1] as? String) == "v:3.5")
+        #expect((rows[1][1] as? String) == "h:-1.0")
     }
 
     @Test("display config change fans out one snapshot row per display")
