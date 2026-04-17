@@ -48,6 +48,23 @@ struct AppUsageQueriesTests {
         }
     }
 
+    private func insertHourSummary(
+        into db: PulseDatabase,
+        hourStart: Date,
+        keys: Int,
+        clicks: Int
+    ) throws {
+        try db.queue.write { db in
+            try db.execute(
+                sql: """
+                INSERT INTO hour_summary (ts_hour, key_press_total, mouse_distance_mm, mouse_click_total, idle_seconds)
+                VALUES (?, ?, 0.0, ?, 0)
+                """,
+                arguments: [Int64(hourStart.timeIntervalSince1970), keys, clicks]
+            )
+        }
+    }
+
     @Test("appUsageRanking computes intervals between switches")
     func basicRanking() async throws {
         let (store, db) = try makeStore()
@@ -169,12 +186,7 @@ struct AppUsageQueriesTests {
             (today11, 10, 3),
             (yesterday22, 2, 3)
         ] {
-            try db.queue.write { db in
-                try db.execute(sql: """
-                    INSERT INTO hour_summary (ts_hour, key_press_total, mouse_distance_mm, mouse_click_total, idle_seconds)
-                    VALUES (?, ?, 0.0, ?, 0)
-                    """, arguments: [Int64(date.timeIntervalSince1970), keys, clicks])
-            }
+            try insertHourSummary(into: db, hourStart: date, keys: keys, clicks: clicks)
         }
 
         let cells = try store.hourlyHeatmap(endingAt: endingAt, days: 7, calendar: calendar)
@@ -197,12 +209,7 @@ struct AppUsageQueriesTests {
         let endingAt = calendar.date(from: DateComponents(timeZone: calendar.timeZone, year: 2026, month: 1, day: 10, hour: 23))!
         let hourStart = calendar.startOfDay(for: endingAt).addingTimeInterval(3 * 3600)
 
-        try db.queue.write { db in
-            try db.execute(sql: """
-                INSERT INTO hour_summary (ts_hour, key_press_total, mouse_distance_mm, mouse_click_total, idle_seconds)
-                VALUES (?, 0, 0.0, 0, 0)
-                """, arguments: [Int64(hourStart.timeIntervalSince1970)])
-        }
+        try insertHourSummary(into: db, hourStart: hourStart, keys: 0, clicks: 0)
         let cells = try store.hourlyHeatmap(endingAt: endingAt, days: 2, calendar: calendar)
         #expect(cells.isEmpty)
     }
@@ -217,12 +224,7 @@ struct AppUsageQueriesTests {
 
         // 10 days ago — outside any reasonable window.
         let outside = endDay.addingTimeInterval(-10 * 86_400 + 12 * 3600)
-        try db.queue.write { db in
-            try db.execute(sql: """
-                INSERT INTO hour_summary (ts_hour, key_press_total, mouse_distance_mm, mouse_click_total, idle_seconds)
-                VALUES (?, 100, 0.0, 50, 0)
-                """, arguments: [Int64(outside.timeIntervalSince1970)])
-        }
+        try insertHourSummary(into: db, hourStart: outside, keys: 100, clicks: 50)
         let cells = try store.hourlyHeatmap(endingAt: endingAt, days: 7, calendar: calendar)
         #expect(cells.isEmpty)
     }
