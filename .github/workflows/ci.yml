@@ -54,13 +54,13 @@ jobs:
             spm-${{ matrix.runner }}-
 
       - name: Resolve packages
-        run: swift package resolve
+        run: swift package resolve 2>&1 | tee resolve.log
 
       - name: Build (all targets)
-        run: swift build --build-tests
+        run: swift build --build-tests 2>&1 | tee build.log
 
       - name: Test (with coverage)
-        run: swift test --parallel --enable-code-coverage 2>&1 | tee test-output.log
+        run: swift test --parallel --enable-code-coverage 2>&1 | tee test.log
 
       - name: Generate coverage report
         id: coverage
@@ -108,6 +108,55 @@ jobs:
           name: coverage-${{ matrix.runner }}
           path: coverage.txt
           if-no-files-found: ignore
+
+      - name: Upload build / test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.runner }}
+          path: |
+            resolve.log
+            build.log
+            test.log
+          if-no-files-found: ignore
+
+      - name: Post failure summary as PR comment
+        # Self-debugging hook: when a PR build fails, paste the relevant
+        # log excerpts back into the PR conversation. This is what allows
+        # the agent to read what went wrong without GitHub auth/log access.
+        # See docs/WORKFLOW.md for the full PR loop.
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "## CI failure on \`${{ matrix.runner }}\`"
+            echo ""
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo ""
+            for log in resolve.log build.log test.log; do
+              if [ -s "$log" ]; then
+                echo "### \`$log\` — last 120 lines"
+                echo ""
+                echo '```'
+                tail -120 "$log"
+                echo '```'
+                echo ""
+                ERR_LINES=$(grep -nE 'error:|warning:|FAIL|Process completed with exit code' "$log" | tail -40 || true)
+                if [ -n "$ERR_LINES" ]; then
+                  echo "### \`$log\` — error / warning lines"
+                  echo ""
+                  echo '```'
+                  echo "$ERR_LINES"
+                  echo '```'
+                  echo ""
+                fi
+              fi
+            done
+          } > /tmp/comment.md
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body-file /tmp/comment.md \
+            --repo ${{ github.repository }}
 
   # ---------------------------------------------------------------------------
   # Lightweight lint pass — fast, independent, runs on every PR.
