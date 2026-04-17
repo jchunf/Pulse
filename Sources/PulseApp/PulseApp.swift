@@ -270,6 +270,7 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var trendPoints: [DailyTrendPoint] = []
     @Published private(set) var lastRefreshAt: Date?
     @Published private(set) var errorMessage: String?
+    @Published private(set) var recentAchievement: LandmarkAchievement?
 
     private let store: EventStore?
     private var refreshTask: Task<Void, Never>?
@@ -339,10 +340,80 @@ final class DashboardModel: ObservableObject {
             self.trendPoints = trend
             self.lastRefreshAt = now
             self.errorMessage = nil
+            updateAchievementIfNeeded(
+                distanceMillimeters: summary.totalMouseDistanceMillimeters,
+                now: now
+            )
         } catch {
             self.errorMessage = "Failed to load summary: \(error.localizedDescription)"
         }
     }
+
+    // MARK: - Milestone achievements (F-25)
+
+    /// Day-keyed storage of the highest landmark index the user has
+    /// acknowledged today. Comparing `currentIndex > storedIndex` is what
+    /// drives the one-shot achievement banner.
+    private static let achievementDayKey = "pulse.achievement.day"
+    private static let achievementLandmarkIndexKey = "pulse.achievement.landmarkIndex"
+
+    private func updateAchievementIfNeeded(distanceMillimeters: Double, now: Date) {
+        let meters = distanceMillimeters / 1_000.0
+        let dayKey = Self.achievementDayString(for: now)
+        let storedDay = UserDefaults.standard.string(forKey: Self.achievementDayKey)
+        var storedIndex: Int
+        if storedDay != dayKey {
+            UserDefaults.standard.set(dayKey, forKey: Self.achievementDayKey)
+            UserDefaults.standard.set(-1, forKey: Self.achievementLandmarkIndexKey)
+            storedIndex = -1
+            // New day — clear any stale achievement from yesterday.
+            recentAchievement = nil
+        } else if UserDefaults.standard.object(forKey: Self.achievementLandmarkIndexKey) == nil {
+            storedIndex = -1
+        } else {
+            storedIndex = UserDefaults.standard.integer(forKey: Self.achievementLandmarkIndexKey)
+        }
+
+        let landmarks = LandmarkLibrary.standard.landmarks
+        let currentIndex = landmarks.lastIndex(where: { $0.distanceMeters <= meters }) ?? -1
+        guard currentIndex > storedIndex, currentIndex >= 0 else { return }
+        let landmark = landmarks[currentIndex]
+        recentAchievement = LandmarkAchievement(
+            landmark: landmark,
+            metersReached: meters,
+            firstReachedAt: now
+        )
+    }
+
+    /// Acknowledge the current achievement so it doesn't re-appear on the
+    /// next refresh tick. Moves the stored index up to include the
+    /// landmark the banner showed; subsequent (higher) landmarks still
+    /// trigger their own banner.
+    func dismissAchievement() {
+        guard let achievement = recentAchievement else { return }
+        let landmarks = LandmarkLibrary.standard.landmarks
+        if let idx = landmarks.firstIndex(where: { $0.key == achievement.landmark.key }) {
+            UserDefaults.standard.set(idx, forKey: Self.achievementLandmarkIndexKey)
+        }
+        recentAchievement = nil
+    }
+
+    private static func achievementDayString(for date: Date) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone.current
+        let comps = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", comps.year ?? 0, comps.month ?? 0, comps.day ?? 0)
+    }
+}
+
+/// One-shot achievement payload for the Dashboard's milestone banner.
+/// `metersReached` is the raw distance at the time the landmark was
+/// crossed so the banner shows the actual headline number, not the
+/// landmark's canonical distance.
+struct LandmarkAchievement: Equatable {
+    let landmark: Landmark
+    let metersReached: Double
+    let firstReachedAt: Date
 }
 
 // MARK: - Views
@@ -467,6 +538,12 @@ struct DashboardView: View {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 DashboardPermissionBanner(permissions: healthModel.snapshot.permissions)
+                if let achievement = model.recentAchievement {
+                    MilestoneAchievementBanner(
+                        achievement: achievement,
+                        onDismiss: { model.dismissAchievement() }
+                    )
+                }
                 if let summary = model.summary {
                     MileageHeroCard(distanceMillimeters: summary.totalMouseDistanceMillimeters)
                     SummaryCardsView(summary: summary)
@@ -575,6 +652,57 @@ struct DashboardPermissionBanner: View {
                     .strokeBorder(Color.orange.opacity(0.35), lineWidth: 1)
             )
         }
+    }
+}
+
+/// One-shot celebration banner that fires when today's cursor distance
+/// crosses a new `LandmarkLibrary` landmark for the first time (F-25
+/// "里程碑彩蛋"). Persistence of the highest-acknowledged landmark for
+/// the day lives in `DashboardModel`; this view is pure presentation.
+struct MilestoneAchievementBanner: View {
+
+    let achievement: LandmarkAchievement
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "sparkles")
+                .font(.title2)
+                .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Milestone reached")
+                    .font(.caption.bold())
+                    .foregroundStyle(Color.accentColor)
+                    .textCase(.uppercase)
+                Text("Today's mileage just hit \(achievement.landmark.displayName) — \(achievement.landmark.distanceMeters.formatted(.number.precision(.fractionLength(0)))) m.")
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("You've moved \(String(format: "%.0f", achievement.metersReached)) m so far today.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.footnote.bold())
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.borderless)
+            .help("Dismiss")
+        }
+        .padding(14)
+        .background(
+            LinearGradient(
+                colors: [Color.accentColor.opacity(0.22), Color.accentColor.opacity(0.08)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
+        )
     }
 }
 
