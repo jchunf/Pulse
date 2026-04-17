@@ -1,0 +1,70 @@
+name: Tag and Release
+
+# Manually-triggered workflow that creates a Git tag from inside CI.
+# Exists so the maintainer can cut a release without needing a local
+# git environment with push-tag credentials — clicking "Run workflow"
+# from the GitHub Actions UI in any browser is enough.
+#
+# Once this workflow finishes, the existing `package.yml` workflow
+# fires automatically on the new `v*` tag push, builds the universal
+# `.app`, zips it, and attaches the zip + sha256 to a GitHub
+# pre-Release with auto-generated PR notes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name to create (e.g. v1.0.0-rc1)'
+        required: true
+        type: string
+      message:
+        description: 'Annotated tag message (defaults to "Pulse <tag>")'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    name: Create tag on main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate tag shape
+        run: |
+          tag="${{ inputs.tag }}"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]]; then
+            echo "::error::tag '$tag' must match v<MAJOR>.<MINOR>.<PATCH>[-PRE], e.g. v1.0.0-rc1" >&2
+            exit 1
+          fi
+
+      - name: Reject duplicate tag
+        run: |
+          tag="${{ inputs.tag }}"
+          if git rev-parse "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "::error::tag '$tag' already exists on main; pick a new one" >&2
+            exit 1
+          fi
+
+      - name: Configure git identity
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create + push annotated tag
+        run: |
+          tag="${{ inputs.tag }}"
+          msg="${{ inputs.message }}"
+          if [[ -z "$msg" ]]; then
+            msg="Pulse $tag"
+          fi
+          git tag -a "$tag" -m "$msg"
+          git push origin "$tag"
+          echo "::notice::pushed $tag — package workflow will now build + publish the release"
