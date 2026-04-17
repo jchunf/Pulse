@@ -58,16 +58,17 @@ struct UsagePostureTests {
             timeZone: calendar.timeZone, year: 2026, month: 4, day: 17
         ))!
         let dayMs = Int64(day.timeIntervalSince1970 * 1_000)
-        let now = calendar.date(byAdding: .hour, value: 12, to: day)!
+        // now == 0:40 ends C's interval precisely; with no `D` sentinel
+        // the tail after C exactly matches the last transition.
+        let now = Date(timeIntervalSince1970: TimeInterval((dayMs + 2_400_000) / 1_000))
 
-        // app A from minute 0 → 0:05 (300s, kept)
-        // app B from 0:05 → 0:05:30 (30s, dropped)
+        // app A from 0:00 → 0:05 (300s, kept)
+        // app B from 0:05 → 0:05:30 (30s, dropped — below minSessionSeconds)
         // app C from 0:05:30 → 0:40 (2070s, kept)
         try insertForeground(into: db, events: [
             (tsMs: dayMs, bundle: "A"),
             (tsMs: dayMs + 300_000, bundle: "B"),
-            (tsMs: dayMs + 330_000, bundle: "C"),
-            (tsMs: dayMs + 2_400_000, bundle: "D") // sentinel close
+            (tsMs: dayMs + 330_000, bundle: "C")
         ])
 
         let posture = try store.sessionPosture(
