@@ -129,13 +129,20 @@ public extension EventStore {
         }
     }
 
-    /// Builds app-usage rows by deriving intervals from foreground_app
-    /// system_events. Uses LEAD() to compute each interval's end as the
-    /// next switch, falling back to `capMs` for the latest switch.
+    /// Computes app-usage seconds per bundle over `[startMs, endMs)` by
+    /// layering the three non-overlapping sources populated by the B5
+    /// rollup pipeline:
     ///
-    /// Cross-day continuity (an app active before `start`): if the latest
-    /// switch before `start` is not nil, prepend a synthetic switch at
-    /// `start` for that bundle so its share of the queried range counts.
+    /// - `hour_app` for fully-rolled hours (L3).
+    /// - `min_app` for rolled minutes in the currently-open hour (L2).
+    /// - `system_events` (LEAD over raw switches) for the portion beyond
+    ///   the `foreground_app_to_min` watermark, capped at `capMs`.
+    ///
+    /// The rolled sources are deleted at each promotion step, so UNIONing
+    /// all three over the same range never double-counts. When no rollup
+    /// has run yet (fresh install) the watermark is 0 and the whole
+    /// window resolves to the LEAD-based raw path — which still honours
+    /// cross-range continuity via `priorBundle` before the range start.
     static func runAppUsageQuery(
         db: Database,
         startMs: Int64,
@@ -143,15 +150,73 @@ public extension EventStore {
         capMs: Int64,
         limit: Int
     ) throws -> [AppUsageRow] {
-        // Find the bundle active just before the queried range, if any.
+        let effectiveCapMs = min(capMs, endMs)
+
+        let watermarkMs = try Int64.fetchOne(
+            db,
+            sql: "SELECT last_processed_ms FROM rollup_watermarks WHERE job = 'foreground_app_to_min'"
+        ) ?? 0
+
+        var byBundle: [String: Int64] = [:]
+
+        // Rolled portion: [startMs, min(watermarkMs, endMs)).
+        let rolledEndMs = min(watermarkMs, endMs)
+        if rolledEndMs > startMs {
+            let startSec = startMs / 1_000
+            let rolledEndSec = rolledEndMs / 1_000
+            for row in try Row.fetchAll(db, sql: """
+                SELECT bundle_id, COALESCE(SUM(seconds_used), 0) AS seconds_used FROM hour_app
+                WHERE ts_hour >= ? AND ts_hour < ?
+                GROUP BY bundle_id
+                """, arguments: [startSec, rolledEndSec]) {
+                byBundle[row["bundle_id"], default: 0] += row["seconds_used"] as Int64
+            }
+            for row in try Row.fetchAll(db, sql: """
+                SELECT bundle_id, COALESCE(SUM(seconds_used), 0) AS seconds_used FROM min_app
+                WHERE ts_minute >= ? AND ts_minute < ?
+                GROUP BY bundle_id
+                """, arguments: [startSec, rolledEndSec]) {
+                byBundle[row["bundle_id"], default: 0] += row["seconds_used"] as Int64
+            }
+        }
+
+        // Raw portion: [max(startMs, watermarkMs), effectiveCapMs).
+        let rawStartMs = max(startMs, watermarkMs)
+        if rawStartMs < effectiveCapMs {
+            for (bundle, seconds) in try rawPortionSeconds(
+                db: db,
+                startMs: rawStartMs,
+                endMs: endMs,
+                capMs: effectiveCapMs
+            ) {
+                byBundle[bundle, default: 0] += seconds
+            }
+        }
+
+        return byBundle
+            .filter { $0.value > 0 }
+            .sorted { $0.value > $1.value }
+            .prefix(limit)
+            .map { AppUsageRow(bundleId: $0.key, secondsUsed: Int($0.value)) }
+    }
+
+    /// LEAD-over-`system_events` computation for the portion of the range
+    /// that hasn't yet been rolled into `min_app`. Extracted so the rolled
+    /// path above can call it cleanly. A synthetic leading switch at
+    /// `startMs` carries whichever bundle was active just before the
+    /// range, so cross-boundary continuity is preserved.
+    private static func rawPortionSeconds(
+        db: Database,
+        startMs: Int64,
+        endMs: Int64,
+        capMs: Int64
+    ) throws -> [String: Int64] {
         let priorBundle = try String.fetchOne(db, sql: """
             SELECT payload FROM system_events
             WHERE category = 'foreground_app' AND ts < ?
             ORDER BY ts DESC LIMIT 1
             """, arguments: [startMs])
 
-        // Build the SELECT carrying all switches in range. If we have a
-        // prior bundle, prepend a synthetic switch at exactly `start`.
         let preamble: String
         var arguments: [(any DatabaseValueConvertible)?]
         if let priorBundle {
@@ -186,18 +251,17 @@ public extension EventStore {
             FROM ordered
             GROUP BY bundle_id
             HAVING seconds_used > 0
-            ORDER BY seconds_used DESC
-            LIMIT ?
             """
-
-        let tail: [(any DatabaseValueConvertible)?] = [capMs, capMs, limit]
+        let tail: [(any DatabaseValueConvertible)?] = [capMs, capMs]
         arguments.append(contentsOf: tail)
-        return try Row.fetchAll(db, sql: sql, arguments: StatementArguments(arguments)).map { row in
-            AppUsageRow(
-                bundleId: row["bundle_id"],
-                secondsUsed: row["seconds_used"]
-            )
+
+        var result: [String: Int64] = [:]
+        for row in try Row.fetchAll(db, sql: sql, arguments: StatementArguments(arguments)) {
+            let bundle: String = row["bundle_id"]
+            let seconds: Int64 = row["seconds_used"]
+            result[bundle] = seconds
         }
+        return result
     }
 
     // MARK: - Daily trend

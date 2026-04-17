@@ -107,6 +107,47 @@ struct AppUsageQueriesTests {
         }
     }
 
+    private func setAppWatermark(into db: PulseDatabase, at instant: Date) throws {
+        try db.queue.write { db in
+            try db.execute(
+                sql: """
+                INSERT INTO rollup_watermarks (job, last_processed_ms)
+                VALUES ('foreground_app_to_min', ?)
+                ON CONFLICT(job) DO UPDATE SET last_processed_ms = excluded.last_processed_ms
+                """,
+                arguments: [Int64(instant.timeIntervalSince1970 * 1_000)]
+            )
+        }
+    }
+
+    private func insertMinApp(
+        into db: PulseDatabase,
+        minute: Date,
+        bundle: String,
+        seconds: Int64
+    ) throws {
+        try db.queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO min_app (ts_minute, bundle_id, seconds_used) VALUES (?, ?, ?)",
+                arguments: [Int64(minute.timeIntervalSince1970), bundle, seconds]
+            )
+        }
+    }
+
+    private func insertHourApp(
+        into db: PulseDatabase,
+        hour: Date,
+        bundle: String,
+        seconds: Int64
+    ) throws {
+        try db.queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO hour_app (ts_hour, bundle_id, seconds_used) VALUES (?, ?, ?)",
+                arguments: [Int64(hour.timeIntervalSince1970), bundle, seconds]
+            )
+        }
+    }
+
     @Test("appUsageRanking computes intervals between switches")
     func basicRanking() async throws {
         let (store, db) = try makeStore()
@@ -365,6 +406,104 @@ struct AppUsageQueriesTests {
         // Distance: 50_000 + 40_000 (hour) + 1_500 (min) + 1_000 (sec: 10×100) = 92_500 mm.
         let expectedDistance: Double = 92_500
         #expect(summary.totalMouseDistanceMillimeters == expectedDistance)
+    }
+
+    // MARK: - Layered app-usage ranking (A7)
+
+    @Test("appUsageRanking reads min_app rows for the rolled portion of the range")
+    func rankingReadsMinApp() async throws {
+        let (store, db) = try makeStore()
+        let day = Date(timeIntervalSince1970: 1_700_000_000)
+        try insertMinApp(into: db, minute: day, bundle: "com.apple.Safari", seconds: 40)
+        try insertMinApp(into: db, minute: day.addingTimeInterval(60), bundle: "com.apple.Safari", seconds: 60)
+        try insertMinApp(into: db, minute: day.addingTimeInterval(120), bundle: "com.apple.dt.Xcode", seconds: 50)
+        let watermark = day.addingTimeInterval(600)
+        try setAppWatermark(into: db, at: watermark)
+
+        let rows = try store.appUsageRanking(
+            start: day,
+            end: day.addingTimeInterval(3_600),
+            capUntil: watermark,
+            limit: 10
+        )
+        #expect(rows.count == 2)
+        #expect(rows.first?.bundleId == "com.apple.Safari")
+        #expect(rows.first?.secondsUsed == 100)
+        #expect(rows.last?.bundleId == "com.apple.dt.Xcode")
+        #expect(rows.last?.secondsUsed == 50)
+    }
+
+    @Test("appUsageRanking reads hour_app rows for fully-rolled hours")
+    func rankingReadsHourApp() async throws {
+        let (store, db) = try makeStore()
+        let hour = Date(timeIntervalSince1970: 1_700_000_000)
+        try insertHourApp(into: db, hour: hour, bundle: "com.apple.Safari", seconds: 1_800)
+        try insertHourApp(into: db, hour: hour, bundle: "com.apple.dt.Xcode", seconds: 1_200)
+        let watermark = hour.addingTimeInterval(3_600)
+        try setAppWatermark(into: db, at: watermark)
+
+        let rows = try store.appUsageRanking(
+            start: hour,
+            end: hour.addingTimeInterval(7_200),
+            capUntil: watermark,
+            limit: 10
+        )
+        #expect(rows.map(\.bundleId) == ["com.apple.Safari", "com.apple.dt.Xcode"])
+        #expect(rows.first?.secondsUsed == 1_800)
+        #expect(rows.last?.secondsUsed == 1_200)
+    }
+
+    @Test("appUsageRanking ignores system_events that sit below the watermark")
+    func rankingAvoidsDoubleCountBelowWatermark() async throws {
+        let (store, db) = try makeStore()
+        let day = Date(timeIntervalSince1970: 1_700_000_000)
+        // Raw switches that, if LEAD'd, would give Safari 100 seconds.
+        try insertSwitch(into: db, ts: day, bundle: "com.apple.Safari")
+        try insertSwitch(into: db, ts: day.addingTimeInterval(100), bundle: "com.apple.dt.Xcode")
+        // And the same data rolled into min_app, at 40 seconds of Safari.
+        try insertMinApp(into: db, minute: day, bundle: "com.apple.Safari", seconds: 40)
+        // Watermark claims the whole range is rolled.
+        let watermark = day.addingTimeInterval(200)
+        try setAppWatermark(into: db, at: watermark)
+
+        let rows = try store.appUsageRanking(
+            start: day,
+            end: day.addingTimeInterval(3_600),
+            capUntil: watermark,
+            limit: 10
+        )
+        // Only the rolled min_app value should count; the raw LEAD is skipped.
+        #expect(rows.count == 1)
+        #expect(rows.first?.bundleId == "com.apple.Safari")
+        #expect(rows.first?.secondsUsed == 40)
+    }
+
+    @Test("appUsageRanking unions rolled + post-watermark raw contributions")
+    func rankingLayersRolledAndRaw() async throws {
+        let (store, db) = try makeStore()
+        let day = Date(timeIntervalSince1970: 1_700_000_000)
+        // Rolled: 600s of Safari in hour_app.
+        let priorHour = day.addingTimeInterval(-3_600)
+        try insertHourApp(into: db, hour: priorHour, bundle: "com.apple.Safari", seconds: 600)
+        // Rolled: 30s of Xcode in min_app at `day`.
+        try insertMinApp(into: db, minute: day, bundle: "com.apple.dt.Xcode", seconds: 30)
+        // Watermark sits 60 seconds after `day`.
+        let watermark = day.addingTimeInterval(60)
+        try setAppWatermark(into: db, at: watermark)
+        // Raw post-watermark: Safari activates at the watermark and runs 30 seconds.
+        try insertSwitch(into: db, ts: watermark, bundle: "com.apple.Safari")
+        let cap = watermark.addingTimeInterval(30)
+
+        let rows = try store.appUsageRanking(
+            start: priorHour,
+            end: day.addingTimeInterval(3_600),
+            capUntil: cap,
+            limit: 10
+        )
+        let safariSeconds = rows.first(where: { $0.bundleId == "com.apple.Safari" })?.secondsUsed
+        let xcodeSeconds = rows.first(where: { $0.bundleId == "com.apple.dt.Xcode" })?.secondsUsed
+        #expect(safariSeconds == 630)  // 600 from hour_app + 30 raw
+        #expect(xcodeSeconds == 30)    // from min_app only
     }
 
     @Test("queries handle an empty database")
