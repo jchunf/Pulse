@@ -33,7 +33,8 @@ struct PulseApp: App {
             MenuBarLabel(
                 model: appDelegate.healthModel,
                 anomalyMonitor: appDelegate.anomalyMonitor,
-                briefingTrigger: appDelegate.briefingTrigger
+                briefingTrigger: appDelegate.briefingTrigger,
+                privacyAuditTrigger: appDelegate.privacyAuditTrigger
             )
         }
         .menuBarExtraStyle(.window)
@@ -52,8 +53,16 @@ struct PulseApp: App {
         .defaultSize(width: 420, height: 460)
         .windowResizability(.contentSize)
 
+        Window("Privacy audit", id: "privacyAudit") {
+            PrivacyAuditView(model: appDelegate.privacyAuditModel)
+        }
+        .defaultSize(width: 560, height: 520)
+
         Settings {
-            SettingsView(goalsStore: appDelegate.goalsStore)
+            SettingsView(
+                goalsStore: appDelegate.goalsStore,
+                onOpenPrivacyAudit: { appDelegate.requestShowPrivacyAudit() }
+            )
         }
     }
 }
@@ -68,6 +77,7 @@ struct MenuBarLabel: View {
     @ObservedObject var model: HealthModel
     @ObservedObject var anomalyMonitor: AnomalyMonitor
     let briefingTrigger: PassthroughSubject<Void, Never>
+    let privacyAuditTrigger: PassthroughSubject<Void, Never>
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -85,6 +95,10 @@ struct MenuBarLabel: View {
             openWindow(id: "briefing")
             NSApp.activate(ignoringOtherApps: true)
         }
+        .onReceive(privacyAuditTrigger) { _ in
+            openWindow(id: "privacyAudit")
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 }
 
@@ -98,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let healthModel: HealthModel
     let dashboardModel: DashboardModel
     let briefingModel: DailyBriefingModel
+    let privacyAuditModel: PrivacyAuditModel
     let anomalyMonitor: AnomalyMonitor
     let goalsStore: GoalsStore
 
@@ -107,6 +122,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// menu — both paths share the same "have we already shown today?"
     /// gate via UserDefaults.
     let briefingTrigger = PassthroughSubject<Void, Never>()
+
+    /// Separate trigger for the privacy-audit window. Uses the same
+    /// MenuBarLabel-listens-for-Void pattern so SettingsView can ask
+    /// AppDelegate to open a window without itself holding a
+    /// `@Environment(\.openWindow)` (Settings scenes run in a nested
+    /// environment where that handle is unreliable).
+    let privacyAuditTrigger = PassthroughSubject<Void, Never>()
 
     private let database: PulseDatabase?
     private let runtime: CollectorRuntime?
@@ -155,6 +177,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             goalsStore: self.goalsStore
         )
         self.briefingModel = DailyBriefingModel(
+            store: dbResult.database.map { EventStore(database: $0) }
+        )
+        self.privacyAuditModel = PrivacyAuditModel(
             store: dbResult.database.map { EventStore(database: $0) }
         )
         self.anomalyMonitor = AnomalyMonitor(
@@ -217,6 +242,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { [weak self] in
             await self?.briefingModel.load(for: .yesterday)
             await MainActor.run { self?.briefingTrigger.send(()) }
+        }
+    }
+
+    /// Loads the privacy-audit snapshot and asks the MenuBarLabel
+    /// listener to open the window. Called from the Settings button.
+    func requestShowPrivacyAudit() {
+        Task { [weak self] in
+            await self?.privacyAuditModel.reload()
+            await MainActor.run { self?.privacyAuditTrigger.send(()) }
         }
     }
 
@@ -2037,6 +2071,7 @@ struct SettingsView: View {
     @AppStorage(PulsePreferenceKey.heatmapDays)
     private var heatmapDays: Int = DashboardModel.defaultHeatmapDays
     @ObservedObject var goalsStore: GoalsStore
+    let onOpenPrivacyAudit: () -> Void
 
     var body: some View {
         Form {
@@ -2093,6 +2128,18 @@ struct SettingsView: View {
             }
 
             Section {
+                Button(action: onOpenPrivacyAudit) {
+                    Text("Show what Pulse has recorded…", bundle: .module)
+                }
+            } header: {
+                Text("Privacy", bundle: .module)
+            } footer: {
+                Text("Opens a window that lists the raw row counts and the full system-events ledger from the last hour — read live from your local SQLite.", bundle: .module)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 HStack {
                     Text("Build", bundle: .module)
                     Spacer()
@@ -2106,7 +2153,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520, height: 320)
+        .frame(width: 520, height: 360)
     }
 }
 
@@ -2306,6 +2353,238 @@ struct BriefingFocusRow: View {
         formatter.locale = .current
         formatter.setLocalizedDateFormatFromTemplate("HH:mm")
         return formatter.string(from: date)
+    }
+}
+
+// MARK: - Privacy audit (A22)
+
+/// Owns the latest snapshot of raw writes the Pulse collector has made
+/// in the last hour. Reloaded on user demand — this is a verification
+/// tool, not a live dashboard; polling would undermine the "here is
+/// exactly what was captured" story.
+@MainActor
+final class PrivacyAuditModel: ObservableObject {
+
+    @Published private(set) var snapshot: PrivacyAuditSnapshot?
+    @Published private(set) var errorMessage: String?
+
+    private let store: EventStore?
+
+    init(store: EventStore?) {
+        self.store = store
+    }
+
+    /// Rebuilds the snapshot from disk. Safe to call repeatedly; the
+    /// read transaction is cheap because raw tables are small.
+    func reload(now: Date = Date(), windowSeconds: TimeInterval = 3600) async {
+        guard let store else {
+            errorMessage = String(localized: "Database not available.", bundle: .module)
+            return
+        }
+        do {
+            let snap = try await Task.detached {
+                try store.buildPrivacyAuditSnapshot(
+                    now: now,
+                    windowSeconds: windowSeconds
+                )
+            }.value
+            self.snapshot = snap
+            self.errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+/// Window that lists the raw per-table row counts and the full
+/// `system_events` ledger for the last hour. Lets the user verify the
+/// `05-privacy.md` claims in-app, not just in a promise file.
+struct PrivacyAuditView: View {
+
+    @ObservedObject var model: PrivacyAuditModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            header
+            if let snap = model.snapshot {
+                countsGrid(snap)
+                Divider()
+                systemEventsSection(snap)
+            } else if let error = model.errorMessage {
+                Text(error)
+                    .foregroundStyle(.red)
+            } else {
+                HStack {
+                    ProgressView()
+                    Text("Reading the database…", bundle: .module)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            Divider()
+            footer
+        }
+        .padding(18)
+        .frame(minWidth: 520, minHeight: 480)
+        .task {
+            if model.snapshot == nil { await model.reload() }
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("What Pulse has recorded", bundle: .module)
+                .font(.title2.bold())
+            Text(
+                "Every count and row below is read live from your local SQLite — this window is the ground truth, not a summary we maintain separately.",
+                bundle: .module
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private func countsGrid(_ snap: PrivacyAuditSnapshot) -> some View {
+        let columns = [
+            GridItem(.flexible(), alignment: .leading),
+            GridItem(.flexible(), alignment: .trailing)
+        ]
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(PrivacyAuditView.rangeDescription(snap))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            LazyVGrid(columns: columns, spacing: 8) {
+                countRow(
+                    label: Text("Mouse move samples", bundle: .module),
+                    value: snap.mouseMoveCount
+                )
+                countRow(
+                    label: Text("Mouse click samples", bundle: .module),
+                    value: snap.mouseClickCount
+                )
+                countRow(
+                    label: Text("Key press samples", bundle: .module),
+                    value: snap.keyPressCount
+                )
+                countRow(
+                    label: Text("Key codes stored", bundle: .module),
+                    value: snap.keyCodesRecorded,
+                    highlight: snap.keyCodesRecorded == 0 ? .green : .orange
+                )
+            }
+            HStack {
+                Button {
+                    Task { await model.reload() }
+                } label: {
+                    Text("Reload", bundle: .module)
+                }
+                .buttonStyle(.bordered)
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting(
+                        [PrivacyAuditView.databaseDirectoryURL()]
+                    )
+                } label: {
+                    Text("Show database in Finder", bundle: .module)
+                }
+                .buttonStyle(.bordered)
+                Spacer()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func countRow(label: Text, value: Int, highlight: Color? = nil) -> some View {
+        label.font(.body)
+        Text("\(value)")
+            .font(.body.monospacedDigit())
+            .foregroundStyle(highlight ?? .primary)
+    }
+
+    private func systemEventsSection(_ snap: PrivacyAuditSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("System events (latest first)", bundle: .module)
+                    .font(.headline)
+                Spacer()
+                Text("\(snap.systemEvents.count)")
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            if snap.systemEvents.isEmpty {
+                Text("No events in this window.", bundle: .module)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(Array(snap.systemEvents.enumerated()), id: \.offset) { _, row in
+                            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                Text(PrivacyAuditView.clockTime(row.timestamp))
+                                    .font(.footnote.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 64, alignment: .leading)
+                                Text(row.category)
+                                    .font(.footnote.monospacedDigit())
+                                    .frame(width: 140, alignment: .leading)
+                                Text(row.payload ?? "—")
+                                    .font(.footnote.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                        }
+                    }
+                }
+                .frame(minHeight: 180, maxHeight: 260)
+                .background(Color.black.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+            }
+        }
+    }
+
+    private var footer: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(
+                "Pulse runs entirely on your Mac. It makes no outbound network calls (the only potential exception is the future update checker, which will be opt-in and point only at GitHub releases).",
+                bundle: .module
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private static func clockTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.setLocalizedDateFormatFromTemplate("HH:mm:ss")
+        return formatter.string(from: date)
+    }
+
+    private static func rangeDescription(_ snap: PrivacyAuditSnapshot) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.setLocalizedDateFormatFromTemplate("yyyy-MM-dd HH:mm")
+        let start = formatter.string(from: snap.windowStart)
+        let end = formatter.string(from: snap.windowEnd)
+        let template = NSLocalizedString(
+            "privacyAudit.window.template",
+            bundle: .module,
+            value: "Window: %@ → %@",
+            comment: "Privacy audit window time range"
+        )
+        return String(format: template, start, end)
+    }
+
+    private static func databaseDirectoryURL() -> URL {
+        let fm = FileManager.default
+        let support = (try? fm.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: false
+        )) ?? URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent("Library/Application Support", isDirectory: true)
+        return support.appendingPathComponent("Pulse", isDirectory: true)
     }
 }
 
