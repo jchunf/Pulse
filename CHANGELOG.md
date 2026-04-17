@@ -10,24 +10,30 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ---
 
-## [Unreleased] — v1.0.0-rc1 feature set
+## [1.0.0-rc1] — 2026-04-17
 
-This is the first time we have a coherent "candidate" to tag. Feature scope
-closes the three v1.0 goals from
-`reviews/2026-04-17-product-direction.md` §2 (retention hook, narrative
-engine, goals layer) and the v1.2 items from §3.5 / §3.6 / §3.7 land early.
+First release-candidate tag. Feature scope closes the three v1.0 goals
+from `reviews/2026-04-17-product-direction.md` §2 (retention hook,
+narrative engine, goals layer); the §3.5 / §3.6 / §3.7 items
+(originally tagged for v1.2) land early; and the §5 "立刻" #1
+(onboarding) ships in this candidate.
 
-**Gap before the v1.0 tag (see `docs/V1-REGRESSION.md`)**:
+**Knowingly out of scope for the v1.0.0 tag** (tracked in
+`docs/V1-REGRESSION.md` §7):
 
-- Review §5 "立刻" #1 — full onboarding flow (welcome → privacy pledge →
-  guided Input Monitoring + Accessibility prompts per `docs/06`). Today
-  only the A6 `PermissionAssistantView` recovery surface exists.
 - Review §5 "立刻" #2 — Developer ID signing, notarization, Sparkle
-  appcast (`docs/07`). Nothing in `Makefile` / CI packages a signed
-  `.app` / `.dmg` yet.
+  appcast (`docs/07`). The `package` workflow currently produces an
+  ad-hoc-signed `.app`, runnable on the maintainer's own Mac but not
+  distributable to a third party. Will land in a `1.0.0` retag after
+  the maintainer's Apple Developer enrolment completes.
 
-These two blockers are intentionally tracked separately so the current
-feature freeze can be regression-tested on its own.
+### Onboarding
+
+- **A25** first-launch onboarding window (welcome → privacy pledge →
+  guided Input Monitoring + Accessibility grant → ready). Auto-fires
+  the first time `Pulse.app` opens on a Mac; never reopens once
+  `pulse.onboarding.completedAt` is set in `UserDefaults`. Closes
+  review §5 "立刻" #1. (#45)
 
 ### 采集 / Collection (B)
 
@@ -84,6 +90,11 @@ feature freeze can be regression-tested on its own.
 - Product-direction review captured at
   `reviews/2026-04-17-product-direction.md` (#32); this CHANGELOG
   tracks which rows are now closed.
+- **D1** v1 prep — `CHANGELOG.md`, `docs/V1-REGRESSION.md` 8-section
+  manual checklist, `scripts/package.sh` + `apple/Info.plist` template
+  for ad-hoc-signed local `.app` bundles, GitHub Actions `package`
+  workflow that uploads a 14-day artifact on every PR and attaches a
+  zip to the auto-generated GitHub Release on `v*` tags. (#44)
 
 ---
 
