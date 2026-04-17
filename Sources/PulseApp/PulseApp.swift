@@ -19,7 +19,8 @@ struct PulseApp: App {
                 model: appDelegate.healthModel,
                 onPause: { duration in appDelegate.pauseCollector(duration: duration) },
                 onResume: { appDelegate.resumeCollector() },
-                onShowBriefing: { appDelegate.requestShowBriefing() }
+                onShowBriefing: { appDelegate.requestShowBriefing() },
+                onGenerateReport: { appDelegate.generateWeeklyReport() }
             )
         } label: {
             // Use a different SF Symbol when collection is paused or
@@ -192,6 +193,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { [weak self] in
             await self?.briefingModel.load(for: .yesterday)
             await MainActor.run { self?.briefingTrigger.send(()) }
+        }
+    }
+
+    /// User-initiated weekly report generation. Writes an HTML file to
+    /// `~/Library/Application Support/Pulse/reports/` and opens it in
+    /// the default browser. Fails silently on I/O errors; a future slice
+    /// can surface them through HealthModel.errorMessage.
+    func generateWeeklyReport() {
+        guard let database else { return }
+        let store = EventStore(database: database)
+        Task.detached {
+            do {
+                let report = try store.weeklyReport(endingAt: Date())
+                let html = WeeklyReportRenderer.renderLocalized(report: report)
+                let url = try WeeklyReportRenderer.writeToDisk(html: html, endingAt: Date())
+                await MainActor.run { NSWorkspace.shared.open(url) }
+            } catch {
+                #if DEBUG
+                print("weekly report failed: \(error)")
+                #endif
+            }
         }
     }
 
@@ -569,6 +591,7 @@ struct HealthMenuView: View {
     let onPause: (TimeInterval) -> Void
     let onResume: () -> Void
     let onShowBriefing: () -> Void
+    let onGenerateReport: () -> Void
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -624,9 +647,14 @@ struct HealthMenuView: View {
                     }
                     .keyboardShortcut("q")
                 }
-                HStack {
+                HStack(spacing: 16) {
                     Button(action: onShowBriefing) {
                         Text("Yesterday's briefing", bundle: .module)
+                            .font(.footnote)
+                    }
+                    .buttonStyle(.link)
+                    Button(action: onGenerateReport) {
+                        Text("Generate weekly report", bundle: .module)
                             .font(.footnote)
                     }
                     .buttonStyle(.link)
