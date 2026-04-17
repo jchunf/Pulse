@@ -28,7 +28,10 @@ struct PulseApp: App {
         .menuBarExtraStyle(.window)
 
         Window("Pulse Dashboard", id: "dashboard") {
-            DashboardView(model: appDelegate.dashboardModel)
+            DashboardView(
+                model: appDelegate.dashboardModel,
+                healthModel: appDelegate.healthModel
+            )
         }
         .defaultSize(width: 720, height: 480)
 
@@ -431,11 +434,13 @@ struct PauseControlsView: View {
 struct DashboardView: View {
 
     @ObservedObject var model: DashboardModel
+    @ObservedObject var healthModel: HealthModel
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 header
+                DashboardPermissionBanner(permissions: healthModel.snapshot.permissions)
                 if let summary = model.summary {
                     MileageHeroCard(distanceMillimeters: summary.totalMouseDistanceMillimeters)
                     SummaryCardsView(summary: summary)
@@ -485,6 +490,55 @@ struct DashboardView: View {
         if seconds < 60 { return "\(seconds)s ago" }
         if seconds < 3_600 { return "\(seconds / 60)m ago" }
         return "\(seconds / 3_600)h ago"
+    }
+}
+
+/// Inline Dashboard banner shown whenever one or more required
+/// permissions (Input Monitoring / Accessibility) aren't granted.
+/// Mirrors the menu-bar `PermissionAssistantView` but uses a full-width
+/// style suited to the Dashboard's wider canvas. When nothing is
+/// missing the view collapses to `EmptyView()` so it doesn't add
+/// padding.
+struct DashboardPermissionBanner: View {
+
+    let permissions: PermissionSnapshot
+
+    var body: some View {
+        let missing = permissions.missingRequired
+        if missing.isEmpty {
+            EmptyView()
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text("Pulse isn't collecting right now")
+                        .font(.headline)
+                }
+                Text("Grant the permissions below in System Settings, then relaunch Pulse. Until then the numbers on this page won't update.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    ForEach(missing, id: \.self) { permission in
+                        Button {
+                            if let url = permission.systemSettingsURL {
+                                NSWorkspace.shared.open(url)
+                            }
+                        } label: {
+                            Label("Open \(permission.displayName)", systemImage: "arrow.up.forward.app")
+                        }
+                    }
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(Color.orange.opacity(0.35), lineWidth: 1)
+            )
+        }
     }
 }
 
