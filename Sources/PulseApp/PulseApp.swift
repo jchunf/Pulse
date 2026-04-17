@@ -271,6 +271,7 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var heatmapCells: [HeatmapCell] = []
     @Published private(set) var heatmapDays: Int = DashboardModel.defaultHeatmapDays
     @Published private(set) var trendPoints: [DailyTrendPoint] = []
+    @Published private(set) var longestFocus: FocusSegment?
     @Published private(set) var lastRefreshAt: Date?
     @Published private(set) var errorMessage: String?
     @Published private(set) var recentAchievement: LandmarkAchievement?
@@ -337,10 +338,12 @@ final class DashboardModel: ObservableObject {
             let summary = try store.todaySummary(start: dayStart, end: dayEnd, capUntil: now)
             let heatmap = try store.hourlyHeatmap(endingAt: now, days: days)
             let trend = try store.dailyTrend(endingAt: now, days: Self.trendDays)
+            let focus = try store.longestFocusSegment(on: dayStart, now: now)
             self.summary = summary
             self.heatmapCells = heatmap
             self.heatmapDays = days
             self.trendPoints = trend
+            self.longestFocus = focus
             self.lastRefreshAt = now
             self.errorMessage = nil
             updateAchievementIfNeeded(
@@ -611,6 +614,7 @@ struct DashboardView: View {
                     SummaryCardsView(summary: summary)
                     WeekTrendChart(points: model.trendPoints)
                     WeekHourlyHeatmap(cells: model.heatmapCells, days: model.heatmapDays)
+                    DeepFocusCard(segment: model.longestFocus)
                     AppRankingChart(rows: summary.topApps)
                     DiagnosticsCard(snapshot: healthModel.snapshot)
                 } else if model.errorMessage != nil {
@@ -826,25 +830,50 @@ struct SummaryCardsView: View {
 
     let summary: TodaySummary
 
+    private static let narrative = NarrativeEngine.standard
+
     var body: some View {
         let columns = [GridItem(.adaptive(minimum: 160), spacing: 12)]
         LazyVGrid(columns: columns, spacing: 12) {
-            metric(titleKey: "Distance", value: PulseFormat.distance(millimeters: summary.totalMouseDistanceMillimeters))
-            metric(titleKey: "Clicks", value: PulseFormat.integer(summary.totalMouseClicks))
-            metric(titleKey: "Scrolls", value: PulseFormat.integer(summary.totalScrollTicks))
-            metric(titleKey: "Keystrokes", value: PulseFormat.integer(summary.totalKeyPresses))
-            metric(titleKey: "Active time", value: PulseFormat.duration(seconds: summary.totalActiveSeconds))
-            metric(titleKey: "Idle time", value: PulseFormat.duration(seconds: summary.totalIdleSeconds))
+            metric(titleKey: "Distance",
+                   value: PulseFormat.distance(millimeters: summary.totalMouseDistanceMillimeters))
+            metric(titleKey: "Clicks",
+                   value: PulseFormat.integer(summary.totalMouseClicks))
+            metric(titleKey: "Scrolls",
+                   value: PulseFormat.integer(summary.totalScrollTicks))
+            metric(titleKey: "Keystrokes",
+                   value: PulseFormat.integer(summary.totalKeyPresses),
+                   narrativeSubtitle: keystrokesNarrative)
+            metric(titleKey: "Active time",
+                   value: PulseFormat.duration(seconds: summary.totalActiveSeconds))
+            metric(titleKey: "Idle time",
+                   value: PulseFormat.duration(seconds: summary.totalIdleSeconds))
         }
     }
 
-    private func metric(titleKey: LocalizedStringKey, value: String) -> some View {
+    private var keystrokesNarrative: String? {
+        Self.narrative
+            .bestMatch(metric: .keystrokes, value: Double(summary.totalKeyPresses))
+            .map { PulseFormat.narrativeSentence(for: $0) }
+    }
+
+    private func metric(
+        titleKey: LocalizedStringKey,
+        value: String,
+        narrativeSubtitle: String? = nil
+    ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(titleKey, bundle: .module)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.title2.monospacedDigit())
+            if let narrativeSubtitle {
+                Text(narrativeSubtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1095,6 +1124,81 @@ struct DiagnosticsCard: View {
             snapshot.rollupStamps.idleEventsToMin,
             snapshot.rollupStamps.purgeExpired
         ].compactMap { $0 }.max()
+    }
+}
+
+/// Narrates today's single longest uninterrupted run in one app — the
+/// "深度专注片段" the product review flags as the most under-exploited
+/// signal we already collect. Empty state is a Landmark-style nudge; the
+/// populated state pairs the raw duration with a `NarrativeEngine`
+/// sentence ("≈ 3× a pomodoro") so the card fits the wider narrative
+/// program A16 kicks off.
+struct DeepFocusCard: View {
+
+    let segment: FocusSegment?
+
+    private static let displayNameCache = BundleDisplayNameCache()
+    private static let narrative = NarrativeEngine.standard
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Deep focus today", bundle: .module)
+                .font(.headline)
+            if let segment {
+                filled(segment)
+            } else {
+                empty
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func filled(_ segment: FocusSegment) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(PulseFormat.duration(seconds: segment.durationSeconds))
+                .font(.system(size: 36, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+            let app = Self.displayNameCache.name(for: segment.bundleId)
+            let start = Self.clockTime(segment.startedAt)
+            let end = Self.clockTime(segment.endedAt)
+            Text("\(app) · \(start) – \(end)", bundle: .module)
+                .font(.body)
+                .foregroundStyle(.primary)
+            if let narrative = Self.narrative.bestMatch(
+                metric: .focusDurationSeconds,
+                value: Double(segment.durationSeconds)
+            ) {
+                Text(PulseFormat.narrativeSentence(for: narrative))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [Color.accentColor.opacity(0.14), Color.accentColor.opacity(0.04)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private var empty: some View {
+        Text("Still warming up — your longest focus streak shows up once you've spent 20+ minutes in one app without going idle.", bundle: .module)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.vertical, 8)
+    }
+
+    private static func clockTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.setLocalizedDateFormatFromTemplate("HH:mm")
+        return formatter.string(from: date)
     }
 }
 

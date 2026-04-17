@@ -419,6 +419,120 @@ public extension EventStore {
             }
         }
     }
+
+    // MARK: - Longest focus segment (A16)
+
+    /// Returns today's longest uninterrupted run of the user in a single
+    /// foreground app while not being idle — the "deep focus" streak the
+    /// review (`reviews/2026-04-17-product-direction.md#22`) flags as the
+    /// single most under-leveraged signal we already collect.
+    ///
+    /// The heuristic: walk `system_events.foreground_app` transitions
+    /// for the day, and for each `(bundle, start, end)` interval check
+    /// whether every minute in it had ≥ `minActiveSecondsPerMinute` active
+    /// seconds (derived from `min_idle` as `60 - idle_seconds`). Segments
+    /// containing any sub-threshold minute are discarded. Among the
+    /// surviving segments, the longest one wins (ties broken by earlier
+    /// start time for determinism).
+    ///
+    /// Returns `nil` when no segment qualifies (fresh install, pre-rollup,
+    /// or a day dominated by context switches).
+    func longestFocusSegment(
+        on day: Date,
+        minActiveSecondsPerMinute: Int = 30,
+        calendar: Calendar = .current,
+        now: Date = Date()
+    ) throws -> FocusSegment? {
+        let dayStart = calendar.startOfDay(for: day)
+        let dayEnd = min(calendar.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart, now)
+        guard dayEnd > dayStart else { return nil }
+        let dayStartMs = Int64(dayStart.timeIntervalSince1970 * 1_000)
+        let dayEndMs = Int64(dayEnd.timeIntervalSince1970 * 1_000)
+        let dayStartSec = Int64(dayStart.timeIntervalSince1970)
+        let dayEndSec = Int64(dayEnd.timeIntervalSince1970)
+
+        return try database.queue.read { db -> FocusSegment? in
+            // Idle seconds per minute for the day. A minute is "active
+            // enough" when (60 - idle_seconds) >= minActiveSecondsPerMinute.
+            let idleRows = try Row.fetchAll(db, sql: """
+                SELECT ts_minute, idle_seconds FROM min_idle
+                WHERE ts_minute >= ? AND ts_minute < ?
+                """, arguments: [dayStartSec, dayEndSec])
+            var idleByMinute: [Int64: Int64] = [:]
+            for row in idleRows {
+                idleByMinute[row["ts_minute"] as Int64] = row["idle_seconds"] as Int64
+            }
+            func minuteIsActive(_ minuteStartSec: Int64) -> Bool {
+                let idle = idleByMinute[minuteStartSec] ?? 0
+                return (60 - idle) >= Int64(minActiveSecondsPerMinute)
+            }
+
+            // The bundle active at day start (carry-over from yesterday).
+            let priorBundle = try String.fetchOne(db, sql: """
+                SELECT payload FROM system_events
+                WHERE category = 'foreground_app' AND ts < ?
+                ORDER BY ts DESC LIMIT 1
+                """, arguments: [dayStartMs])
+
+            // In-range transitions.
+            let transitions = try Row.fetchAll(db, sql: """
+                SELECT ts, payload FROM system_events
+                WHERE category = 'foreground_app' AND ts >= ? AND ts < ?
+                ORDER BY ts
+                """, arguments: [dayStartMs, dayEndMs])
+
+            // Assemble intervals: [(startMs, endMs, bundle)].
+            var intervals: [(Int64, Int64, String)] = []
+            var currentStart = dayStartMs
+            var currentBundle: String? = priorBundle
+            for row in transitions {
+                let ts: Int64 = row["ts"]
+                let bundle: String = row["payload"]
+                if let prior = currentBundle, ts > currentStart {
+                    intervals.append((currentStart, ts, prior))
+                }
+                currentStart = ts
+                currentBundle = bundle
+            }
+            if let prior = currentBundle, dayEndMs > currentStart {
+                intervals.append((currentStart, dayEndMs, prior))
+            }
+
+            // For each interval, verify every minute it covers is active
+            // (meets the per-minute threshold). Keep the longest qualifier.
+            var best: FocusSegment?
+            for (startMs, endMs, bundle) in intervals {
+                let durationSeconds = (endMs - startMs) / 1_000
+                if durationSeconds < 60 { continue } // <1 min can't be focus
+                let firstMinuteStart = (startMs / 1_000 / 60) * 60
+                let lastMinuteStartExclusive = ((endMs + 59_999) / 1_000 / 60) * 60
+                var minuteCursor = firstMinuteStart
+                var allActive = true
+                while minuteCursor < lastMinuteStartExclusive {
+                    if !minuteIsActive(minuteCursor) {
+                        allActive = false
+                        break
+                    }
+                    minuteCursor += 60
+                }
+                guard allActive else { continue }
+                let candidate = FocusSegment(
+                    bundleId: bundle,
+                    startedAt: Date(timeIntervalSince1970: TimeInterval(startMs) / 1_000),
+                    endedAt: Date(timeIntervalSince1970: TimeInterval(endMs) / 1_000),
+                    durationSeconds: Int(durationSeconds)
+                )
+                if let current = best {
+                    if candidate.durationSeconds > current.durationSeconds {
+                        best = candidate
+                    }
+                } else {
+                    best = candidate
+                }
+            }
+            return best
+        }
+    }
 }
 
 // MARK: - Value types
@@ -506,5 +620,25 @@ public struct HeatmapCell: Sendable, Equatable {
         self.dayOffset = dayOffset
         self.hour = hour
         self.activityCount = activityCount
+    }
+}
+
+/// One uninterrupted run of the user in a single foreground app while
+/// staying active (not idle). Produced by
+/// `EventStore.longestFocusSegment(on:)` and rendered by `DeepFocusCard`.
+/// `durationSeconds` is carried separately rather than derived from
+/// `endedAt - startedAt` so callers can persist / log the value without
+/// re-doing the Date math.
+public struct FocusSegment: Sendable, Equatable {
+    public let bundleId: String
+    public let startedAt: Date
+    public let endedAt: Date
+    public let durationSeconds: Int
+
+    public init(bundleId: String, startedAt: Date, endedAt: Date, durationSeconds: Int) {
+        self.bundleId = bundleId
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.durationSeconds = durationSeconds
     }
 }
