@@ -611,6 +611,7 @@ struct DashboardView: View {
                 }
                 if let summary = model.summary {
                     MileageHeroCard(distanceMillimeters: summary.totalMouseDistanceMillimeters)
+                    LandmarkProgressPanel(distanceMillimeters: summary.totalMouseDistanceMillimeters)
                     SummaryCardsView(summary: summary)
                     WeekTrendChart(points: model.trendPoints)
                     WeekHourlyHeatmap(cells: model.heatmapCells, days: model.heatmapDays)
@@ -826,6 +827,93 @@ struct MileageHeroCard: View {
     }
 }
 
+/// Panel shown under `MileageHeroCard` listing a fixed set of anchor
+/// landmarks with a progress bar per row. Complements the hero card's
+/// single dramatic comparison with a multi-anchor view — the prototype's
+/// "which landmarks have I crossed and how far to the next" story.
+///
+/// Anchor selection is fixed rather than adaptive so the list stays
+/// stable week to week (progress bars re-fill smoothly instead of
+/// re-ordering). The four picked span four orders of magnitude
+/// (1 km → 15 500 km) so every user sees movement on at least one bar.
+struct LandmarkProgressPanel: View {
+
+    let distanceMillimeters: Double
+
+    /// Stable anchor set, ordered from smallest to largest.
+    private static let anchorKeys: [String] = [
+        "kilometer", "marathon", "beijing_gz", "pacific"
+    ]
+
+    private var rows: [(Landmark, Double)] {
+        let meters = distanceMillimeters / 1_000.0
+        let library = LandmarkLibrary.standard.landmarks
+        return Self.anchorKeys.compactMap { key in
+            library.first(where: { $0.key == key }).map { landmark in
+                let ratio = landmark.distanceMeters > 0 ? meters / landmark.distanceMeters : 0
+                return (landmark, ratio)
+            }
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Landmarks", bundle: .module)
+                .font(.headline)
+            VStack(spacing: 8) {
+                ForEach(rows, id: \.0.key) { row in
+                    LandmarkProgressRow(landmark: row.0, ratio: row.1)
+                }
+            }
+        }
+    }
+}
+
+struct LandmarkProgressRow: View {
+
+    let landmark: Landmark
+    let ratio: Double
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(PulseFormat.localizedLandmarkName(for: landmark))
+                    .font(.footnote)
+                Spacer()
+                Text(valueText)
+                    .font(.footnote.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.accentColor.opacity(0.12))
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.orange.opacity(0.85), Color.accentColor],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: geo.size.width * min(1, max(0, ratio)))
+                }
+            }
+            .frame(height: 6)
+        }
+    }
+
+    private var valueText: String {
+        if ratio >= 1 {
+            let rounded = (ratio * 10).rounded() / 10
+            return "\(rounded.formatted(.number.precision(.fractionLength(1))))×"
+        } else {
+            let pct = Int((ratio * 100).rounded())
+            return "\(pct)%"
+        }
+    }
+}
+
 struct SummaryCardsView: View {
 
     let summary: TodaySummary
@@ -958,6 +1046,7 @@ struct WeekHourlyHeatmap: View {
         VStack(alignment: .leading, spacing: 8) {
             headlineText.font(.headline)
             content
+            insightFooter
         }
     }
 
@@ -983,9 +1072,8 @@ struct WeekHourlyHeatmap: View {
                     ForEach(0..<24, id: \.self) { hour in
                         let activity = lookup[cellKey(day: dayOffset, hour: hour)] ?? 0
                         let intensity = Double(activity) / Double(maxActivity)
-                        let opacity = Self.minOpacity + (Self.maxOpacity - Self.minOpacity) * intensity
                         RoundedRectangle(cornerRadius: 2)
-                            .fill(Color.accentColor.opacity(opacity))
+                            .fill(Self.heatColor(intensity: intensity))
                             .frame(height: 16)
                     }
                 }
@@ -1000,6 +1088,57 @@ struct WeekHourlyHeatmap: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private var insightFooter: some View {
+        if let peak = peakHour() {
+            let descriptorKey = Self.descriptorKey(forHour: peak)
+            let hourString = String(format: "%02d:00", peak)
+            HStack(spacing: 6) {
+                Text("Peak at \(hourString)", bundle: .module)
+                Text("·")
+                    .foregroundStyle(.tertiary)
+                Text(descriptorKey, bundle: .module)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.top, 4)
+        }
+    }
+
+    /// Aggregate activity by hour-of-day across all cells; return the hour
+    /// with the highest total. `nil` when there's nothing to summarise.
+    private func peakHour() -> Int? {
+        var byHour: [Int: Int] = [:]
+        for cell in cells {
+            byHour[cell.hour, default: 0] += cell.activityCount
+        }
+        return byHour.max(by: { $0.value < $1.value })?.key
+    }
+
+    /// Map a peak hour to a localised "morning / afternoon / evening /
+    /// night" descriptor key. Four buckets keep the copy short and avoid
+    /// edge-case phrasing.
+    private static func descriptorKey(forHour hour: Int) -> LocalizedStringKey {
+        switch hour {
+        case 5..<12:  return "heatmap.peak.morning"
+        case 12..<17: return "heatmap.peak.afternoon"
+        case 17..<22: return "heatmap.peak.evening"
+        default:      return "heatmap.peak.night"
+        }
+    }
+
+    /// Maps intensity ∈ [0, 1] onto a cool → warm color ramp so the heatmap
+    /// shows hotter peaks in orange and quieter hours in a low-saturation
+    /// green. `intensity = 0` still renders a visible cell (min saturation)
+    /// so empty hours stay distinguishable from missing-data regions.
+    private static func heatColor(intensity: Double) -> Color {
+        let clamped = max(0, min(1, intensity))
+        let hue = 0.35 - 0.30 * clamped       // 0.35 (green) → 0.05 (orange-red)
+        let saturation = 0.15 + 0.70 * clamped
+        let brightness = 0.55 + 0.40 * clamped
+        return Color(hue: hue, saturation: saturation, brightness: brightness)
     }
 
     @ViewBuilder
