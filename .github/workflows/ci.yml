@@ -68,6 +68,22 @@ jobs:
       - name: Test (with coverage)
         run: swift test --parallel --enable-code-coverage 2>&1 | tee test.log
 
+      - name: Fail on hidden compile errors in logs
+        # Safety net. Observed empirically: when one test sub-target compiles
+        # cleanly and another fails, `swift test` has been seen to exit 0
+        # and leave the failing test compilation errors only in the log.
+        # Grep for canonical Swift compile diagnostics and fail the step
+        # outright so the job conclusion truthfully reflects reality.
+        if: always()
+        run: |
+          set +e
+          HIT=$(grep -HnE '^[^[:space:]].*\.swift:[0-9]+:[0-9]+: error:' build.log test.log 2>/dev/null)
+          if [ -n "$HIT" ]; then
+            echo "::error::compile errors found in logs but exit code was clean — failing explicitly"
+            echo "$HIT" | head -50
+            exit 1
+          fi
+
       - name: Generate coverage report
         id: coverage
         run: |

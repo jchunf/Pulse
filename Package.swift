@@ -31,8 +31,9 @@ let package = Package(
         .executable(name: "PulseApp", targets: ["PulseApp"])
     ],
     dependencies: [
-        .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.0"),
-        .package(url: "https://github.com/pointfreeco/swift-snapshot-testing.git", from: "1.17.0")
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.0")
+        // swift-snapshot-testing will return when the first UI
+        // snapshot-based test actually lands (docs/10-testing-and-ci.md §二).
     ],
     targets: [
         .target(

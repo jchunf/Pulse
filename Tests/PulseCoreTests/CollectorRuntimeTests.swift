@@ -124,7 +124,7 @@ struct CollectorRuntimeTests {
         // We can't directly invoke tick from outside the runtime in B2; the
         // surface for that lands in B3. For this PR we at least confirm no
         // crash occurred and writes happened.
-        let total = try db.queue.read { db -> Int in
+        let total = try await db.queue.read { db -> Int in
             try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM system_events") ?? 0
         }
         #expect(total >= 1)
