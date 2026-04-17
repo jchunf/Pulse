@@ -20,21 +20,31 @@ For every change worth shipping:
 4. **Subscribe** to the PR via `mcp__github__subscribe_pr_activity`.
    Activity (CI status, comments, reviews) will flow into the conversation.
 
-5. **Wait for CI** — `ci.yml` runs `lint`, `build-and-test (macos-14)`
-   and `build-and-test (macos-15)`. All three must complete with
-   `conclusion: success`.
+5. **Actively poll CI status** — **do not sit idle waiting for webhooks**.
+   After opening the PR, immediately call `mcp__github__pull_request_read`
+   with method `get_check_runs`. Keep polling on a light cadence (e.g.
+   every ~30 seconds) until **every required check has
+   `status: completed`**. Webhook events are a bonus, not a substitute
+   for polling — if they arrive, great; if they don't, polling finds the
+   result anyway. Never end a turn with "I'll wait for the webhook" —
+   check right now.
 
-6. **If CI fails**, the workflow auto-posts a comment to the PR with:
-   - run URL
-   - last 120 lines of `resolve.log`, `build.log`, `test.log`
-   - distilled `error:` / `warning:` / `FAIL` lines
-   The agent reads the comment via
-   `mcp__github__pull_request_read get_comments` and iterates by
-   pushing fixes to the same branch.
+6. **Read results**:
+   - All `conclusion: success` → proceed to merge (step 8).
+   - Any `conclusion: failure` → read the PR comments via
+     `mcp__github__pull_request_read get_comments`. `ci.yml` posts
+     failure logs as comments on failure (see §"CI itself" below).
+     Parse, diagnose, push a fix to the same branch, then poll again.
+   - Any `status: in_progress` → poll again until completed.
 
-7. **Once CI is green**, merge — only then is `main` updated.
+7. **Never** end a turn describing work as "done" if CI is still pending
+   or red. "Waiting for CI" is not a completion state.
 
-8. **Never** force-push to `main`, never merge with `--no-verify` or
+8. **Once all required checks are green**, merge via
+   `mcp__github__merge_pull_request` (squash) and
+   `mcp__github__unsubscribe_pr_activity`. Only then is `main` updated.
+
+9. **Never** force-push to `main`, never merge with `--no-verify` or
    while the check runs are red. If something blocks shipping, raise it
    in the PR conversation, do not bypass.
 
@@ -45,9 +55,10 @@ For every change worth shipping:
 | Push code | `Bash` → `git push -u origin <branch>` |
 | Open PR | `mcp__github__create_pull_request` |
 | Subscribe | `mcp__github__subscribe_pr_activity` |
-| Read CI status | `mcp__github__pull_request_read` (`get_check_runs`) |
+| **Poll CI status (active)** | `mcp__github__pull_request_read` (`get_check_runs`) — call after every push, every fix, and whenever the PR is waiting for CI |
 | Read failure log comments | `mcp__github__pull_request_read` (`get_comments`) |
-| Merge | `mcp__github__merge_pull_request` (only after green) |
+| Merge | `mcp__github__merge_pull_request` (only after all required checks `success`) |
+| Unsubscribe | `mcp__github__unsubscribe_pr_activity` (after merge / close) |
 
 ## CI itself (what `.github/workflows/ci.yml` does)
 
@@ -89,5 +100,20 @@ investigated within a day.
    download the `logs-<runner>` artifact from the run.
 3. Reproduce locally if a Mac is available
    (`make build && make test`).
-4. Push the fix to the same branch, wait for the next CI run.
+4. Push the fix to the same branch, **then call `get_check_runs`
+   immediately** to confirm the new run started, and keep polling until
+   it completes.
 5. Iterate. Don't merge until all required checks are `success`.
+
+## Turn-end rule
+
+Before ending a turn that involves a PR:
+
+- If the PR is open with CI not yet completed: **poll `get_check_runs`
+  now**. If still pending, state the current status and the next
+  expected checkpoint. Don't declare the turn "done".
+- If the PR is open with CI failed: fix or escalate. Never end a turn
+  with a red PR and no next step.
+- If the PR is open with CI all green: merge (or explicitly confirm with
+  the user, per §"What the agent does NOT do"). A green, un-merged PR
+  is an incomplete turn unless the user directed otherwise.
