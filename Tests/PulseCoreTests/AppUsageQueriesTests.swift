@@ -48,6 +48,23 @@ struct AppUsageQueriesTests {
         }
     }
 
+    private func insertHourSummary(
+        into db: PulseDatabase,
+        hourStart: Date,
+        keys: Int,
+        clicks: Int
+    ) throws {
+        try db.queue.write { db in
+            try db.execute(
+                sql: """
+                INSERT INTO hour_summary (ts_hour, key_press_total, mouse_distance_mm, mouse_click_total, idle_seconds)
+                VALUES (?, ?, 0.0, ?, 0)
+                """,
+                arguments: [Int64(hourStart.timeIntervalSince1970), keys, clicks]
+            )
+        }
+    }
+
     @Test("appUsageRanking computes intervals between switches")
     func basicRanking() async throws {
         let (store, db) = try makeStore()
@@ -143,6 +160,73 @@ struct AppUsageQueriesTests {
         #expect(summary.totalMouseDistanceMillimeters == 350.0)
         #expect(summary.totalActiveSeconds == 90)
         #expect(summary.topApps.first?.bundleId == "com.apple.Safari")
+    }
+
+    @Test("hourlyHeatmap maps ts_hour rows to dayOffset + hour cells")
+    func heatmapMapsRows() async throws {
+        let (store, db) = try makeStore()
+        // Use a fixed UTC calendar so tests are deterministic across runners.
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        // endingAt: 2026-01-10 14:30 UTC.
+        let comps = DateComponents(
+            timeZone: calendar.timeZone,
+            year: 2026, month: 1, day: 10, hour: 14, minute: 30
+        )
+        let endingAt = calendar.date(from: comps)!
+        let endDay = calendar.startOfDay(for: endingAt)
+
+        // Insert hour_summary rows: 3 hours total.
+        // today 10:00 (activity 7), today 11:00 (activity 13), yesterday 22:00 (activity 5)
+        let today10 = endDay.addingTimeInterval(10 * 3600)
+        let today11 = endDay.addingTimeInterval(11 * 3600)
+        let yesterday22 = endDay.addingTimeInterval(-2 * 3600)
+        for (date, keys, clicks) in [
+            (today10, 4, 3),
+            (today11, 10, 3),
+            (yesterday22, 2, 3)
+        ] {
+            try insertHourSummary(into: db, hourStart: date, keys: keys, clicks: clicks)
+        }
+
+        let cells = try store.hourlyHeatmap(endingAt: endingAt, days: 7, calendar: calendar)
+
+        // Build a lookup so ordering doesn't matter.
+        let lookup: [String: Int] = Dictionary(
+            uniqueKeysWithValues: cells.map { ("\($0.dayOffset)-\($0.hour)", $0.activityCount) }
+        )
+        #expect(lookup["0-10"] == 7)   // today 10:00
+        #expect(lookup["0-11"] == 13)  // today 11:00
+        #expect(lookup["1-22"] == 5)   // yesterday 22:00
+        #expect(cells.count == 3)
+    }
+
+    @Test("hourlyHeatmap excludes zero-activity rows")
+    func heatmapExcludesZero() async throws {
+        let (store, db) = try makeStore()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let endingAt = calendar.date(from: DateComponents(timeZone: calendar.timeZone, year: 2026, month: 1, day: 10, hour: 23))!
+        let hourStart = calendar.startOfDay(for: endingAt).addingTimeInterval(3 * 3600)
+
+        try insertHourSummary(into: db, hourStart: hourStart, keys: 0, clicks: 0)
+        let cells = try store.hourlyHeatmap(endingAt: endingAt, days: 2, calendar: calendar)
+        #expect(cells.isEmpty)
+    }
+
+    @Test("hourlyHeatmap ignores data outside the requested window")
+    func heatmapBoundedByDays() async throws {
+        let (store, db) = try makeStore()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let endingAt = calendar.date(from: DateComponents(timeZone: calendar.timeZone, year: 2026, month: 1, day: 10, hour: 14))!
+        let endDay = calendar.startOfDay(for: endingAt)
+
+        // 10 days ago — outside any reasonable window.
+        let outside = endDay.addingTimeInterval(-10 * 86_400 + 12 * 3600)
+        try insertHourSummary(into: db, hourStart: outside, keys: 100, clicks: 50)
+        let cells = try store.hourlyHeatmap(endingAt: endingAt, days: 7, calendar: calendar)
+        #expect(cells.isEmpty)
     }
 
     @Test("queries handle an empty database")

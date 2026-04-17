@@ -241,11 +241,16 @@ final class HealthModel: ObservableObject {
 final class DashboardModel: ObservableObject {
 
     @Published private(set) var summary: TodaySummary?
+    @Published private(set) var heatmapCells: [HeatmapCell] = []
     @Published private(set) var lastRefreshAt: Date?
     @Published private(set) var errorMessage: String?
 
     private let store: EventStore?
     private var refreshTask: Task<Void, Never>?
+
+    /// Number of calendar days the week heatmap spans. Includes today as
+    /// the most recent day (`dayOffset == 0`).
+    static let heatmapDays = 7
 
     init(store: EventStore?) {
         self.store = store
@@ -277,7 +282,9 @@ final class DashboardModel: ObservableObject {
         let dayEnd = dayStart.addingTimeInterval(86_400)
         do {
             let summary = try store.todaySummary(start: dayStart, end: dayEnd, capUntil: now)
+            let heatmap = try store.hourlyHeatmap(endingAt: now, days: Self.heatmapDays)
             self.summary = summary
+            self.heatmapCells = heatmap
             self.lastRefreshAt = now
             self.errorMessage = nil
         } catch {
@@ -347,6 +354,7 @@ struct DashboardView: View {
                 if let summary = model.summary {
                     MileageHeroCard(distanceMillimeters: summary.totalMouseDistanceMillimeters)
                     SummaryCardsView(summary: summary)
+                    WeekHourlyHeatmap(cells: model.heatmapCells, days: DashboardModel.heatmapDays)
                     AppRankingChart(rows: summary.topApps)
                 } else if model.errorMessage != nil {
                     Text(model.errorMessage ?? "")
@@ -502,6 +510,88 @@ struct SummaryCardsView: View {
         let hours = minutes / 60
         let remMinutes = minutes % 60
         return "\(hours)h \(remMinutes)m"
+    }
+}
+
+/// 24h × Nd activity heatmap (F-03). Days run top → bottom with today on
+/// top; hours run left → right from 00:00 to 23:00. Each cell's opacity is
+/// proportional to its share of the max-observed activity in the window.
+/// Missing cells (no data rolled up for that hour) render at the minimum
+/// opacity so the grid shape stays readable.
+struct WeekHourlyHeatmap: View {
+
+    let cells: [HeatmapCell]
+    let days: Int
+
+    private static let minOpacity: Double = 0.06
+    private static let maxOpacity: Double = 0.95
+    private static let hourLabels = [0, 6, 12, 18]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Weekly heatmap")
+                .font(.headline)
+            content
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        let lookup = indexed(cells)
+        let maxActivity = max(cells.map(\.activityCount).max() ?? 1, 1)
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(0..<days, id: \.self) { dayOffset in
+                HStack(spacing: 2) {
+                    dayLabel(for: dayOffset)
+                        .frame(width: 52, alignment: .trailing)
+                    ForEach(0..<24, id: \.self) { hour in
+                        let activity = lookup[cellKey(day: dayOffset, hour: hour)] ?? 0
+                        let intensity = Double(activity) / Double(maxActivity)
+                        let opacity = Self.minOpacity + (Self.maxOpacity - Self.minOpacity) * intensity
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.accentColor.opacity(opacity))
+                            .frame(height: 16)
+                            .help("\(shortDayName(dayOffset)) \(String(format: "%02d", hour)):00 — \(activity) events")
+                    }
+                }
+            }
+            HStack(spacing: 2) {
+                Color.clear.frame(width: 52, height: 12)
+                ForEach(0..<24, id: \.self) { hour in
+                    Text(Self.hourLabels.contains(hour) ? "\(hour)" : "")
+                        .font(.system(size: 9).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    private func dayLabel(for dayOffset: Int) -> some View {
+        Text(shortDayName(dayOffset))
+            .font(.caption2.monospacedDigit())
+            .foregroundStyle(.secondary)
+    }
+
+    private func shortDayName(_ dayOffset: Int) -> String {
+        if dayOffset == 0 { return "Today" }
+        if dayOffset == 1 { return "Yday" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        let date = Calendar.current.date(byAdding: .day, value: -dayOffset, to: Date()) ?? Date()
+        return formatter.string(from: date)
+    }
+
+    private func cellKey(day: Int, hour: Int) -> Int {
+        day * 24 + hour
+    }
+
+    private func indexed(_ cells: [HeatmapCell]) -> [Int: Int] {
+        var result: [Int: Int] = [:]
+        for cell in cells {
+            result[cellKey(day: cell.dayOffset, hour: cell.hour)] = cell.activityCount
+        }
+        return result
     }
 }
 

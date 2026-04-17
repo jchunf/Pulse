@@ -179,6 +179,59 @@ public extension EventStore {
             )
         }
     }
+
+    // MARK: - Hourly heatmap
+
+    /// Returns one `HeatmapCell` per hour with non-zero activity in the
+    /// `days` days ending at `endingAt`. `activityCount` = key presses +
+    /// mouse clicks in the hour. Read from `hour_summary` (L3). The
+    /// current in-progress hour is **not** reflected — it's still being
+    /// accumulated in `min_*` / `sec_*` / raw tables and only rolls into
+    /// `hour_summary` once the hour is complete. The 1-hour staleness is
+    /// acceptable for a 7-day pattern visualization.
+    ///
+    /// `dayOffset` is 0 for today, `days - 1` for the oldest included day.
+    func hourlyHeatmap(
+        endingAt: Date,
+        days: Int,
+        calendar: Calendar = .current
+    ) throws -> [HeatmapCell] {
+        precondition(days >= 1, "days must be at least 1")
+        let endDay = calendar.startOfDay(for: endingAt)
+        guard let startDay = calendar.date(byAdding: .day, value: -(days - 1), to: endDay) else {
+            return []
+        }
+        let rangeStartSec = Int64(startDay.timeIntervalSince1970)
+        // Include the entire current day so the heatmap's rightmost column
+        // shows today's completed hours too.
+        guard let rangeEnd = calendar.date(byAdding: .day, value: 1, to: endDay) else {
+            return []
+        }
+        let rangeEndSec = Int64(rangeEnd.timeIntervalSince1970)
+
+        return try database.queue.read { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT ts_hour,
+                       (key_press_total + mouse_click_total) AS activity
+                FROM hour_summary
+                WHERE ts_hour >= ? AND ts_hour < ?
+                  AND (key_press_total + mouse_click_total) > 0
+                ORDER BY ts_hour
+                """, arguments: [rangeStartSec, rangeEndSec])
+            return rows.compactMap { row -> HeatmapCell? in
+                let tsHour: Int64 = row["ts_hour"]
+                let activity: Int = row["activity"]
+                let date = Date(timeIntervalSince1970: TimeInterval(tsHour))
+                let dayOfDate = calendar.startOfDay(for: date)
+                guard let daysFromStart = calendar.dateComponents([.day], from: startDay, to: dayOfDate).day else {
+                    return nil
+                }
+                let dayOffset = (days - 1) - daysFromStart
+                let hour = calendar.component(.hour, from: date)
+                return HeatmapCell(dayOffset: dayOffset, hour: hour, activityCount: activity)
+            }
+        }
+    }
 }
 
 // MARK: - Value types
@@ -217,5 +270,21 @@ public struct AppUsageRow: Sendable, Equatable, Identifiable {
     public init(bundleId: String, secondsUsed: Int) {
         self.bundleId = bundleId
         self.secondsUsed = secondsUsed
+    }
+}
+
+/// One cell of a 24h × Nd activity heatmap. `dayOffset` 0 = today, 1 =
+/// yesterday, … The producing query only emits cells with non-zero
+/// activity; UI layers should default missing `(dayOffset, hour)`
+/// combinations to zero.
+public struct HeatmapCell: Sendable, Equatable {
+    public let dayOffset: Int
+    public let hour: Int
+    public let activityCount: Int
+
+    public init(dayOffset: Int, hour: Int, activityCount: Int) {
+        self.dayOffset = dayOffset
+        self.hour = hour
+        self.activityCount = activityCount
     }
 }
