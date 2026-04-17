@@ -24,8 +24,28 @@ public extension EventStore {
         let endSec = Int64(end.timeIntervalSince1970)
 
         return try database.queue.read { db -> TodaySummary in
-            // Mouse: prefer min_mouse for closed minutes; add the open
-            // bucket from sec_mouse for the partial latest minute.
+            // The rollups are destructive: rollMinuteToHour deletes from
+            // min_*; rollSecondToMinute deletes from sec_*; rollRawToSecond
+            // deletes from raw_*. Any given (minute, second, ms) event
+            // therefore lives in exactly **one** of the layers at a time,
+            // so UNIONing the four layers over the same date range is
+            // correct regardless of rollup progress.
+
+            // L3 — closed hours promoted to hour_summary.
+            let mouseDistanceHour = try Double.fetchOne(db, sql: """
+                SELECT COALESCE(SUM(mouse_distance_mm), 0.0) FROM hour_summary
+                WHERE ts_hour >= ? AND ts_hour < ?
+                """, arguments: [startSec, endSec]) ?? 0
+            let mouseClicksHour = try Int.fetchOne(db, sql: """
+                SELECT COALESCE(SUM(mouse_click_total), 0) FROM hour_summary
+                WHERE ts_hour >= ? AND ts_hour < ?
+                """, arguments: [startSec, endSec]) ?? 0
+            let keyPressesHour = try Int.fetchOne(db, sql: """
+                SELECT COALESCE(SUM(key_press_total), 0) FROM hour_summary
+                WHERE ts_hour >= ? AND ts_hour < ?
+                """, arguments: [startSec, endSec]) ?? 0
+
+            // L2 — closed minutes not yet promoted.
             let mouseDistanceMin = try Double.fetchOne(db, sql: """
                 SELECT COALESCE(SUM(distance_mm), 0.0) FROM min_mouse
                 WHERE ts_minute >= ? AND ts_minute < ?
@@ -34,6 +54,12 @@ public extension EventStore {
                 SELECT COALESCE(SUM(click_events), 0) FROM min_mouse
                 WHERE ts_minute >= ? AND ts_minute < ?
                 """, arguments: [startSec, endSec]) ?? 0
+            let keyPressesMin = try Int.fetchOne(db, sql: """
+                SELECT COALESCE(SUM(press_count), 0) FROM min_key
+                WHERE ts_minute >= ? AND ts_minute < ?
+                """, arguments: [startSec, endSec]) ?? 0
+
+            // L1 — closed seconds not yet promoted.
             let mouseDistanceSec = try Double.fetchOne(db, sql: """
                 SELECT COALESCE(SUM(distance_mm), 0.0) FROM sec_mouse
                 WHERE ts_second >= ? AND ts_second < ?
@@ -42,18 +68,12 @@ public extension EventStore {
                 SELECT COALESCE(SUM(click_events), 0) FROM sec_mouse
                 WHERE ts_second >= ? AND ts_second < ?
                 """, arguments: [startSec, endSec]) ?? 0
-
-            // Keys: same closed/open layering.
-            let keyPressesMin = try Int.fetchOne(db, sql: """
-                SELECT COALESCE(SUM(press_count), 0) FROM min_key
-                WHERE ts_minute >= ? AND ts_minute < ?
-                """, arguments: [startSec, endSec]) ?? 0
             let keyPressesSec = try Int.fetchOne(db, sql: """
                 SELECT COALESCE(SUM(press_count), 0) FROM sec_key
                 WHERE ts_second >= ? AND ts_second < ?
                 """, arguments: [startSec, endSec]) ?? 0
 
-            // L0 raw rows that haven't been rolled yet.
+            // L0 — raw rows not yet promoted.
             let rawMoves = try Int.fetchOne(db, sql: """
                 SELECT COUNT(*) FROM raw_mouse_moves WHERE ts >= ? AND ts < ?
                 """, arguments: [startMs, endMs]) ?? 0
@@ -75,10 +95,10 @@ public extension EventStore {
             let totalActiveSeconds = topApps.reduce(0) { $0 + $1.secondsUsed }
 
             return TodaySummary(
-                totalKeyPresses: keyPressesMin + keyPressesSec + rawKeys,
-                totalMouseClicks: mouseClicksMin + mouseClicksSec + rawClicks,
+                totalKeyPresses: keyPressesHour + keyPressesMin + keyPressesSec + rawKeys,
+                totalMouseClicks: mouseClicksHour + mouseClicksMin + mouseClicksSec + rawClicks,
                 totalMouseMovesRaw: rawMoves,
-                totalMouseDistanceMillimeters: mouseDistanceMin + mouseDistanceSec,
+                totalMouseDistanceMillimeters: mouseDistanceHour + mouseDistanceMin + mouseDistanceSec,
                 totalActiveSeconds: totalActiveSeconds,
                 topApps: topApps
             )

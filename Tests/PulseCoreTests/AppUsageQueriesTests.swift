@@ -52,15 +52,16 @@ struct AppUsageQueriesTests {
         into db: PulseDatabase,
         hourStart: Date,
         keys: Int,
-        clicks: Int
+        clicks: Int,
+        distanceMm: Double = 0.0
     ) throws {
         try db.queue.write { db in
             try db.execute(
                 sql: """
                 INSERT INTO hour_summary (ts_hour, key_press_total, mouse_distance_mm, mouse_click_total, idle_seconds)
-                VALUES (?, ?, 0.0, ?, 0)
+                VALUES (?, ?, ?, ?, 0)
                 """,
-                arguments: [Int64(hourStart.timeIntervalSince1970), keys, clicks]
+                arguments: [Int64(hourStart.timeIntervalSince1970), keys, distanceMm, clicks]
             )
         }
     }
@@ -272,6 +273,68 @@ struct AppUsageQueriesTests {
         try insertHourSummary(into: db, hourStart: outside, keys: 100, clicks: 50)
         let cells = try store.hourlyHeatmap(endingAt: endingAt, days: 7, calendar: calendar)
         #expect(cells.isEmpty)
+    }
+
+    @Test("todaySummary layers hour_summary + min_* + sec_* + raw for one metric")
+    func summaryLayersAcrossRollupStates() async throws {
+        let (store, db) = try makeStore()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let day = calendar.date(from: DateComponents(
+            timeZone: calendar.timeZone, year: 2026, month: 1, day: 10, hour: 0
+        ))!
+        let now = day.addingTimeInterval(9 * 3_600 + 30 * 60 + 15) // 09:30:15
+
+        // Hours 07:00 and 08:00 are fully rolled → in hour_summary.
+        try insertHourSummary(into: db, hourStart: day.addingTimeInterval(7 * 3_600), keys: 200, clicks: 30, distanceMm: 50_000)
+        try insertHourSummary(into: db, hourStart: day.addingTimeInterval(8 * 3_600), keys: 150, clicks: 20, distanceMm: 40_000)
+
+        // Minute 09:00 rolled to min_* but hour 9 hasn't promoted yet.
+        try insertMinKey(into: db, minute: day.addingTimeInterval(9 * 3_600), presses: 20)
+        try insertMinMouse(into: db, minute: day.addingTimeInterval(9 * 3_600), distanceMm: 1_500, clicks: 3)
+
+        // Seconds 09:30:00..09:30:10 rolled to sec_* but not min_* yet.
+        try db.queue.write { db in
+            for offset in 0..<10 {
+                let sec = Int64(day.addingTimeInterval(9 * 3_600 + 30 * 60 + Double(offset)).timeIntervalSince1970)
+                try db.execute(
+                    sql: "INSERT INTO sec_key (ts_second, press_count) VALUES (?, 5)",
+                    arguments: [sec]
+                )
+                try db.execute(
+                    sql: "INSERT INTO sec_mouse (ts_second, move_events, click_events, scroll_ticks, distance_mm) VALUES (?, 0, 1, 0, 100.0)",
+                    arguments: [sec]
+                )
+            }
+        }
+
+        // Raw rows that haven't been promoted to sec yet (last ~5 seconds).
+        try db.queue.write { db in
+            for offset in 0..<5 {
+                let ms = Int64(day.addingTimeInterval(9 * 3_600 + 30 * 60 + 10 + Double(offset)).timeIntervalSince1970 * 1_000)
+                try db.execute(
+                    sql: "INSERT INTO raw_key_events (ts, key_code) VALUES (?, NULL)",
+                    arguments: [ms]
+                )
+                try db.execute(
+                    sql: "INSERT INTO raw_mouse_clicks (ts, display_id, x_norm, y_norm, button) VALUES (?, 1, 0.5, 0.5, 'left')",
+                    arguments: [ms]
+                )
+            }
+        }
+
+        let summary = try store.todaySummary(
+            start: day,
+            end: day.addingTimeInterval(86_400),
+            capUntil: now
+        )
+
+        // Keys: 200 + 150 (hour) + 20 (min) + 5×10 (sec) + 5 (raw) = 425.
+        #expect(summary.totalKeyPresses == 200 + 150 + 20 + 50 + 5)
+        // Clicks: 30 + 20 (hour) + 3 (min) + 10 (sec) + 5 (raw) = 68.
+        #expect(summary.totalMouseClicks == 30 + 20 + 3 + 10 + 5)
+        // Distance: 50_000 + 40_000 (hour) + 1_500 (min) + 10×100 (sec) = 92_500 mm.
+        #expect(summary.totalMouseDistanceMillimeters == 50_000 + 40_000 + 1_500 + 1_000)
     }
 
     @Test("queries handle an empty database")
