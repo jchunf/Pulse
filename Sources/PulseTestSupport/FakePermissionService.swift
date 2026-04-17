@@ -17,20 +17,32 @@ public final class FakePermissionService: PermissionService, @unchecked Sendable
     }
 
     public func status(of permission: Permission) -> PermissionStatus {
-        lock.lock(); defer { lock.unlock() }
-        return statuses[permission] ?? .notDetermined
+        readStatus(of: permission)
     }
 
     public func requestAccess(for permission: Permission) async {
-        lock.lock()
-        requestCounts[permission, default: 0] += 1
-        lock.unlock()
+        // Delegated to a sync helper. Holding a lock across an async body
+        // would trip the Swift 6 noasync diagnostic on NSLock; keeping the
+        // critical section entirely synchronous avoids it.
+        recordRequest(for: permission)
     }
 
     /// Directly set a permission's status. Test-only.
     public func setStatus(_ status: PermissionStatus, for permission: Permission) {
         lock.lock(); defer { lock.unlock() }
         statuses[permission] = status
+    }
+
+    // MARK: - Private sync helpers (NSLock-using critical sections stay sync)
+
+    private func readStatus(of permission: Permission) -> PermissionStatus {
+        lock.lock(); defer { lock.unlock() }
+        return statuses[permission] ?? .notDetermined
+    }
+
+    private func recordRequest(for permission: Permission) {
+        lock.lock(); defer { lock.unlock() }
+        requestCounts[permission, default: 0] += 1
     }
 
     /// Convenience: grant all defined permissions.
