@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import GRDB
 @testable import PulseCore
 import PulseTestSupport
 
@@ -168,6 +169,31 @@ struct CollectorRuntimeTests {
             )
         }
         #expect(categories.contains("idle_entered"))
+    }
+
+    @Test("lid and power events from external sources land as system_events")
+    func lidAndPowerEventsPersist() async throws {
+        let (runtime, db, clock, _) = try makeRuntime()
+        await runtime.setRunningForTesting()
+        await runtime.ingestExternalEvent(.lidClosed(at: clock.now))
+        clock.advance(1)
+        await runtime.ingestExternalEvent(.lidOpened(at: clock.now))
+        clock.advance(1)
+        await runtime.ingestExternalEvent(.powerChanged(isOnBattery: true, percent: 87, at: clock.now))
+        await runtime.flushForTesting()
+
+        let rows = try await db.queue.read { db -> [(String, String?)] in
+            try Row.fetchAll(
+                db,
+                sql: "SELECT category, payload FROM system_events WHERE category IN ('lid_closed','lid_opened','power') ORDER BY ts"
+            ).map { row -> (String, String?) in
+                let category: String = row["category"]
+                let payload: String? = row["payload"]
+                return (category, payload)
+            }
+        }
+        #expect(rows.map(\.0) == ["lid_closed", "lid_opened", "power"])
+        #expect(rows.last?.1 == "battery:87")
     }
 
     @Test("ingestExternalEvent routes through the same gates as primary source")
