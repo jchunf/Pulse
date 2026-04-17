@@ -7,6 +7,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# The PR-comment step below needs write access to the PR conversation.
+# Reads are given as a belt-and-suspenders safeguard.
+permissions:
+  contents: read
+  pull-requests: write
+
 # Cancel in-progress runs on the same PR when a new push arrives.
 concurrency:
   group: ci-${{ github.ref }}
@@ -170,9 +176,17 @@ jobs:
             done
           } > /tmp/comment.md
 
-          gh pr comment ${{ github.event.pull_request.number }} \
-            --body-file /tmp/comment.md \
-            --repo ${{ github.repository }}
+          # Echo to the run's step summary first so logs are always viewable
+          # in the Actions UI, even if the comment post below fails.
+          cat /tmp/comment.md >> "$GITHUB_STEP_SUMMARY"
+
+          if ! gh pr comment ${{ github.event.pull_request.number }} \
+                --body-file /tmp/comment.md \
+                --repo ${{ github.repository }}; then
+            echo "::warning::gh pr comment failed; see step summary for the payload"
+            echo "=== would-be comment payload ==="
+            cat /tmp/comment.md
+          fi
 
   # ---------------------------------------------------------------------------
   # Lightweight lint pass — fast, independent, runs on every PR.
