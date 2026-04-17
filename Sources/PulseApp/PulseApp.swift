@@ -345,6 +345,7 @@ struct DashboardView: View {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 if let summary = model.summary {
+                    MileageHeroCard(distanceMillimeters: summary.totalMouseDistanceMillimeters)
                     SummaryCardsView(summary: summary)
                     AppRankingChart(rows: summary.topApps)
                 } else if model.errorMessage != nil {
@@ -390,6 +391,67 @@ struct DashboardView: View {
         if seconds < 60 { return "\(seconds)s ago" }
         if seconds < 3_600 { return "\(seconds / 60)m ago" }
         return "\(seconds / 3_600)h ago"
+    }
+}
+
+/// Hero card for the "mouse mileage" feature (F-07). Shows today's cursor
+/// distance in a prominent typeface with a dramatic landmark comparison
+/// underneath — the "哇" moment the roadmap flags as the MVP's addictive
+/// hook. The comparison text comes from `LandmarkLibrary`, which preserves
+/// drama at both first-day (tiny fractions of a pool) and long-running
+/// (multiples of a marathon) scales.
+struct MileageHeroCard: View {
+
+    let distanceMillimeters: Double
+    let library: LandmarkLibrary
+
+    init(distanceMillimeters: Double, library: LandmarkLibrary = .standard) {
+        self.distanceMillimeters = distanceMillimeters
+        self.library = library
+    }
+
+    var body: some View {
+        let meters = distanceMillimeters / 1_000.0
+        let comparison = library.bestMatch(forMeters: meters)
+
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Mouse mileage today")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            Text(formatDistance(meters: meters))
+                .font(.system(size: 52, weight: .bold, design: .rounded))
+                .monospacedDigit()
+            Text(comparison.humanReadable)
+                .font(.title3)
+                .foregroundStyle(.secondary)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [Color.accentColor.opacity(0.18), Color.accentColor.opacity(0.05)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.accentColor.opacity(0.25), lineWidth: 1)
+        )
+    }
+
+    private func formatDistance(meters: Double) -> String {
+        if meters < 0.1 {
+            return String(format: "%.0f mm", meters * 1_000)
+        } else if meters < 1 {
+            return String(format: "%.0f cm", meters * 100)
+        } else if meters < 1_000 {
+            return String(format: "%.1f m", meters)
+        } else {
+            return String(format: "%.2f km", meters / 1_000)
+        }
     }
 }
 
