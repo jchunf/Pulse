@@ -1,0 +1,618 @@
+{
+  "sourceLanguage" : "en",
+  "version" : "1.0",
+  "strings" : {
+    "1 hour" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "1 hour" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "1 小时" } }
+      }
+    },
+    "1 second" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "1 second" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "1 秒" } }
+      }
+    },
+    "10 seconds" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "10 seconds" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "10 秒" } }
+      }
+    },
+    "14 days" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "14 days" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "14 天" } }
+      }
+    },
+    "15 minutes" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "15 minutes" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "15 分钟" } }
+      }
+    },
+    "3 days" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "3 days" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "3 天" } }
+      }
+    },
+    "30 days" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "30 days" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "30 天" } }
+      }
+    },
+    "30 minutes" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "30 minutes" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "30 分钟" } }
+      }
+    },
+    "30 seconds" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "30 seconds" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "30 秒" } }
+      }
+    },
+    "5 seconds" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "5 seconds" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "5 秒" } }
+      }
+    },
+    "7 days" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "7 days" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "7 天" } }
+      }
+    },
+    "About" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "About" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "关于" } }
+      }
+    },
+    "Accessibility" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Accessibility" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "辅助功能" } }
+      }
+    },
+    "Active time" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Active time" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "活跃时长" } }
+      }
+    },
+    "Build" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Build" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "版本" } }
+      }
+    },
+    "Calendars" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Calendars" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "日历" } }
+      }
+    },
+    "Clicks" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clicks" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "点击" } }
+      }
+    },
+    "Collector idle — please open settings." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Collector idle — please open settings." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "采集器空闲 — 请打开设置。" } }
+      }
+    },
+    "Couldn't start the collector: %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Couldn't start the collector: %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法启动采集器：%@" } }
+      }
+    },
+    "Dashboard" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Dashboard" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仪表盘" } }
+      }
+    },
+    "Database not available." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Database not available." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "数据库不可用。" } }
+      }
+    },
+    "Database size" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Database size" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "数据库大小" } }
+      }
+    },
+    "DB size" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "DB size" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "库大小" } }
+      }
+    },
+    "Diagnostics" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Diagnostics" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "诊断" } }
+      }
+    },
+    "Dismiss" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Dismiss" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "关闭" } }
+      }
+    },
+    "Distance" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Distance" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "距离" } }
+      }
+    },
+    "Failed to load summary: %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Failed to load summary: %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "加载汇总失败：%@" } }
+      }
+    },
+    "Grant the permissions below in System Settings, then relaunch Pulse. Until then the numbers on this page won't update." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Grant the permissions below in System Settings, then relaunch Pulse. Until then the numbers on this page won't update." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请在「系统设置」中授予下列权限，然后重启 Pulse。在那之前本页面的数字不会更新。" } }
+      }
+    },
+    "Heatmap window" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Heatmap window" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "热力图窗口" } }
+      }
+    },
+    "How many past days the weekly heatmap covers. Longer windows make each cell smaller; shorter windows emphasise recent pattern." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "How many past days the weekly heatmap covers. Longer windows make each cell smaller; shorter windows emphasise recent pattern." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "热力图覆盖过去多少天。窗口越长，每个格子越小；越短越能突出近期模式。" } }
+      }
+    },
+    "How often the Dashboard window re-queries the local database. Reducing the interval uses a tiny bit more CPU; raising it is fine for passive monitoring." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "How often the Dashboard window re-queries the local database. Reducing the interval uses a tiny bit more CPU; raising it is fine for passive monitoring." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仪表盘窗口查询本地数据库的频率。间隔越短越耗 CPU；被动监控场景调大也无妨。" } }
+      }
+    },
+    "Idle time" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Idle time" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "空闲时长" } }
+      }
+    },
+    "Input Monitoring" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Input Monitoring" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "输入监控" } }
+      }
+    },
+    "Key events (raw)" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Key events (raw)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "按键事件（原始）" } }
+      }
+    },
+    "Keystrokes" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Keystrokes" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "按键" } }
+      }
+    },
+    "Last data point" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Last data point" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "最近数据点" } }
+      }
+    },
+    "Last rollup" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Last rollup" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "最近汇总" } }
+      }
+    },
+    "Last write" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Last write" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "最近写入" } }
+      }
+    },
+    "Last writer error" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Last writer error" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "最近写入错误" } }
+      }
+    },
+    "Listening to your pulse." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Listening to your pulse." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在聆听你的脉搏。" } }
+      }
+    },
+    "Loading today's data…" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Loading today's data…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在加载今日数据…" } }
+      }
+    },
+    "Location Services" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Location Services" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "位置服务" } }
+      }
+    },
+    "Milestone reached" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Milestone reached" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "达成里程碑" } }
+      }
+    },
+    "Mouse clicks (raw)" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Mouse clicks (raw)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "鼠标点击（原始）" } }
+      }
+    },
+    "Mouse mileage today" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Mouse mileage today" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "今日鼠标里程" } }
+      }
+    },
+    "Mouse moves (raw)" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Mouse moves (raw)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "鼠标移动（原始）" } }
+      }
+    },
+    "never" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "never" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "从未" } }
+      }
+    },
+    "No app activity recorded yet today." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No app activity recorded yet today." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "今天还没有记录到应用活动。" } }
+      }
+    },
+    "No rolled-up activity yet. Check back once hourly roll-ups have run." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No rolled-up activity yet. Check back once hourly roll-ups have run." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "还没有汇总数据。等每小时汇总跑过后再来看。" } }
+      }
+    },
+    "No writes in the last minute — Pulse may have lost permission or stopped." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No writes in the last minute — Pulse may have lost permission or stopped." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "过去一分钟没有新数据 — Pulse 可能已失去权限或已停止。" } }
+      }
+    },
+    "Notifications" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Notifications" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通知" } }
+      }
+    },
+    "Open %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开 %@" } }
+      }
+    },
+    "Open %@ settings" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open %@ settings" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开 %@ 设置" } }
+      }
+    },
+    "Open Dashboard" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Dashboard" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开仪表盘" } }
+      }
+    },
+    "Paused" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Paused" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已暂停" } }
+      }
+    },
+    "Paused." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Paused." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已暂停。" } }
+      }
+    },
+    "Paused — collection resumes shortly." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Paused — collection resumes shortly." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已暂停 — 采集即将恢复。" } }
+      }
+    },
+    "Pause collection…" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pause collection…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂停采集…" } }
+      }
+    },
+    "Permissions needed" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Permissions needed" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "需要权限" } }
+      }
+    },
+    "Pulse" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pulse" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Pulse" } }
+      }
+    },
+    "Pulse can't collect without the following permissions. Grant them in System Settings, then relaunch Pulse." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pulse can't collect without the following permissions. Grant them in System Settings, then relaunch Pulse." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Pulse 缺少以下权限就无法采集。请在系统设置中授予后重启 Pulse。" } }
+      }
+    },
+    "Pulse Dashboard" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pulse Dashboard" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Pulse 仪表盘" } }
+      }
+    },
+    "Pulse isn't collecting right now" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pulse isn't collecting right now" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Pulse 目前没在采集" } }
+      }
+    },
+    "Quit Pulse" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quit Pulse" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "退出 Pulse" } }
+      }
+    },
+    "Recent heatmap" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recent heatmap" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "近期热力图" } }
+      }
+    },
+    "Refresh" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refresh" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新" } }
+      }
+    },
+    "Refresh every" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refresh every" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新频率" } }
+      }
+    },
+    "Resume now" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Resume now" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "立即恢复" } }
+      }
+    },
+    "Resumes %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Resumes %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 恢复" } }
+      }
+    },
+    "Scrolls" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Scrolls" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "滚动" } }
+      }
+    },
+    "Sensitive period active." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sensitive period active." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "敏感时段进行中。" } }
+      }
+    },
+    "Stopped." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Stopped." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已停止。" } }
+      }
+    },
+    "Today" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Today" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "今天" } }
+      }
+    },
+    "Top apps" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Top apps" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "应用排行" } }
+      }
+    },
+    "Total flushes" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Total flushes" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "累计刷写" } }
+      }
+    },
+    "Total ingest batches" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Total ingest batches" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "累计写入批次" } }
+      }
+    },
+    "Two-week heatmap" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Two-week heatmap" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "两周热力图" } }
+      }
+    },
+    "Updated %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Updated %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新于 %@" } }
+      }
+    },
+    "Waiting for permissions." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Waiting for permissions." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "等待权限中。" } }
+      }
+    },
+    "Weekly heatmap" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Weekly heatmap" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "周热力图" } }
+      }
+    },
+    "Weekly trend" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Weekly trend" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每周趋势" } }
+      }
+    },
+    "Yday" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Yday" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "昨天" } }
+      }
+    },
+    "You've moved %@ so far today." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "You've moved %@ so far today." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "你今天目前已经走了 %@。" } }
+      }
+    },
+    "Today's mileage just hit %@ — %@." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Today's mileage just hit %@ — %@." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "今日里程已达 %@ —— %@。" } }
+      }
+    },
+    "%lld-day heatmap" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%lld-day heatmap" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%lld 天热力图" } }
+      }
+    },
+    "landmark.step.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "step" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "一步" } }
+      }
+    },
+    "landmark.pool.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "swimming pool length" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "泳池长度" } }
+      }
+    },
+    "landmark.track.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "athletics track lap" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "田径跑道一圈" } }
+      }
+    },
+    "landmark.kilometer.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "kilometer" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "一千米" } }
+      }
+    },
+    "landmark.marathon.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "marathon" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "马拉松" } }
+      }
+    },
+    "landmark.beijing_gz.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Beijing → Guangzhou" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "北京到广州" } }
+      }
+    },
+    "landmark.pacific.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "the Pacific" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "太平洋" } }
+      }
+    },
+    "landmark.equator.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Earth's equator" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "地球赤道" } }
+      }
+    },
+    "mileage.comparison.tiny" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "a tiny fraction of %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仅为 %@ 的一小段" } }
+      }
+    },
+    "mileage.comparison.percent" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%lld%% of %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "约为 %@ 的 %lld%%" } }
+      }
+    },
+    "mileage.comparison.aboutOne" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "about 1× %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "约 1× %@" } }
+      }
+    },
+    "mileage.comparison.multi" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "≈ %@× %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "约 %@× %@" } }
+      }
+    },
+    "permission.status.granted" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "granted" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已授权" } }
+      }
+    },
+    "permission.status.denied" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "denied" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已拒绝" } }
+      }
+    },
+    "permission.status.notDetermined" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "notDetermined" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未决定" } }
+      }
+    },
+    "permission.status.unknown" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "unknown" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未知" } }
+      }
+    },
+    "just now" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "just now" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刚刚" } }
+      }
+    }
+  }
+}

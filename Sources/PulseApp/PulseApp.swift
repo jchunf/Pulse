@@ -228,7 +228,10 @@ final class HealthModel: ObservableObject {
     }
 
     func recordStartupError(_ error: Error) {
-        self.errorMessage = "Couldn't start the collector: \(error.localizedDescription)"
+        self.errorMessage = String.localizedStringWithFormat(
+            NSLocalizedString("Couldn't start the collector: %@", bundle: .module, comment: ""),
+            error.localizedDescription
+        )
     }
 
     var menuBarIconName: String {
@@ -323,7 +326,7 @@ final class DashboardModel: ObservableObject {
 
     func refresh() async {
         guard let store else {
-            errorMessage = "Database not available."
+            errorMessage = String(localized: "Database not available.", bundle: .module)
             return
         }
         let now = Date()
@@ -345,7 +348,10 @@ final class DashboardModel: ObservableObject {
                 now: now
             )
         } catch {
-            self.errorMessage = "Failed to load summary: \(error.localizedDescription)"
+            self.errorMessage = String.localizedStringWithFormat(
+                NSLocalizedString("Failed to load summary: %@", bundle: .module, comment: ""),
+                error.localizedDescription
+            )
         }
     }
 
@@ -416,6 +422,34 @@ struct LandmarkAchievement: Equatable {
     let firstReachedAt: Date
 }
 
+// MARK: - Localization helpers
+
+/// Translated display name for a `Permission`. `PulseCore` keeps the
+/// canonical `Permission.displayName` in English so tests and logs stay
+/// stable; the View layer maps the enum to the matching catalog key.
+func localizedPermissionStatus(_ status: PermissionStatus) -> String {
+    let key: String
+    switch status {
+    case .granted:        key = "permission.status.granted"
+    case .denied:         key = "permission.status.denied"
+    case .notDetermined:  key = "permission.status.notDetermined"
+    case .unknown:        key = "permission.status.unknown"
+    }
+    return NSLocalizedString(key, bundle: .module, value: status.rawValue, comment: "")
+}
+
+func localizedPermissionName(_ permission: Permission) -> String {
+    let key: String
+    switch permission {
+    case .inputMonitoring: key = "Input Monitoring"
+    case .accessibility:   key = "Accessibility"
+    case .calendars:       key = "Calendars"
+    case .location:        key = "Location Services"
+    case .notifications:   key = "Notifications"
+    }
+    return NSLocalizedString(key, bundle: .module, value: permission.displayName, comment: "")
+}
+
 // MARK: - Views
 
 struct HealthMenuView: View {
@@ -428,9 +462,9 @@ struct HealthMenuView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Pulse").font(.headline)
+                Text("Pulse", bundle: .module).font(.headline)
                 Spacer()
-                Text(model.snapshot.statusHeadline)
+                Text(localizedStatusHeadline(for: model.snapshot), bundle: .module)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.trailing)
@@ -465,17 +499,45 @@ struct HealthMenuView: View {
             Divider()
 
             HStack {
-                Button("Open Dashboard") {
+                Button {
                     openWindow(id: "dashboard")
                     NSApp.activate(ignoringOtherApps: true)
+                } label: {
+                    Text("Open Dashboard", bundle: .module)
                 }
                 Spacer()
-                Button("Quit Pulse") { NSApp.terminate(nil) }
-                    .keyboardShortcut("q")
+                Button { NSApp.terminate(nil) } label: {
+                    Text("Quit Pulse", bundle: .module)
+                }
+                .keyboardShortcut("q")
             }
         }
         .padding(14)
         .frame(width: 360)
+    }
+
+    /// Derives the menu-bar status headline from the raw HealthSnapshot
+    /// flags so it can be localized via the xcstrings catalog. Mirrors
+    /// `HealthSnapshot.statusHeadline` (which remains English-only for
+    /// developer logs).
+    private func localizedStatusHeadline(for snapshot: HealthSnapshot) -> LocalizedStringKey {
+        if snapshot.pause.isActive {
+            switch snapshot.pause.reason {
+            case .userPause:       return "Paused — collection resumes shortly."
+            case .sensitivePeriod: return "Sensitive period active."
+            case .none:            return "Paused."
+            }
+        }
+        if !snapshot.permissions.isAllRequiredGranted {
+            return "Waiting for permissions."
+        }
+        if snapshot.isSilentlyFailing {
+            return "Collector idle — please open settings."
+        }
+        if snapshot.isRunning {
+            return "Listening to your pulse."
+        }
+        return "Stopped."
     }
 }
 
@@ -494,37 +556,37 @@ struct PauseControlsView: View {
         if pause.isActive, let resumesAt = pause.resumesAt {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Label("Paused", systemImage: "pause.circle.fill")
-                        .font(.footnote.bold())
-                        .foregroundStyle(.orange)
-                    Text("Resumes \(formatCountdown(from: capturedAt, to: resumesAt))")
+                    Label {
+                        Text("Paused", bundle: .module)
+                    } icon: {
+                        Image(systemName: "pause.circle.fill")
+                    }
+                    .font(.footnote.bold())
+                    .foregroundStyle(.orange)
+                    Text("Resumes \(PulseFormat.countdown(from: capturedAt, to: resumesAt))", bundle: .module)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Resume now", action: onResume)
+                Button(action: onResume) {
+                    Text("Resume now", bundle: .module)
+                }
             }
         } else {
             Menu {
-                Button("15 minutes")  { onPause(15 * 60) }
-                Button("30 minutes")  { onPause(30 * 60) }
-                Button("1 hour")      { onPause(60 * 60) }
+                Button { onPause(15 * 60) } label: { Text("15 minutes", bundle: .module) }
+                Button { onPause(30 * 60) } label: { Text("30 minutes", bundle: .module) }
+                Button { onPause(60 * 60) } label: { Text("1 hour",     bundle: .module) }
             } label: {
-                Label("Pause collection…", systemImage: "pause.circle")
-                    .font(.footnote)
+                Label {
+                    Text("Pause collection…", bundle: .module)
+                } icon: {
+                    Image(systemName: "pause.circle")
+                }
+                .font(.footnote)
             }
             .menuStyle(.borderlessButton)
         }
-    }
-
-    private func formatCountdown(from now: Date, to target: Date) -> String {
-        let seconds = max(0, Int(target.timeIntervalSince(now)))
-        if seconds < 60 { return "in \(seconds)s" }
-        let minutes = seconds / 60
-        if minutes < 60 { return "in \(minutes)m" }
-        let hours = minutes / 60
-        let remMinutes = minutes % 60
-        return remMinutes == 0 ? "in \(hours)h" : "in \(hours)h \(remMinutes)m"
     }
 }
 
@@ -555,9 +617,11 @@ struct DashboardView: View {
                     Text(model.errorMessage ?? "")
                         .foregroundStyle(.red)
                 } else {
-                    ProgressView("Loading today's data…")
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.top, 40)
+                    ProgressView {
+                        Text("Loading today's data…", bundle: .module)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 40)
                 }
             }
             .padding(24)
@@ -579,7 +643,11 @@ struct DashboardView: View {
                 Button {
                     Task { await model.refresh() }
                 } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+                    Label {
+                        Text("Refresh", bundle: .module)
+                    } icon: {
+                        Image(systemName: "arrow.clockwise")
+                    }
                 }
             }
         }
@@ -587,22 +655,14 @@ struct DashboardView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Today")
+            Text("Today", bundle: .module)
                 .font(.largeTitle.bold())
             if let last = model.lastRefreshAt {
-                Text("Updated \(formatRelative(last))")
+                Text("Updated \(PulseFormat.ago(from: last, to: Date()))", bundle: .module)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         }
-    }
-
-    private func formatRelative(_ instant: Date) -> String {
-        let seconds = Int(Date().timeIntervalSince(instant))
-        if seconds < 5 { return "just now" }
-        if seconds < 60 { return "\(seconds)s ago" }
-        if seconds < 3_600 { return "\(seconds / 60)m ago" }
-        return "\(seconds / 3_600)h ago"
     }
 }
 
@@ -625,10 +685,10 @@ struct DashboardPermissionBanner: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
-                    Text("Pulse isn't collecting right now")
+                    Text("Pulse isn't collecting right now", bundle: .module)
                         .font(.headline)
                 }
-                Text("Grant the permissions below in System Settings, then relaunch Pulse. Until then the numbers on this page won't update.")
+                Text("Grant the permissions below in System Settings, then relaunch Pulse. Until then the numbers on this page won't update.", bundle: .module)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -639,7 +699,11 @@ struct DashboardPermissionBanner: View {
                                 NSWorkspace.shared.open(url)
                             }
                         } label: {
-                            Label("Open \(permission.displayName)", systemImage: "arrow.up.forward.app")
+                            Label {
+                                Text("Open \(localizedPermissionName(permission))", bundle: .module)
+                            } icon: {
+                                Image(systemName: "arrow.up.forward.app")
+                            }
                         }
                     }
                 }
@@ -665,19 +729,22 @@ struct MilestoneAchievementBanner: View {
     let onDismiss: () -> Void
 
     var body: some View {
+        let landmarkName = PulseFormat.localizedLandmarkName(for: achievement.landmark)
+        let landmarkDistance = PulseFormat.metersWhole(achievement.landmark.distanceMeters)
+        let movedSoFar = PulseFormat.metersWhole(achievement.metersReached)
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "sparkles")
                 .font(.title2)
                 .foregroundStyle(Color.accentColor)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Milestone reached")
+                Text("Milestone reached", bundle: .module)
                     .font(.caption.bold())
                     .foregroundStyle(Color.accentColor)
                     .textCase(.uppercase)
-                Text("Today's mileage just hit \(achievement.landmark.displayName) — \(achievement.landmark.distanceMeters.formatted(.number.precision(.fractionLength(0)))) m.")
+                Text("Today's mileage just hit \(landmarkName) — \(landmarkDistance).", bundle: .module)
                     .font(.body)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("You've moved \(String(format: "%.0f", achievement.metersReached)) m so far today.")
+                Text("You've moved \(movedSoFar) so far today.", bundle: .module)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -688,7 +755,7 @@ struct MilestoneAchievementBanner: View {
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(.borderless)
-            .help("Dismiss")
+            .help(Text("Dismiss", bundle: .module))
         }
         .padding(14)
         .background(
@@ -727,14 +794,14 @@ struct MileageHeroCard: View {
         let comparison = library.bestMatch(forMeters: meters)
 
         VStack(alignment: .leading, spacing: 10) {
-            Text("Mouse mileage today")
+            Text("Mouse mileage today", bundle: .module)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
-            Text(formatDistance(meters: meters))
+            Text(PulseFormat.distance(millimeters: distanceMillimeters))
                 .font(.system(size: 52, weight: .bold, design: .rounded))
                 .monospacedDigit()
-            Text(comparison.humanReadable)
+            Text(PulseFormat.landmarkComparisonSentence(for: comparison))
                 .font(.title3)
                 .foregroundStyle(.secondary)
         }
@@ -753,18 +820,6 @@ struct MileageHeroCard: View {
                 .strokeBorder(Color.accentColor.opacity(0.25), lineWidth: 1)
         )
     }
-
-    private func formatDistance(meters: Double) -> String {
-        if meters < 0.1 {
-            return String(format: "%.0f mm", meters * 1_000)
-        } else if meters < 1 {
-            return String(format: "%.0f cm", meters * 100)
-        } else if meters < 1_000 {
-            return String(format: "%.1f m", meters)
-        } else {
-            return String(format: "%.2f km", meters / 1_000)
-        }
-    }
 }
 
 struct SummaryCardsView: View {
@@ -774,18 +829,18 @@ struct SummaryCardsView: View {
     var body: some View {
         let columns = [GridItem(.adaptive(minimum: 160), spacing: 12)]
         LazyVGrid(columns: columns, spacing: 12) {
-            metric(title: "Distance", value: formatMeters(summary.totalMouseDistanceMillimeters))
-            metric(title: "Clicks", value: format(summary.totalMouseClicks))
-            metric(title: "Scrolls", value: format(summary.totalScrollTicks))
-            metric(title: "Keystrokes", value: format(summary.totalKeyPresses))
-            metric(title: "Active time", value: formatDuration(summary.totalActiveSeconds))
-            metric(title: "Idle time", value: formatDuration(summary.totalIdleSeconds))
+            metric(titleKey: "Distance", value: PulseFormat.distance(millimeters: summary.totalMouseDistanceMillimeters))
+            metric(titleKey: "Clicks", value: PulseFormat.integer(summary.totalMouseClicks))
+            metric(titleKey: "Scrolls", value: PulseFormat.integer(summary.totalScrollTicks))
+            metric(titleKey: "Keystrokes", value: PulseFormat.integer(summary.totalKeyPresses))
+            metric(titleKey: "Active time", value: PulseFormat.duration(seconds: summary.totalActiveSeconds))
+            metric(titleKey: "Idle time", value: PulseFormat.duration(seconds: summary.totalIdleSeconds))
         }
     }
 
-    private func metric(title: String, value: String) -> some View {
+    private func metric(titleKey: LocalizedStringKey, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
+            Text(titleKey, bundle: .module)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Text(value)
@@ -794,28 +849,6 @@ struct SummaryCardsView: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func format(_ value: Int) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
-    }
-
-    private func formatMeters(_ mm: Double) -> String {
-        let meters = mm / 1_000.0
-        if meters < 1 { return String(format: "%.0f mm", mm) }
-        if meters < 1_000 { return String(format: "%.1f m", meters) }
-        return String(format: "%.2f km", meters / 1_000.0)
-    }
-
-    private func formatDuration(_ seconds: Int) -> String {
-        if seconds < 60 { return "\(seconds)s" }
-        let minutes = seconds / 60
-        if minutes < 60 { return "\(minutes)m" }
-        let hours = minutes / 60
-        let remMinutes = minutes % 60
-        return "\(hours)h \(remMinutes)m"
     }
 }
 
@@ -829,10 +862,10 @@ struct WeekTrendChart: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Weekly trend")
+            Text("Weekly trend", bundle: .module)
                 .font(.headline)
             if points.allSatisfy({ $0.totalEvents == 0 }) {
-                Text("No rolled-up activity yet. Check back once hourly roll-ups have run.")
+                Text("No rolled-up activity yet. Check back once hourly roll-ups have run.", bundle: .module)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 12)
             } else {
@@ -867,9 +900,13 @@ struct WeekTrendChart: View {
         }
     }
 
+    /// Short weekday name ("Mon" / "周一") via `DateFormatter` using
+    /// `Locale.current`, so the chart x-axis reads correctly under both
+    /// English and Chinese system settings.
     private func shortDay(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "EEE"
+        formatter.locale = .current
+        formatter.setLocalizedDateFormatFromTemplate("EEE")
         return formatter.string(from: date)
     }
 }
@@ -890,18 +927,18 @@ struct WeekHourlyHeatmap: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(headline)
-                .font(.headline)
+            headlineText.font(.headline)
             content
         }
     }
 
-    private var headline: String {
+    @ViewBuilder
+    private var headlineText: some View {
         switch days {
-        case ..<7:   return "Recent heatmap"
-        case 7:      return "Weekly heatmap"
-        case 8...14: return "Two-week heatmap"
-        default:     return "\(days)-day heatmap"
+        case ..<7:   Text("Recent heatmap",   bundle: .module)
+        case 7:      Text("Weekly heatmap",   bundle: .module)
+        case 8...14: Text("Two-week heatmap", bundle: .module)
+        default:     Text("\(days)-day heatmap", bundle: .module)
         }
     }
 
@@ -921,7 +958,6 @@ struct WeekHourlyHeatmap: View {
                         RoundedRectangle(cornerRadius: 2)
                             .fill(Color.accentColor.opacity(opacity))
                             .frame(height: 16)
-                            .help("\(shortDayName(dayOffset)) \(String(format: "%02d", hour)):00 — \(activity) events")
                     }
                 }
             }
@@ -937,17 +973,28 @@ struct WeekHourlyHeatmap: View {
         }
     }
 
+    @ViewBuilder
     private func dayLabel(for dayOffset: Int) -> some View {
-        Text(shortDayName(dayOffset))
-            .font(.caption2.monospacedDigit())
-            .foregroundStyle(.secondary)
+        switch dayOffset {
+        case 0:
+            Text("Today", bundle: .module)
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+        case 1:
+            Text("Yday", bundle: .module)
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+        default:
+            Text(shortDayName(dayOffset))
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func shortDayName(_ dayOffset: Int) -> String {
-        if dayOffset == 0 { return "Today" }
-        if dayOffset == 1 { return "Yday" }
         let formatter = DateFormatter()
-        formatter.dateFormat = "EEE"
+        formatter.locale = .current
+        formatter.setLocalizedDateFormatFromTemplate("EEE")
         let date = Calendar.current.date(byAdding: .day, value: -dayOffset, to: Date()) ?? Date()
         return formatter.string(from: date)
     }
@@ -976,36 +1023,44 @@ struct DiagnosticsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Diagnostics")
+            Text("Diagnostics", bundle: .module)
                 .font(.headline)
 
             if snapshot.isSilentlyFailing {
-                Label("No writes in the last minute — Pulse may have lost permission or stopped.", systemImage: "exclamationmark.circle.fill")
-                    .font(.footnote)
-                    .foregroundStyle(.orange)
-                    .padding(8)
-                    .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+                Label {
+                    Text("No writes in the last minute — Pulse may have lost permission or stopped.", bundle: .module)
+                } icon: {
+                    Image(systemName: "exclamationmark.circle.fill")
+                }
+                .font(.footnote)
+                .foregroundStyle(.orange)
+                .padding(8)
+                .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
             }
 
-            metricRow(label: "Last data point",
-                      value: snapshot.lastWriteAt.map { ago(from: $0, to: snapshot.capturedAt) } ?? "never")
-            metricRow(label: "Last rollup",
-                      value: mostRecentRollup.map { ago(from: $0, to: snapshot.capturedAt) } ?? "never")
-            metricRow(label: "Database size",
-                      value: snapshot.databaseFileSizeBytes.map {
-                          ByteCountFormatter.string(fromByteCount: $0, countStyle: .file)
-                      } ?? "unknown")
-            metricRow(label: "Total ingest batches",
-                      value: "\(snapshot.writer.totalFlushes)")
+            metricRow(labelKey: "Last data point",
+                      value: snapshot.lastWriteAt.map { PulseFormat.ago(from: $0, to: snapshot.capturedAt) }
+                        ?? String(localized: "never", bundle: .module))
+            metricRow(labelKey: "Last rollup",
+                      value: mostRecentRollup.map { PulseFormat.ago(from: $0, to: snapshot.capturedAt) }
+                        ?? String(localized: "never", bundle: .module))
+            metricRow(labelKey: "Database size",
+                      value: snapshot.databaseFileSizeBytes.map(PulseFormat.bytes) ?? "–")
+            metricRow(labelKey: "Total ingest batches",
+                      value: PulseFormat.integer(snapshot.writer.totalFlushes))
 
             if let error = snapshot.writer.lastErrorDescription,
                let errorAt = snapshot.writer.lastErrorAt {
                 Divider()
                 VStack(alignment: .leading, spacing: 2) {
-                    Label("Last writer error", systemImage: "exclamationmark.triangle")
-                        .font(.footnote.bold())
-                        .foregroundStyle(.orange)
-                    Text("\(ago(from: errorAt, to: snapshot.capturedAt)): \(error)")
+                    Label {
+                        Text("Last writer error", bundle: .module)
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle")
+                    }
+                    .font(.footnote.bold())
+                    .foregroundStyle(.orange)
+                    Text("\(PulseFormat.ago(from: errorAt, to: snapshot.capturedAt)): \(error)")
                         .font(.footnote.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
@@ -1019,9 +1074,9 @@ struct DiagnosticsCard: View {
     }
 
     @ViewBuilder
-    private func metricRow(label: String, value: String) -> some View {
+    private func metricRow(labelKey: LocalizedStringKey, value: String) -> some View {
         HStack {
-            Text(label)
+            Text(labelKey, bundle: .module)
                 .font(.footnote)
             Spacer()
             Text(value)
@@ -1037,16 +1092,9 @@ struct DiagnosticsCard: View {
             snapshot.rollupStamps.minuteToHour,
             snapshot.rollupStamps.foregroundAppToMin,
             snapshot.rollupStamps.minAppToHour,
+            snapshot.rollupStamps.idleEventsToMin,
             snapshot.rollupStamps.purgeExpired
         ].compactMap { $0 }.max()
-    }
-
-    private func ago(from instant: Date, to now: Date) -> String {
-        let seconds = Int(now.timeIntervalSince(instant))
-        if seconds < 1 { return "just now" }
-        if seconds < 60 { return "\(seconds)s ago" }
-        if seconds < 3_600 { return "\(seconds / 60)m ago" }
-        return "\(seconds / 3_600)h ago"
     }
 }
 
@@ -1058,10 +1106,10 @@ struct AppRankingChart: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Top apps")
+            Text("Top apps", bundle: .module)
                 .font(.headline)
             if rows.isEmpty {
-                Text("No app activity recorded yet today.")
+                Text("No app activity recorded yet today.", bundle: .module)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 12)
             } else {
@@ -1071,7 +1119,7 @@ struct AppRankingChart: View {
                         y: .value("App", displayName(for: row.bundleId))
                     )
                     .annotation(position: .trailing) {
-                        Text(formatDuration(row.secondsUsed))
+                        Text(PulseFormat.duration(seconds: row.secondsUsed))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -1084,15 +1132,6 @@ struct AppRankingChart: View {
 
     private func displayName(for bundleId: String) -> String {
         Self.displayNameCache.name(for: bundleId)
-    }
-
-    private func formatDuration(_ seconds: Int) -> String {
-        if seconds < 60 { return "\(seconds)s" }
-        let minutes = seconds / 60
-        if minutes < 60 { return "\(minutes)m" }
-        let hours = minutes / 60
-        let remMinutes = minutes % 60
-        return remMinutes == 0 ? "\(hours)h" : "\(hours)h \(remMinutes)m"
     }
 }
 
@@ -1147,49 +1186,41 @@ struct CountersView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            row(label: "Mouse moves (raw)",  value: snapshot.l0Counts.mouseMoves)
-            row(label: "Mouse clicks (raw)", value: snapshot.l0Counts.mouseClicks)
-            row(label: "Key events (raw)",   value: snapshot.l0Counts.keyEvents)
-            row(label: "Total flushes",      value: snapshot.writer.totalFlushes)
+            row(labelKey: "Mouse moves (raw)",  value: snapshot.l0Counts.mouseMoves)
+            row(labelKey: "Mouse clicks (raw)", value: snapshot.l0Counts.mouseClicks)
+            row(labelKey: "Key events (raw)",   value: snapshot.l0Counts.keyEvents)
+            row(labelKey: "Total flushes",      value: snapshot.writer.totalFlushes)
             if let last = snapshot.lastWriteAt {
-                rowText(label: "Last write", value: relative(last, from: snapshot.capturedAt))
+                rowText(labelKey: "Last write", value: PulseFormat.ago(from: last, to: snapshot.capturedAt))
             } else {
-                rowText(label: "Last write", value: "never")
+                rowText(labelKey: "Last write", value: String(localized: "never", bundle: .module))
             }
             if let bytes = snapshot.databaseFileSizeBytes {
-                rowText(label: "DB size", value: ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
+                rowText(labelKey: "DB size", value: PulseFormat.bytes(bytes))
             }
         }
         .font(.footnote)
     }
 
     @ViewBuilder
-    private func row(label: String, value: Int) -> some View {
+    private func row(labelKey: LocalizedStringKey, value: Int) -> some View {
         HStack {
-            Text(label)
+            Text(labelKey, bundle: .module)
             Spacer()
-            Text("\(value)")
+            Text(PulseFormat.integer(value))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
         }
     }
 
     @ViewBuilder
-    private func rowText(label: String, value: String) -> some View {
+    private func rowText(labelKey: LocalizedStringKey, value: String) -> some View {
         HStack {
-            Text(label)
+            Text(labelKey, bundle: .module)
             Spacer()
             Text(value)
                 .foregroundStyle(.secondary)
         }
-    }
-
-    private func relative(_ instant: Date, from now: Date) -> String {
-        let seconds = Int(now.timeIntervalSince(instant))
-        if seconds < 1 { return "just now" }
-        if seconds < 60 { return "\(seconds)s ago" }
-        if seconds < 3_600 { return "\(seconds / 60)m ago" }
-        return "\(seconds / 3_600)h ago"
     }
 }
 
@@ -1201,9 +1232,9 @@ struct PermissionList: View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(Permission.allCases, id: \.self) { permission in
                 HStack {
-                    Text(permission.rawValue)
+                    Text(localizedPermissionName(permission))
                     Spacer()
-                    Text((snapshot.statuses[permission] ?? .unknown).rawValue)
+                    Text(localizedPermissionStatus(snapshot.statuses[permission] ?? .unknown))
                         .foregroundStyle(.secondary)
                 }
                 .font(.footnote)
@@ -1228,10 +1259,14 @@ struct PermissionAssistantView: View {
             EmptyView()
         } else {
             VStack(alignment: .leading, spacing: 6) {
-                Label("Permissions needed", systemImage: "exclamationmark.triangle.fill")
-                    .font(.footnote.bold())
-                    .foregroundStyle(.orange)
-                Text("Pulse can't collect without the following permissions. Grant them in System Settings, then relaunch Pulse.")
+                Label {
+                    Text("Permissions needed", bundle: .module)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                }
+                .font(.footnote.bold())
+                .foregroundStyle(.orange)
+                Text("Pulse can't collect without the following permissions. Grant them in System Settings, then relaunch Pulse.", bundle: .module)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1241,8 +1276,12 @@ struct PermissionAssistantView: View {
                             NSWorkspace.shared.open(url)
                         }
                     } label: {
-                        Label("Open \(permission.displayName) settings", systemImage: "arrow.up.forward.app")
-                            .font(.footnote)
+                        Label {
+                            Text("Open \(localizedPermissionName(permission)) settings", bundle: .module)
+                        } icon: {
+                            Image(systemName: "arrow.up.forward.app")
+                        }
+                        .font(.footnote)
                     }
                     .buttonStyle(.link)
                 }
@@ -1284,34 +1323,38 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
-                Picker("Refresh every", selection: $refreshIntervalSeconds) {
-                    Text("1 second").tag(1.0)
-                    Text("5 seconds").tag(5.0)
-                    Text("10 seconds").tag(10.0)
-                    Text("30 seconds").tag(30.0)
+                Picker(selection: $refreshIntervalSeconds) {
+                    Text("1 second",   bundle: .module).tag(1.0)
+                    Text("5 seconds",  bundle: .module).tag(5.0)
+                    Text("10 seconds", bundle: .module).tag(10.0)
+                    Text("30 seconds", bundle: .module).tag(30.0)
+                } label: {
+                    Text("Refresh every", bundle: .module)
                 }
-                Text("How often the Dashboard window re-queries the local database. Reducing the interval uses a tiny bit more CPU; raising it is fine for passive monitoring.")
+                Text("How often the Dashboard window re-queries the local database. Reducing the interval uses a tiny bit more CPU; raising it is fine for passive monitoring.", bundle: .module)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Picker("Heatmap window", selection: $heatmapDays) {
-                    Text("3 days").tag(3)
-                    Text("7 days").tag(7)
-                    Text("14 days").tag(14)
-                    Text("30 days").tag(30)
+                Picker(selection: $heatmapDays) {
+                    Text("3 days",  bundle: .module).tag(3)
+                    Text("7 days",  bundle: .module).tag(7)
+                    Text("14 days", bundle: .module).tag(14)
+                    Text("30 days", bundle: .module).tag(30)
+                } label: {
+                    Text("Heatmap window", bundle: .module)
                 }
-                Text("How many past days the weekly heatmap covers. Longer windows make each cell smaller; shorter windows emphasise recent pattern.")
+                Text("How many past days the weekly heatmap covers. Longer windows make each cell smaller; shorter windows emphasise recent pattern.", bundle: .module)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } header: {
-                Text("Dashboard")
+                Text("Dashboard", bundle: .module)
             }
 
             Section {
                 HStack {
-                    Text("Build")
+                    Text("Build", bundle: .module)
                     Spacer()
                     Text(PulsePlatform.buildFingerprint)
                         .font(.footnote.monospacedDigit())
@@ -1319,7 +1362,7 @@ struct SettingsView: View {
                         .textSelection(.enabled)
                 }
             } header: {
-                Text("About")
+                Text("About", bundle: .module)
             }
         }
         .formStyle(.grouped)

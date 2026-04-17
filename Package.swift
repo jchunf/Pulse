@@ -58,6 +58,9 @@ let package = Package(
             dependencies: [
                 "PulseCore",
                 "PulsePlatform"
+            ],
+            resources: [
+                .process("Resources")
             ]
         ),
         .testTarget(
