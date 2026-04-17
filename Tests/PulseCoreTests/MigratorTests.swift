@@ -28,13 +28,13 @@ struct MigratorTests {
         }
     }
 
-    @Test("bundled migrator loads at least V1 and targetVersion == 1")
+    @Test("bundled migrator loads up to V2")
     func bundledMigratorLoads() throws {
         let migrator = try Migrator.bundled()
-        #expect(migrator.targetVersion == 1)
+        #expect(migrator.targetVersion == 2)
     }
 
-    @Test("in-memory database migrated to V1 has core tables")
+    @Test("in-memory database migrated to head has core tables")
     func schemaAppliedInMemory() throws {
         let db = try PulseDatabase.inMemory()
         let tableNames: [String] = try db.queue.read { db in
@@ -52,6 +52,7 @@ struct MigratorTests {
             "raw_key_events",
             "raw_mouse_clicks",
             "raw_mouse_moves",
+            "rollup_watermarks",
             "sec_activity",
             "sec_key",
             "sec_mouse",
@@ -68,7 +69,7 @@ struct MigratorTests {
         let version: Int? = try db.queue.read { db in
             try Int.fetchOne(db, sql: "PRAGMA user_version")
         }
-        #expect(version == 1)
+        #expect(version == 2)
     }
 
     @Test("re-running migrator on an up-to-date DB is a no-op")
@@ -76,7 +77,7 @@ struct MigratorTests {
         let db = try PulseDatabase.inMemory()
         let migrator = try Migrator.bundled()
         let version = try migrator.migrate(db.queue)
-        #expect(version == 1)
+        #expect(version == 2)
     }
 
     @Test("raw_mouse_moves has expected column shape")

@@ -121,4 +121,131 @@ struct RollupSchedulerTests {
         #expect(scheduler.stamps.rawToSecond == clock.now)
         #expect(scheduler.stamps.purgeExpired == nil)
     }
+
+    // MARK: - B5 app-usage rollup
+
+    private func insertForegroundSwitch(
+        into db: PulseDatabase,
+        atMillis ts: Int64,
+        bundle: String
+    ) throws {
+        try db.queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO system_events (ts, category, payload) VALUES (?, 'foreground_app', ?)",
+                arguments: [ts, bundle]
+            )
+        }
+    }
+
+    @Test("foregroundAppToMin attributes interval seconds to each containing minute")
+    func foregroundAppToMinBasic() throws {
+        let (scheduler, db, clock) = try makeScheduler()
+        // Align the fake clock on a minute boundary so expected counts are
+        // obvious: clock = 1_700_000_000 (exactly a minute start).
+        let minuteStartSec: Int64 = 1_700_000_000 - (1_700_000_000 % 60)
+        let baseMs: Int64 = minuteStartSec * 1_000
+
+        // Switch to Safari at minute+0s, Xcode at minute+30s.
+        try insertForegroundSwitch(into: db, atMillis: baseMs, bundle: "com.apple.Safari")
+        try insertForegroundSwitch(into: db, atMillis: baseMs + 30_000, bundle: "com.apple.dt.Xcode")
+
+        // Advance the clock a full minute past the first switch so the
+        // minute we're attributing to is "closed" from the scheduler's
+        // point of view.
+        clock.advance(120)
+        try scheduler.runOnce(.foregroundAppToMin, now: clock.now)
+
+        let rows: [(Int64, String, Int64)] = try db.queue.read { db in
+            try Row.fetchAll(
+                db,
+                sql: "SELECT ts_minute, bundle_id, seconds_used FROM min_app ORDER BY ts_minute, bundle_id"
+            ).map { row in
+                (row["ts_minute"] as Int64, row["bundle_id"] as String, row["seconds_used"] as Int64)
+            }
+        }
+        // First minute: Safari 30s, Xcode 30s. Second minute: Xcode 60s
+        // (continuing through the full minute). Total 3 rows.
+        #expect(rows.count == 3)
+        #expect(rows[0] == (minuteStartSec, "com.apple.Safari", 30))
+        #expect(rows[1] == (minuteStartSec, "com.apple.dt.Xcode", 30))
+        #expect(rows[2] == (minuteStartSec + 60, "com.apple.dt.Xcode", 60))
+    }
+
+    @Test("foregroundAppToMin is idempotent: re-running does not double-count")
+    func foregroundAppToMinIdempotent() throws {
+        let (scheduler, db, clock) = try makeScheduler()
+        let minuteStartSec: Int64 = 1_700_000_000 - (1_700_000_000 % 60)
+        let baseMs: Int64 = minuteStartSec * 1_000
+        try insertForegroundSwitch(into: db, atMillis: baseMs, bundle: "com.apple.Safari")
+
+        clock.advance(120)
+        try scheduler.runOnce(.foregroundAppToMin, now: clock.now)
+        try scheduler.runOnce(.foregroundAppToMin, now: clock.now)
+
+        let totals: [Int64] = try db.queue.read { db in
+            try Int64.fetchAll(db, sql: "SELECT seconds_used FROM min_app")
+        }
+        // Each minute should reflect a single 60s attribution, not doubled.
+        #expect(totals.allSatisfy { $0 == 60 })
+    }
+
+    @Test("foregroundAppToMin carries the bundle active before the watermark")
+    func foregroundAppToMinCarriesPriorBundle() throws {
+        let (scheduler, db, clock) = try makeScheduler()
+        let minuteStartSec: Int64 = 1_700_000_000 - (1_700_000_000 % 60)
+        let baseMs: Int64 = minuteStartSec * 1_000
+
+        // A Safari switch 5 minutes before the clock — this becomes the
+        // watermark's "prior bundle" on the first rollup run.
+        try insertForegroundSwitch(into: db, atMillis: baseMs - 5 * 60_000, bundle: "com.apple.Safari")
+        // Nothing else — Safari has been active for 5 min straight.
+
+        clock.advance(120)
+        try scheduler.runOnce(.foregroundAppToMin, now: clock.now)
+
+        let total: Int64 = try db.queue.read { db in
+            try Int64.fetchOne(db, sql: "SELECT COALESCE(SUM(seconds_used), 0) FROM min_app") ?? 0
+        }
+        // Clock.now is at minuteStartSec+120 → minuteBucket is
+        // minuteStartSec+120 (the start of the current minute). Closed
+        // minutes covered: [baseMs - 5min, minuteStart+120ms / 1000 - 120).
+        // That's 7 full minutes of Safari at 60s each = 420s.
+        #expect(total == 420)
+    }
+
+    @Test("minAppToHour aggregates into hour_app and deletes min_app rows")
+    func minAppToHourPromotes() throws {
+        let (scheduler, db, clock) = try makeScheduler()
+        let hourStart: Int64 = 1_700_000_000 - (1_700_000_000 % 3_600)
+        try db.queue.write { db in
+            // 3 minutes of Safari (120s total) + 1 minute of Xcode (45s).
+            try db.execute(sql: "INSERT INTO min_app (ts_minute, bundle_id, seconds_used) VALUES (?, 'com.apple.Safari', 40)", arguments: [hourStart])
+            try db.execute(sql: "INSERT INTO min_app (ts_minute, bundle_id, seconds_used) VALUES (?, 'com.apple.Safari', 40)", arguments: [hourStart + 60])
+            try db.execute(sql: "INSERT INTO min_app (ts_minute, bundle_id, seconds_used) VALUES (?, 'com.apple.Safari', 40)", arguments: [hourStart + 120])
+            try db.execute(sql: "INSERT INTO min_app (ts_minute, bundle_id, seconds_used) VALUES (?, 'com.apple.dt.Xcode', 45)", arguments: [hourStart + 180])
+        }
+
+        // Advance clock past the hour boundary so the rollup treats the
+        // seeded hour as closed.
+        clock.advance(3_700)
+        try scheduler.runOnce(.minAppToHour, now: clock.now)
+
+        let rows: [(Int64, String, Int64)] = try db.queue.read { db in
+            try Row.fetchAll(
+                db,
+                sql: "SELECT ts_hour, bundle_id, seconds_used FROM hour_app ORDER BY bundle_id"
+            ).map { row in
+                (row["ts_hour"] as Int64, row["bundle_id"] as String, row["seconds_used"] as Int64)
+            }
+        }
+        #expect(rows.count == 2)
+        #expect(rows[0] == (hourStart, "com.apple.Safari", 120))
+        #expect(rows[1] == (hourStart, "com.apple.dt.Xcode", 45))
+
+        // min_app rows for the closed hour must be gone.
+        let remaining: Int = try db.queue.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM min_app") ?? -1
+        }
+        #expect(remaining == 0)
+    }
 }
