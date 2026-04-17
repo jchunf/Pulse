@@ -120,40 +120,56 @@ jobs:
             test.log
           if-no-files-found: ignore
 
-      - name: Post failure summary as PR comment
-        # Self-debugging hook: when a PR build fails, paste the relevant
-        # log excerpts back into the PR conversation. This is what allows
-        # the agent to read what went wrong without GitHub auth/log access.
-        # See docs/WORKFLOW.md for the full PR loop.
-        if: failure() && github.event_name == 'pull_request'
+      - name: Post CI summary as PR comment (failures + warnings)
+        # Self-debugging hook: paste log excerpts into the PR conversation
+        # whenever CI either (a) fails outright or (b) succeeds but emitted
+        # warnings / "error:" lines / failed assertions that did not flip
+        # the job to failure. The agent has no GitHub auth from its sandbox,
+        # so PR comments are the only channel back. See docs/WORKFLOW.md.
+        if: always() && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
         run: |
+          set +e
+          ISSUE_LINES=""
+          for log in resolve.log build.log test.log; do
+            [ -s "$log" ] || continue
+            matches=$(grep -nE 'error:|warning:|FAIL|Assertion|Test Suite .* failed|unexpected error|Process completed with exit code' "$log" || true)
+            if [ -n "$matches" ]; then
+              ISSUE_LINES+="\n### \`$log\` — flagged lines\n\n\`\`\`\n$matches\n\`\`\`\n"
+            fi
+          done
+
+          if [ "$JOB_STATUS" = "success" ] && [ -z "$ISSUE_LINES" ]; then
+            echo "Clean success on ${{ matrix.runner }} — no PR comment needed."
+            exit 0
+          fi
+
+          HEADER_ICON="❌"
+          HEADER_LABEL="failed"
+          if [ "$JOB_STATUS" = "success" ]; then
+            HEADER_ICON="⚠️"
+            HEADER_LABEL="passed with warnings"
+          fi
+
           {
-            echo "## CI failure on \`${{ matrix.runner }}\`"
+            echo "## $HEADER_ICON CI $HEADER_LABEL on \`${{ matrix.runner }}\`"
             echo ""
             echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             echo ""
+            echo -e "$ISSUE_LINES"
             for log in resolve.log build.log test.log; do
-              if [ -s "$log" ]; then
-                echo "### \`$log\` — last 120 lines"
-                echo ""
-                echo '```'
-                tail -120 "$log"
-                echo '```'
-                echo ""
-                ERR_LINES=$(grep -nE 'error:|warning:|FAIL|Process completed with exit code' "$log" | tail -40 || true)
-                if [ -n "$ERR_LINES" ]; then
-                  echo "### \`$log\` — error / warning lines"
-                  echo ""
-                  echo '```'
-                  echo "$ERR_LINES"
-                  echo '```'
-                  echo ""
-                fi
-              fi
+              [ -s "$log" ] || continue
+              echo "### \`$log\` — last 120 lines"
+              echo ""
+              echo '```'
+              tail -120 "$log"
+              echo '```'
+              echo ""
             done
           } > /tmp/comment.md
+
           gh pr comment ${{ github.event.pull_request.number }} \
             --body-file /tmp/comment.md \
             --repo ${{ github.repository }}
