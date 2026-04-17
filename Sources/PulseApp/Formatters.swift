@@ -106,6 +106,52 @@ enum PulseFormat {
         )
     }
 
+    // MARK: - Generic narrative anchors (A16)
+
+    /// Localised name for a `NarrativeAnchor`. Looks up the catalog key
+    /// (`keystrokes.tweet`, `focus.episode`, …); falls back to the English
+    /// `displayName` when the translation is missing so we never render
+    /// an empty line.
+    static func localizedAnchorName(for anchor: NarrativeAnchor) -> String {
+        NSLocalizedString(
+            anchor.key,
+            bundle: .main,
+            value: anchor.displayName,
+            comment: "Localised NarrativeEngine anchor name"
+        )
+    }
+
+    /// One-line dramatic framing for any `NarrativeComparison`. Ladder
+    /// mirrors the mileage landmark branches:
+    /// - `m < 1`   → "X% of a %@"  (anchor bigger than observation)
+    /// - `m < 2`   → "about 1× a %@"
+    /// - else      → "≈ M× a %@"   with one decimal
+    static func narrativeSentence(for comparison: NarrativeComparison) -> String {
+        let name = localizedAnchorName(for: comparison.anchor)
+        let m = comparison.multiplier
+        if m < 1 {
+            let pct = Int((m * 100).rounded())
+            return String.localizedStringWithFormat(
+                String(localized: "mileage.comparison.percent"),
+                pct,
+                name
+            )
+        } else if m < 2 {
+            return String.localizedStringWithFormat(
+                String(localized: "mileage.comparison.aboutOne"),
+                name
+            )
+        } else {
+            let rounded = (m * 10).rounded() / 10
+            let multiplierString = rounded.formatted(.number.precision(.fractionLength(1)))
+            return String.localizedStringWithFormat(
+                String(localized: "mileage.comparison.multi"),
+                multiplierString,
+                name
+            )
+        }
+    }
+
     /// Dramatic-comparison line for the Mileage card. Mirrors the
     /// `LandmarkLibrary.formatMultiplier` branches but composed from
     /// localised templates in `Localizable.xcstrings`.
