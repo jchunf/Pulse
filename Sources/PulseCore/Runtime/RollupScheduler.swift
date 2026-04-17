@@ -16,17 +16,23 @@ public final class RollupScheduler: @unchecked Sendable {
         public let minutesToHoursInterval: TimeInterval
         public let purgeInterval: TimeInterval
         public let rawToSecondInterval: TimeInterval
+        public let foregroundAppToMinInterval: TimeInterval
+        public let minAppToHourInterval: TimeInterval
 
         public init(
             rawToSecondInterval: TimeInterval = 60,
             secondsToMinutesInterval: TimeInterval = 300,
             minutesToHoursInterval: TimeInterval = 3_600,
-            purgeInterval: TimeInterval = 86_400
+            purgeInterval: TimeInterval = 86_400,
+            foregroundAppToMinInterval: TimeInterval = 300,
+            minAppToHourInterval: TimeInterval = 3_600
         ) {
             self.rawToSecondInterval = rawToSecondInterval
             self.secondsToMinutesInterval = secondsToMinutesInterval
             self.minutesToHoursInterval = minutesToHoursInterval
             self.purgeInterval = purgeInterval
+            self.foregroundAppToMinInterval = foregroundAppToMinInterval
+            self.minAppToHourInterval = minAppToHourInterval
         }
 
         public static let `default` = Configuration()
@@ -36,6 +42,8 @@ public final class RollupScheduler: @unchecked Sendable {
         case rawToSecond
         case secondToMinute
         case minuteToHour
+        case foregroundAppToMin
+        case minAppToHour
         case purgeExpired
     }
 
@@ -43,10 +51,17 @@ public final class RollupScheduler: @unchecked Sendable {
         public var rawToSecond: Date?
         public var secondToMinute: Date?
         public var minuteToHour: Date?
+        public var foregroundAppToMin: Date?
+        public var minAppToHour: Date?
         public var purgeExpired: Date?
 
         public static let empty = LastRunStamps(
-            rawToSecond: nil, secondToMinute: nil, minuteToHour: nil, purgeExpired: nil
+            rawToSecond: nil,
+            secondToMinute: nil,
+            minuteToHour: nil,
+            foregroundAppToMin: nil,
+            minAppToHour: nil,
+            purgeExpired: nil
         )
     }
 
@@ -85,17 +100,21 @@ public final class RollupScheduler: @unchecked Sendable {
 
     public func runOnce(_ job: Job, now: Date) throws {
         switch job {
-        case .rawToSecond:    try rollRawToSecond(now: now)
-        case .secondToMinute: try rollSecondToMinute(now: now)
-        case .minuteToHour:   try rollMinuteToHour(now: now)
-        case .purgeExpired:   try purgeExpired(now: now)
+        case .rawToSecond:        try rollRawToSecond(now: now)
+        case .secondToMinute:     try rollSecondToMinute(now: now)
+        case .minuteToHour:       try rollMinuteToHour(now: now)
+        case .foregroundAppToMin: try rollForegroundAppToMin(now: now)
+        case .minAppToHour:       try rollMinAppToHour(now: now)
+        case .purgeExpired:       try purgeExpired(now: now)
         }
         lock.lock()
         switch job {
-        case .rawToSecond:    lastRuns.rawToSecond = now
-        case .secondToMinute: lastRuns.secondToMinute = now
-        case .minuteToHour:   lastRuns.minuteToHour = now
-        case .purgeExpired:   lastRuns.purgeExpired = now
+        case .rawToSecond:        lastRuns.rawToSecond = now
+        case .secondToMinute:     lastRuns.secondToMinute = now
+        case .minuteToHour:       lastRuns.minuteToHour = now
+        case .foregroundAppToMin: lastRuns.foregroundAppToMin = now
+        case .minAppToHour:       lastRuns.minAppToHour = now
+        case .purgeExpired:       lastRuns.purgeExpired = now
         }
         lock.unlock()
     }
@@ -116,6 +135,12 @@ public final class RollupScheduler: @unchecked Sendable {
         case .minuteToHour:
             last = lastRuns.minuteToHour
             interval = configuration.minutesToHoursInterval
+        case .foregroundAppToMin:
+            last = lastRuns.foregroundAppToMin
+            interval = configuration.foregroundAppToMinInterval
+        case .minAppToHour:
+            last = lastRuns.minAppToHour
+            interval = configuration.minAppToHourInterval
         case .purgeExpired:
             last = lastRuns.purgeExpired
             interval = configuration.purgeInterval
@@ -241,6 +266,136 @@ public final class RollupScheduler: @unchecked Sendable {
             try db.execute(sql: "DELETE FROM min_mouse WHERE ts_minute < ?", arguments: [cutoffSeconds])
             try db.execute(sql: "DELETE FROM min_key WHERE ts_minute < ?", arguments: [cutoffSeconds])
             try db.execute(sql: "DELETE FROM min_idle WHERE ts_minute < ?", arguments: [cutoffSeconds])
+        }
+    }
+
+    /// Walks `foreground_app` switches written into `system_events` and
+    /// credits seconds of usage to each containing minute-bucket in
+    /// `min_app`. Unlike the mouse/key rollups, the source (`system_events`)
+    /// has permanent retention, so we cannot delete processed rows; a
+    /// watermark in `rollup_watermarks` tracks the last-processed upper
+    /// bound instead.
+    ///
+    /// The bundle active at the watermark boundary is carried forward via
+    /// a synthetic leading switch at `watermarkMs` so its share of the
+    /// first processed minute isn't dropped.
+    private func rollForegroundAppToMin(now: Date) throws {
+        let minuteCutoffSec = Int64(AggregationRules.minuteBucket(for: now).timeIntervalSince1970)
+        let minuteCutoffMs = minuteCutoffSec * 1_000
+
+        try database.queue.write { db in
+            let watermarkMs = try Int64.fetchOne(
+                db,
+                sql: "SELECT last_processed_ms FROM rollup_watermarks WHERE job = 'foreground_app_to_min'"
+            ) ?? 0
+            guard watermarkMs < minuteCutoffMs else { return }
+
+            // Bundle active at the watermark boundary (if any). Without it
+            // the interval from watermark → first in-range switch would be
+            // attributed to "nothing".
+            let priorBundle: String? = try String.fetchOne(db, sql: """
+                SELECT payload FROM system_events
+                WHERE category = 'foreground_app' AND ts < ?
+                ORDER BY ts DESC LIMIT 1
+                """, arguments: [watermarkMs])
+
+            let inRangeRows = try Row.fetchAll(db, sql: """
+                SELECT ts, payload FROM system_events
+                WHERE category = 'foreground_app' AND ts >= ? AND ts < ?
+                ORDER BY ts
+                """, arguments: [watermarkMs, minuteCutoffMs])
+
+            var switches: [(Int64, String)] = []
+            if let priorBundle {
+                switches.append((watermarkMs, priorBundle))
+            }
+            for row in inRangeRows {
+                let ts: Int64 = row["ts"]
+                let bundle: String = row["payload"]
+                switches.append((ts, bundle))
+            }
+
+            // Attribute each interval's seconds to containing minute buckets.
+            var byMinute: [Int64: [String: Int64]] = [:]
+            for index in 0..<switches.count {
+                let (startMs, bundle) = switches[index]
+                let endMs: Int64 = index + 1 < switches.count
+                    ? switches[index + 1].0
+                    : minuteCutoffMs
+                addSecondsPerMinute(
+                    startMs: startMs,
+                    endMs: endMs,
+                    bundle: bundle,
+                    into: &byMinute
+                )
+            }
+
+            for (minute, bundles) in byMinute {
+                for (bundle, seconds) in bundles where seconds > 0 {
+                    try db.execute(sql: """
+                        INSERT INTO min_app (ts_minute, bundle_id, seconds_used)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT(ts_minute, bundle_id) DO UPDATE SET
+                            seconds_used = min_app.seconds_used + excluded.seconds_used
+                        """, arguments: [minute, bundle, seconds])
+                }
+            }
+
+            // Advance the watermark unconditionally, even if no switches
+            // landed — skipping an empty window should still move time
+            // forward so we don't re-scan the same empty range next tick.
+            try db.execute(sql: """
+                INSERT INTO rollup_watermarks (job, last_processed_ms)
+                VALUES ('foreground_app_to_min', ?)
+                ON CONFLICT(job) DO UPDATE SET last_processed_ms = excluded.last_processed_ms
+                """, arguments: [minuteCutoffMs])
+        }
+    }
+
+    /// Splits the half-open millisecond interval `[startMs, endMs)` into
+    /// minute buckets and credits `seconds` to each entry of `byMinute`.
+    private func addSecondsPerMinute(
+        startMs: Int64,
+        endMs: Int64,
+        bundle: String,
+        into byMinute: inout [Int64: [String: Int64]]
+    ) {
+        guard endMs > startMs else { return }
+        let startSec = startMs / 1_000
+        let endSec = endMs / 1_000
+        guard endSec > startSec else { return }
+
+        var cursor = startSec
+        while cursor < endSec {
+            let minuteBucket = (cursor / 60) * 60
+            let nextBoundary = minuteBucket + 60
+            let segEnd = min(endSec, nextBoundary)
+            let segSeconds = segEnd - cursor
+            byMinute[minuteBucket, default: [:]][bundle, default: 0] += segSeconds
+            cursor = segEnd
+        }
+    }
+
+    /// Promotes closed `min_app` rows to `hour_app`. Like the mouse / key
+    /// rollup, the min layer is deleted after promotion; `purgeExpired`
+    /// retention targets the source table for anything that survives.
+    private func rollMinAppToHour(now: Date) throws {
+        let hourCutoffSec = Int64(AggregationRules.hourBucket(for: now).timeIntervalSince1970)
+        try database.queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO hour_app (ts_hour, bundle_id, seconds_used)
+                SELECT (ts_minute / 3600) * 3600, bundle_id, SUM(seconds_used)
+                FROM min_app
+                WHERE ts_minute < ?
+                GROUP BY (ts_minute / 3600) * 3600, bundle_id
+                ON CONFLICT(ts_hour, bundle_id) DO UPDATE SET
+                    seconds_used = hour_app.seconds_used + excluded.seconds_used
+                """, arguments: [hourCutoffSec])
+
+            try db.execute(
+                sql: "DELETE FROM min_app WHERE ts_minute < ?",
+                arguments: [hourCutoffSec]
+            )
         }
     }
 
