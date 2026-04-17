@@ -16,10 +16,11 @@ struct AggregationRulesTests {
 
     @Test("minute bucket aligns to 60s boundary")
     func minuteBucketAligns() {
-        // 1_700_000_000 is a round minute boundary; +47s should floor back.
+        // 1_699_999_980 is the last minute boundary ≤ 1_700_000_047
+        // (28_333_333 × 60 = 1_699_999_980; next boundary is 1_700_000_040).
         let instant = Date(timeIntervalSince1970: 1_700_000_047)
         let bucket = AggregationRules.minuteBucket(for: instant)
-        #expect(bucket.timeIntervalSince1970 == 1_700_000_000)
+        #expect(bucket.timeIntervalSince1970 == 1_700_000_040)
     }
 
     @Test("hour bucket aligns to 3600s boundary")

@@ -68,19 +68,34 @@ jobs:
       - name: Test (with coverage)
         run: swift test --parallel --enable-code-coverage 2>&1 | tee test.log
 
-      - name: Fail on hidden compile errors in logs
-        # Safety net. Observed empirically: when one test sub-target compiles
-        # cleanly and another fails, `swift test` has been seen to exit 0
-        # and leave the failing test compilation errors only in the log.
-        # Grep for canonical Swift compile diagnostics and fail the step
-        # outright so the job conclusion truthfully reflects reality.
+      - name: Fail on hidden build / test errors in logs
+        # Safety net. `swift test` has been observed exiting 0 even when
+        # (a) one test sub-target fails to compile while another runs
+        # cleanly, or (b) Swift Testing records runtime issues in
+        # `#expect` / `#require` without flipping the overall exit code.
+        # Both are silent regressions. Grep for every canonical failure
+        # marker we've seen, and if any appears, fail the step so the
+        # job conclusion faithfully reflects reality.
         if: always()
         run: |
           set +e
-          HIT=$(grep -HnE '^[^[:space:]].*\.swift:[0-9]+:[0-9]+: error:' build.log test.log 2>/dev/null)
-          if [ -n "$HIT" ]; then
-            echo "::error::compile errors found in logs but exit code was clean — failing explicitly"
-            echo "$HIT" | head -50
+          PATTERNS=(
+            '^[^[:space:]].*\.swift:[0-9]+:[0-9]+: error:'
+            'recorded an issue at'
+            'Expectation failed:'
+            '^.{0,6}Test Case .* failed'
+            '^✘ '
+          )
+          HITS=""
+          for pat in "${PATTERNS[@]}"; do
+            found=$(grep -HnE "$pat" build.log test.log 2>/dev/null || true)
+            if [ -n "$found" ]; then
+              HITS+="$found"$'\n'
+            fi
+          done
+          if [ -n "$HITS" ]; then
+            echo "::error::build or test failures found in logs but exit code was clean — failing explicitly"
+            echo "$HITS" | head -80
             exit 1
           fi
 
