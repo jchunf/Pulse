@@ -2113,6 +2113,22 @@
           }
         }
       }
+    },
+    "Anomaly": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anomaly"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "异常"
+          }
+        }
+      }
     }
   }
 }
