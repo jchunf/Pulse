@@ -36,7 +36,7 @@ struct PulseApp: App {
         .defaultSize(width: 720, height: 480)
 
         Settings {
-            SettingsPlaceholder()
+            SettingsView()
         }
     }
 }
@@ -60,6 +60,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pollTask: Task<Void, Never>?
 
     override init() {
+        UserDefaults.registerPulseDefaults()
+
         let permissions = PulsePlatform.permissionService()
         let displayRegistry = PulsePlatform.displayRegistry()
         let dbResult = AppDelegate.openOrCreateDatabase()
@@ -280,16 +282,27 @@ final class DashboardModel: ObservableObject {
         self.store = store
     }
 
-    /// Begin polling. Idempotent — calling twice is a no-op.
+    /// Begin polling. Idempotent — calling twice is a no-op. Cadence is
+    /// read from `UserDefaults` on every iteration so changes in the
+    /// Settings panel take effect without restarting the window.
     func startPolling() {
         guard refreshTask == nil else { return }
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.refresh()
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                let raw = UserDefaults.standard.double(
+                    forKey: PulsePreferenceKey.dashboardRefreshIntervalSeconds
+                )
+                let seconds = max(1.0, raw > 0 ? raw : Self.defaultRefreshIntervalSeconds)
+                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
             }
         }
     }
+
+    /// Default refresh cadence used when the user hasn't overridden it
+    /// via the Settings panel. Exposed so `UserDefaults.registerDefaults`
+    /// can seed the same value.
+    static let defaultRefreshIntervalSeconds: Double = 5.0
 
     func stopPolling() {
         refreshTask?.cancel()
@@ -951,16 +964,62 @@ struct PermissionAssistantView: View {
     }
 }
 
-struct SettingsPlaceholder: View {
+/// Stable string keys for Pulse's UserDefaults-backed preferences.
+/// Centralised here so the Settings panel and any consumer touch the
+/// same spelling — mismatches would silently divorce the UI from the
+/// stored value.
+enum PulsePreferenceKey {
+    static let dashboardRefreshIntervalSeconds = "pulse.dashboard.refreshIntervalSeconds"
+}
+
+extension UserDefaults {
+    /// Seed defaults for every Pulse preference. Called from
+    /// `AppDelegate.init` before any consumer reads UserDefaults so the
+    /// first run reads sane values instead of `0` / `nil`.
+    static func registerPulseDefaults() {
+        UserDefaults.standard.register(defaults: [
+            PulsePreferenceKey.dashboardRefreshIntervalSeconds: DashboardModel.defaultRefreshIntervalSeconds
+        ])
+    }
+}
+
+struct SettingsView: View {
+
+    @AppStorage(PulsePreferenceKey.dashboardRefreshIntervalSeconds)
+    private var refreshIntervalSeconds: Double = DashboardModel.defaultRefreshIntervalSeconds
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Pulse Preferences")
-                .font(.title2)
-            Text("Detailed preferences arrive in a later PR. For now, this panel is a placeholder so the Settings scene is wired.")
-                .foregroundStyle(.secondary)
+        Form {
+            Section {
+                Picker("Refresh every", selection: $refreshIntervalSeconds) {
+                    Text("1 second").tag(1.0)
+                    Text("5 seconds").tag(5.0)
+                    Text("10 seconds").tag(10.0)
+                    Text("30 seconds").tag(30.0)
+                }
+                Text("How often the Dashboard window re-queries the local database. Reducing the interval uses a tiny bit more CPU; raising it is fine for passive monitoring.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } header: {
+                Text("Dashboard")
+            }
+
+            Section {
+                HStack {
+                    Text("Build")
+                    Spacer()
+                    Text(PulsePlatform.buildFingerprint)
+                        .font(.footnote.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            } header: {
+                Text("About")
+            }
         }
-        .padding(24)
-        .frame(width: 480, height: 280)
+        .formStyle(.grouped)
+        .frame(width: 520, height: 320)
     }
 }
 
