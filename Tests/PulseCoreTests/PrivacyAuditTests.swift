@@ -28,7 +28,7 @@ struct PrivacyAuditTests {
             }
             for ts in clicks {
                 try db.execute(
-                    sql: "INSERT INTO raw_mouse_clicks (ts, display_id, x_norm, y_norm, button, is_double) VALUES (?, 0, 0.5, 0.5, 0, 0)",
+                    sql: "INSERT INTO raw_mouse_clicks (ts, display_id, x_norm, y_norm, button, is_double) VALUES (?, 0, 0.5, 0.5, 'left', 0)",
                     arguments: [ts]
                 )
             }
