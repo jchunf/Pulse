@@ -31,6 +31,7 @@ struct PulseApp: App {
             // the day, or the user asks explicitly via the menu).
             MenuBarLabel(
                 model: appDelegate.healthModel,
+                anomalyMonitor: appDelegate.anomalyMonitor,
                 briefingTrigger: appDelegate.briefingTrigger
             )
         }
@@ -64,15 +65,25 @@ struct PulseApp: App {
 struct MenuBarLabel: View {
 
     @ObservedObject var model: HealthModel
+    @ObservedObject var anomalyMonitor: AnomalyMonitor
     let briefingTrigger: PassthroughSubject<Void, Never>
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Image(systemName: model.menuBarIconName)
-            .onReceive(briefingTrigger) { _ in
-                openWindow(id: "briefing")
-                NSApp.activate(ignoringOtherApps: true)
+        ZStack(alignment: .topTrailing) {
+            Image(systemName: model.menuBarIconName)
+            if anomalyMonitor.hasAnomaly {
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 5, height: 5)
+                    .offset(x: 2, y: -2)
+                    .accessibilityLabel(Text("Anomaly", bundle: .module))
             }
+        }
+        .onReceive(briefingTrigger) { _ in
+            openWindow(id: "briefing")
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 }
 
@@ -86,6 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let healthModel: HealthModel
     let dashboardModel: DashboardModel
     let briefingModel: DailyBriefingModel
+    let anomalyMonitor: AnomalyMonitor
 
     /// Passthrough channel the MenuBarLabel listens on to open the
     /// briefing window. AppDelegate fires this on first-wake-of-day and
@@ -141,6 +153,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.briefingModel = DailyBriefingModel(
             store: dbResult.database.map { EventStore(database: $0) }
         )
+        self.anomalyMonitor = AnomalyMonitor(
+            store: dbResult.database.map { EventStore(database: $0) }
+        )
         super.init()
     }
 
@@ -149,11 +164,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { [weak self] in await self?.bootCollector() }
         startHealthPolling()
         registerWakeObserver()
+        anomalyMonitor.start()
         // Give the MenuBarLabel's PassthroughSubject listener a beat to
         // attach before we fire; otherwise the first-day trigger can miss.
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 1_500_000_000)
-            await MainActor.run { self?.showBriefingIfDueToday() }
+            await MainActor.run {
+                self?.showBriefingIfDueToday()
+                self?.generateWeeklyReportIfDue()
+            }
         }
     }
 
@@ -163,6 +182,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appWatcher.stop()
         lidPowerObserver.stop()
         titleObserver.stop()
+        anomalyMonitor.stop()
         if let wakeObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
         }
@@ -253,8 +273,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.showBriefingIfDueToday()
+                self?.generateWeeklyReportIfDue()
             }
         }
+    }
+
+    // MARK: - Weekly report auto-trigger
+
+    private static let reportWeekKey = "pulse.report.lastGeneratedISOWeek"
+
+    /// ISO-week key ("2026-W16") used to detect "a new week has started
+    /// since we last generated". ISO weeks start on Monday, so dropping
+    /// the report on Monday morning is a natural side effect.
+    private static func currentISOWeekKey(now: Date = Date()) -> String {
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = .current
+        let comps = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now)
+        return String(format: "%04d-W%02d",
+                      comps.yearForWeekOfYear ?? 0, comps.weekOfYear ?? 0)
+    }
+
+    private func generateWeeklyReportIfDue() {
+        let currentKey = Self.currentISOWeekKey()
+        let lastKey = UserDefaults.standard.string(forKey: Self.reportWeekKey)
+        guard lastKey != currentKey else { return }
+        UserDefaults.standard.set(currentKey, forKey: Self.reportWeekKey)
+        generateWeeklyReport()
     }
 
     // MARK: - Private
