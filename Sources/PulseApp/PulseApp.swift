@@ -20,7 +20,8 @@ struct PulseApp: App {
                 onPause: { duration in appDelegate.pauseCollector(duration: duration) },
                 onResume: { appDelegate.resumeCollector() },
                 onShowBriefing: { appDelegate.requestShowBriefing() },
-                onGenerateReport: { appDelegate.generateWeeklyReport() }
+                onGenerateReport: { appDelegate.generateWeeklyReport() },
+                onExportData: { appDelegate.exportData() }
             )
         } label: {
             // Use a different SF Symbol when collection is paused or
@@ -219,6 +220,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Exports the last 30 days + today as a JSON document the user can
+    /// pipe into their own tooling (Obsidian, spreadsheets, personal
+    /// scripts). Opens Finder at the resulting file.
+    func exportData() {
+        guard let database else { return }
+        let store = EventStore(database: database)
+        Task.detached {
+            do {
+                let bundle = try store.buildExportBundle()
+                let encoder = JSONEncoder()
+                encoder.dateEncodingStrategy = .iso8601
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+                let data = try encoder.encode(bundle)
+                let url = try Self.writeExportToDisk(data: data, endingAt: Date())
+                await MainActor.run {
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                }
+            } catch {
+                #if DEBUG
+                print("export failed: \(error)")
+                #endif
+            }
+        }
+    }
+
+    private static func writeExportToDisk(data: Data, endingAt: Date) throws -> URL {
+        let fm = FileManager.default
+        let support = try fm.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let dir = support
+            .appendingPathComponent("Pulse", isDirectory: true)
+            .appendingPathComponent("exports", isDirectory: true)
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let comps = calendar.dateComponents([.year, .month, .day], from: endingAt)
+        let stamp = String(format: "%04d-%02d-%02d",
+                           comps.year ?? 0, comps.month ?? 0, comps.day ?? 0)
+        let url = dir.appendingPathComponent("pulse-export-\(stamp).json")
+        try data.write(to: url, options: .atomic)
+        return url
+    }
+
     /// User-initiated weekly report generation. Writes an HTML file to
     /// `~/Library/Application Support/Pulse/reports/` and opens it in
     /// the default browser. Fails silently on I/O errors; a future slice
@@ -231,7 +279,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let report = try store.weeklyReport(endingAt: Date())
                 let html = WeeklyReportRenderer.renderLocalized(report: report)
                 let url = try WeeklyReportRenderer.writeToDisk(html: html, endingAt: Date())
-                await MainActor.run { NSWorkspace.shared.open(url) }
+                _ = await MainActor.run { NSWorkspace.shared.open(url) }
             } catch {
                 #if DEBUG
                 print("weekly report failed: \(error)")
@@ -461,9 +509,13 @@ final class DashboardModel: ObservableObject {
     /// Default heatmap window (in days). The user can override via the
     /// Settings panel; the `refresh()` loop re-reads the preference on
     /// every tick so changes take effect on the next poll.
-    static let defaultHeatmapDays = 7
+    ///
+    /// `nonisolated` because `UserDefaults.registerPulseDefaults()` runs
+    /// outside the main actor during `AppDelegate.init` — we just need
+    /// the constant, not any instance state.
+    nonisolated static let defaultHeatmapDays = 7
     /// Weekly trend chart span — fixed at 7 days for MVP; not user-tunable.
-    static let trendDays = 7
+    nonisolated static let trendDays = 7
 
     init(store: EventStore?, goalsStore: GoalsStore) {
         self.store = store
@@ -489,8 +541,8 @@ final class DashboardModel: ObservableObject {
 
     /// Default refresh cadence used when the user hasn't overridden it
     /// via the Settings panel. Exposed so `UserDefaults.registerDefaults`
-    /// can seed the same value.
-    static let defaultRefreshIntervalSeconds: Double = 5.0
+    /// can seed the same value (see the `nonisolated` note above).
+    nonisolated static let defaultRefreshIntervalSeconds: Double = 5.0
 
     /// Reads the heatmap-days preference and clamps to the allowed range.
     /// Centralised so the polling loop and the Settings picker can't drift.
@@ -650,6 +702,7 @@ struct HealthMenuView: View {
     let onResume: () -> Void
     let onShowBriefing: () -> Void
     let onGenerateReport: () -> Void
+    let onExportData: () -> Void
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -713,6 +766,11 @@ struct HealthMenuView: View {
                     .buttonStyle(.link)
                     Button(action: onGenerateReport) {
                         Text("Generate weekly report", bundle: .module)
+                            .font(.footnote)
+                    }
+                    .buttonStyle(.link)
+                    Button(action: onExportData) {
+                        Text("Export data…", bundle: .module)
                             .font(.footnote)
                     }
                     .buttonStyle(.link)
