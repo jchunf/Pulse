@@ -171,6 +171,34 @@ struct RollupSchedulerTests {
         #expect(rows[2] == (minuteStartSec + 60, "com.apple.dt.Xcode", 60))
     }
 
+    @Test("foregroundAppToMin also counts switches into min_switches")
+    func foregroundAppToMinPopulatesMinSwitches() throws {
+        let (scheduler, db, clock) = try makeScheduler()
+        let minuteStartSec: Int64 = 1_700_000_000 - (1_700_000_000 % 60)
+        let baseMs: Int64 = minuteStartSec * 1_000
+
+        // 3 switches in minute 0, 1 switch in minute 1.
+        try insertForegroundSwitch(into: db, atMillis: baseMs, bundle: "com.apple.Safari")
+        try insertForegroundSwitch(into: db, atMillis: baseMs + 10_000, bundle: "com.apple.dt.Xcode")
+        try insertForegroundSwitch(into: db, atMillis: baseMs + 30_000, bundle: "com.apple.Safari")
+        try insertForegroundSwitch(into: db, atMillis: baseMs + 65_000, bundle: "com.apple.dt.Xcode")
+
+        clock.advance(180)
+        try scheduler.runOnce(.foregroundAppToMin, now: clock.now)
+
+        let rows: [(Int64, Int64)] = try db.queue.read { db in
+            try Row.fetchAll(
+                db,
+                sql: "SELECT ts_minute, app_switch_count FROM min_switches ORDER BY ts_minute"
+            ).map { row in
+                (row["ts_minute"] as Int64, row["app_switch_count"] as Int64)
+            }
+        }
+        #expect(rows.count == 2)
+        #expect(rows[0] == (minuteStartSec, 3))
+        #expect(rows[1] == (minuteStartSec + 60, 1))
+    }
+
     @Test("foregroundAppToMin is idempotent: re-running does not double-count")
     func foregroundAppToMinIdempotent() throws {
         let (scheduler, db, clock) = try makeScheduler()

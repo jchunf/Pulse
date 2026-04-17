@@ -354,6 +354,22 @@ public final class RollupScheduler: @unchecked Sendable {
                 }
             }
 
+            // min_switches — count how many foreground_app switches
+            // landed in each minute. Uses the same watermark window, so
+            // the per-minute count is incremented by the exact number of
+            // in-range switches even if they're spread across many
+            // bundles. Synthetic priorBundle doesn't participate (it's
+            // not an actual switch, only a boundary marker).
+            try db.execute(sql: """
+                INSERT INTO min_switches (ts_minute, app_switch_count)
+                SELECT ((ts / 1000) / 60) * 60, COUNT(*)
+                FROM system_events
+                WHERE category = 'foreground_app' AND ts >= ? AND ts < ?
+                GROUP BY ((ts / 1000) / 60) * 60
+                ON CONFLICT(ts_minute) DO UPDATE SET
+                    app_switch_count = min_switches.app_switch_count + excluded.app_switch_count
+                """, arguments: [watermarkMs, minuteCutoffMs])
+
             // Advance the watermark unconditionally, even if no switches
             // landed — skipping an empty window should still move time
             // forward so we don't re-scan the same empty range next tick.
