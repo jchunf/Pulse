@@ -6,6 +6,7 @@ import PulsePlatform
 import SwiftUI
 import AppKit
 import Charts
+import Combine
 
 @main
 struct PulseApp: App {
@@ -17,13 +18,20 @@ struct PulseApp: App {
             HealthMenuView(
                 model: appDelegate.healthModel,
                 onPause: { duration in appDelegate.pauseCollector(duration: duration) },
-                onResume: { appDelegate.resumeCollector() }
+                onResume: { appDelegate.resumeCollector() },
+                onShowBriefing: { appDelegate.requestShowBriefing() }
             )
         } label: {
             // Use a different SF Symbol when collection is paused or
             // permissions are missing so the user can read state at a
-            // glance from the menu bar.
-            Image(systemName: appDelegate.healthModel.menuBarIconName)
+            // glance from the menu bar. Wraps the raw Image so we can
+            // host an invisible listener that opens the daily briefing
+            // window when AppDelegate decides it's time (first wake of
+            // the day, or the user asks explicitly via the menu).
+            MenuBarLabel(
+                model: appDelegate.healthModel,
+                briefingTrigger: appDelegate.briefingTrigger
+            )
         }
         .menuBarExtraStyle(.window)
 
@@ -35,9 +43,35 @@ struct PulseApp: App {
         }
         .defaultSize(width: 720, height: 480)
 
+        Window("Yesterday in Pulse", id: "briefing") {
+            DailyBriefingView(model: appDelegate.briefingModel)
+        }
+        .defaultSize(width: 420, height: 460)
+        .windowResizability(.contentSize)
+
         Settings {
             SettingsView()
         }
+    }
+}
+
+/// Wrapper for the menu bar icon so it can host an invisible listener
+/// that reacts to briefing triggers from `AppDelegate`. SwiftUI's
+/// `@Environment(\.openWindow)` is only available inside views;
+/// AppDelegate pings a `PassthroughSubject` and this view translates
+/// the ping into the real window open.
+struct MenuBarLabel: View {
+
+    @ObservedObject var model: HealthModel
+    let briefingTrigger: PassthroughSubject<Void, Never>
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Image(systemName: model.menuBarIconName)
+            .onReceive(briefingTrigger) { _ in
+                openWindow(id: "briefing")
+                NSApp.activate(ignoringOtherApps: true)
+            }
     }
 }
 
@@ -50,6 +84,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     let healthModel: HealthModel
     let dashboardModel: DashboardModel
+    let briefingModel: DailyBriefingModel
+
+    /// Passthrough channel the MenuBarLabel listens on to open the
+    /// briefing window. AppDelegate fires this on first-wake-of-day and
+    /// when the user explicitly picks "Yesterday's briefing" from the
+    /// menu — both paths share the same "have we already shown today?"
+    /// gate via UserDefaults.
+    let briefingTrigger = PassthroughSubject<Void, Never>()
 
     private let database: PulseDatabase?
     private let runtime: CollectorRuntime?
@@ -58,6 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let lidPowerObserver: LidPowerObserver
     private let titleObserver: AccessibilityTitleObserver
     private var pollTask: Task<Void, Never>?
+    private var wakeObserver: NSObjectProtocol?
 
     override init() {
         UserDefaults.registerPulseDefaults()
@@ -94,6 +137,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.dashboardModel = DashboardModel(
             store: dbResult.database.map { EventStore(database: $0) }
         )
+        self.briefingModel = DailyBriefingModel(
+            store: dbResult.database.map { EventStore(database: $0) }
+        )
         super.init()
     }
 
@@ -101,6 +147,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         Task { [weak self] in await self?.bootCollector() }
         startHealthPolling()
+        registerWakeObserver()
+        // Give the MenuBarLabel's PassthroughSubject listener a beat to
+        // attach before we fire; otherwise the first-day trigger can miss.
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            await MainActor.run { self?.showBriefingIfDueToday() }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -109,6 +162,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appWatcher.stop()
         lidPowerObserver.stop()
         titleObserver.stop()
+        if let wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
+        }
         Task { [runtime] in await runtime?.stop() }
     }
 
@@ -125,6 +181,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func resumeCollector() {
         guard let runtime else { return }
         Task { await runtime.resume() }
+    }
+
+    /// Force-show the daily briefing window from a user action (menu bar).
+    /// Skips the "already shown today" gate because the user explicitly
+    /// asked — but still updates the gate so the automatic path doesn't
+    /// re-show later the same day.
+    func requestShowBriefing() {
+        Self.markBriefingShownToday()
+        Task { [weak self] in
+            await self?.briefingModel.load(for: .yesterday)
+            await MainActor.run { self?.briefingTrigger.send(()) }
+        }
+    }
+
+    // MARK: - Daily briefing gate
+
+    private static let briefingGateKey = "pulse.briefing.lastShownDay"
+
+    private static func todayKey(now: Date = Date()) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let comps = calendar.dateComponents([.year, .month, .day], from: now)
+        return String(format: "%04d-%02d-%02d",
+                      comps.year ?? 0, comps.month ?? 0, comps.day ?? 0)
+    }
+
+    private static func markBriefingShownToday() {
+        UserDefaults.standard.set(todayKey(), forKey: briefingGateKey)
+    }
+
+    private func showBriefingIfDueToday() {
+        let today = Self.todayKey()
+        let lastShown = UserDefaults.standard.string(forKey: Self.briefingGateKey)
+        guard lastShown != today else { return }
+        Self.markBriefingShownToday()
+        Task { [weak self] in
+            await self?.briefingModel.load(for: .yesterday)
+            await MainActor.run { self?.briefingTrigger.send(()) }
+        }
+    }
+
+    private func registerWakeObserver() {
+        let center = NSWorkspace.shared.notificationCenter
+        wakeObserver = center.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.showBriefingIfDueToday()
+            }
+        }
     }
 
     // MARK: - Private
@@ -460,6 +568,7 @@ struct HealthMenuView: View {
     @ObservedObject var model: HealthModel
     let onPause: (TimeInterval) -> Void
     let onResume: () -> Void
+    let onShowBriefing: () -> Void
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -501,18 +610,28 @@ struct HealthMenuView: View {
 
             Divider()
 
-            HStack {
-                Button {
-                    openWindow(id: "dashboard")
-                    NSApp.activate(ignoringOtherApps: true)
-                } label: {
-                    Text("Open Dashboard", bundle: .module)
+            VStack(spacing: 8) {
+                HStack {
+                    Button {
+                        openWindow(id: "dashboard")
+                        NSApp.activate(ignoringOtherApps: true)
+                    } label: {
+                        Text("Open Dashboard", bundle: .module)
+                    }
+                    Spacer()
+                    Button { NSApp.terminate(nil) } label: {
+                        Text("Quit Pulse", bundle: .module)
+                    }
+                    .keyboardShortcut("q")
                 }
-                Spacer()
-                Button { NSApp.terminate(nil) } label: {
-                    Text("Quit Pulse", bundle: .module)
+                HStack {
+                    Button(action: onShowBriefing) {
+                        Text("Yesterday's briefing", bundle: .module)
+                            .font(.footnote)
+                    }
+                    .buttonStyle(.link)
+                    Spacer()
                 }
-                .keyboardShortcut("q")
             }
         }
         .padding(14)
@@ -1710,6 +1829,205 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 520, height: 320)
+    }
+}
+
+// MARK: - Daily briefing (A18)
+
+/// Target day for the briefing. Today is only exposed for debug /
+/// manual-open paths; the automatic first-wake flow always uses
+/// `.yesterday`.
+enum BriefingDay {
+    case yesterday
+    case today
+
+    func startAndEnd(now: Date = Date(), calendar: Calendar = .current) -> (Date, Date) {
+        let todayStart = calendar.startOfDay(for: now)
+        switch self {
+        case .today:
+            let end = calendar.date(byAdding: .day, value: 1, to: todayStart) ?? todayStart
+            return (todayStart, end)
+        case .yesterday:
+            let start = calendar.date(byAdding: .day, value: -1, to: todayStart) ?? todayStart
+            return (start, todayStart)
+        }
+    }
+}
+
+/// Owns the data shown in the daily briefing window. Loaded on demand
+/// (`load(for:)`) rather than polled — the window is a one-shot reveal,
+/// not a live dashboard.
+@MainActor
+final class DailyBriefingModel: ObservableObject {
+
+    @Published private(set) var summary: TodaySummary?
+    @Published private(set) var longestFocus: FocusSegment?
+    @Published private(set) var day: Date?
+    @Published private(set) var errorMessage: String?
+
+    private let store: EventStore?
+
+    init(store: EventStore?) {
+        self.store = store
+    }
+
+    func load(for target: BriefingDay, now: Date = Date()) async {
+        guard let store else {
+            errorMessage = String(localized: "Database not available.", bundle: .module)
+            return
+        }
+        let (start, end) = target.startAndEnd(now: now)
+        do {
+            let summary = try store.todaySummary(start: start, end: end, capUntil: end)
+            let focus = try store.longestFocusSegment(on: start, now: end)
+            self.summary = summary
+            self.longestFocus = focus
+            self.day = start
+            self.errorMessage = nil
+        } catch {
+            self.errorMessage = String.localizedStringWithFormat(
+                NSLocalizedString("Failed to load summary: %@", bundle: .module, comment: ""),
+                error.localizedDescription
+            )
+        }
+    }
+}
+
+struct DailyBriefingView: View {
+
+    @ObservedObject var model: DailyBriefingModel
+    @Environment(\.dismissWindow) private var dismissWindow
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+                .padding([.top, .leading, .trailing], 20)
+            Divider().padding(.top, 16)
+            if let summary = model.summary {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        MileageHeroCard(
+                            distanceMillimeters: summary.totalMouseDistanceMillimeters
+                        )
+                        BriefingStatRow(summary: summary)
+                        if let focus = model.longestFocus {
+                            BriefingFocusRow(segment: focus)
+                        }
+                    }
+                    .padding(20)
+                }
+            } else if let error = model.errorMessage {
+                Text(error)
+                    .foregroundStyle(.red)
+                    .padding(20)
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(40)
+            }
+            Spacer(minLength: 0)
+            Divider()
+            HStack {
+                Spacer()
+                Button {
+                    dismissWindow(id: "briefing")
+                } label: {
+                    Text("Got it", bundle: .module)
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+            .padding(12)
+        }
+        .task { await model.load(for: .yesterday) }
+        .frame(minWidth: 400, minHeight: 420)
+    }
+
+    @ViewBuilder
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Yesterday in Pulse", bundle: .module)
+                .font(.title2.bold())
+            if let day = model.day {
+                Text(Self.headerDateFormatter.string(from: day))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private static let headerDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.setLocalizedDateFormatFromTemplate("yyyyMMMdEEE")
+        return formatter
+    }()
+}
+
+/// Compact two-column stat list used inside the briefing window. Shares
+/// its formatters with `SummaryCardsView` so en / zh-Hans output lines
+/// up with the main dashboard.
+struct BriefingStatRow: View {
+
+    let summary: TodaySummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            row("Keystrokes", PulseFormat.integer(summary.totalKeyPresses))
+            row("Clicks",     PulseFormat.integer(summary.totalMouseClicks))
+            row("Scrolls",    PulseFormat.integer(summary.totalScrollTicks))
+            row("Active time", PulseFormat.duration(seconds: summary.totalActiveSeconds))
+            row("Idle time",   PulseFormat.duration(seconds: summary.totalIdleSeconds))
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    @ViewBuilder
+    private func row(_ titleKey: LocalizedStringKey, _ value: String) -> some View {
+        HStack {
+            Text(titleKey, bundle: .module)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.footnote.monospacedDigit())
+        }
+    }
+}
+
+/// One-liner spotlight on the longest focus segment of the day covered
+/// by the briefing, styled to echo the Dashboard's `DeepFocusCard`.
+struct BriefingFocusRow: View {
+
+    let segment: FocusSegment
+    private static let displayNameCache = BundleDisplayNameCache()
+
+    var body: some View {
+        let app = Self.displayNameCache.name(for: segment.bundleId)
+        let start = Self.clockTime(segment.startedAt)
+        let end = Self.clockTime(segment.endedAt)
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Deep focus today", bundle: .module)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            Text(PulseFormat.duration(seconds: segment.durationSeconds))
+                .font(.title3.monospacedDigit().bold())
+            Text("\(app) · \(start) – \(end)", bundle: .module)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private static func clockTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.setLocalizedDateFormatFromTemplate("HH:mm")
+        return formatter.string(from: date)
     }
 }
 
