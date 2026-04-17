@@ -14,7 +14,11 @@ struct PulseApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            HealthMenuView(model: appDelegate.healthModel)
+            HealthMenuView(
+                model: appDelegate.healthModel,
+                onPause: { duration in appDelegate.pauseCollector(duration: duration) },
+                onResume: { appDelegate.resumeCollector() }
+            )
         } label: {
             // Use a different SF Symbol when collection is paused or
             // permissions are missing so the user can read state at a
@@ -101,6 +105,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lidPowerObserver.stop()
         titleObserver.stop()
         Task { [runtime] in await runtime?.stop() }
+    }
+
+    // MARK: - User actions
+
+    /// Pause the collector for the requested duration. Fire-and-forget;
+    /// the HealthModel poll picks up the new pause state within 1s.
+    func pauseCollector(duration: TimeInterval) {
+        guard let runtime else { return }
+        Task { await runtime.pause(reason: .userPause, duration: duration) }
+    }
+
+    /// Cancel any active pause immediately.
+    func resumeCollector() {
+        guard let runtime else { return }
+        Task { await runtime.resume() }
     }
 
     // MARK: - Private
@@ -302,6 +321,8 @@ final class DashboardModel: ObservableObject {
 struct HealthMenuView: View {
 
     @ObservedObject var model: HealthModel
+    let onPause: (TimeInterval) -> Void
+    let onResume: () -> Void
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -318,6 +339,15 @@ struct HealthMenuView: View {
             Divider()
 
             CountersView(snapshot: model.snapshot)
+
+            Divider()
+
+            PauseControlsView(
+                pause: model.snapshot.pause,
+                capturedAt: model.snapshot.capturedAt,
+                onPause: onPause,
+                onResume: onResume
+            )
 
             Divider()
 
@@ -344,6 +374,55 @@ struct HealthMenuView: View {
         }
         .padding(14)
         .frame(width: 360)
+    }
+}
+
+/// Two states: paused (shows a countdown + Resume button) or idle
+/// (shows a 3-way Pause menu: 15m / 30m / 1h). Pauses of different
+/// lengths compose via `PauseController`, which takes the later of
+/// the current and requested deadlines.
+struct PauseControlsView: View {
+
+    let pause: PauseController.State
+    let capturedAt: Date
+    let onPause: (TimeInterval) -> Void
+    let onResume: () -> Void
+
+    var body: some View {
+        if pause.isActive, let resumesAt = pause.resumesAt {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label("Paused", systemImage: "pause.circle.fill")
+                        .font(.footnote.bold())
+                        .foregroundStyle(.orange)
+                    Text("Resumes \(formatCountdown(from: capturedAt, to: resumesAt))")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Resume now", action: onResume)
+            }
+        } else {
+            Menu {
+                Button("15 minutes")  { onPause(15 * 60) }
+                Button("30 minutes")  { onPause(30 * 60) }
+                Button("1 hour")      { onPause(60 * 60) }
+            } label: {
+                Label("Pause collection…", systemImage: "pause.circle")
+                    .font(.footnote)
+            }
+            .menuStyle(.borderlessButton)
+        }
+    }
+
+    private func formatCountdown(from now: Date, to target: Date) -> String {
+        let seconds = max(0, Int(target.timeIntervalSince(now)))
+        if seconds < 60 { return "in \(seconds)s" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "in \(minutes)m" }
+        let hours = minutes / 60
+        let remMinutes = minutes % 60
+        return remMinutes == 0 ? "in \(hours)h" : "in \(hours)h \(remMinutes)m"
     }
 }
 
