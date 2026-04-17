@@ -52,15 +52,57 @@ struct AppUsageQueriesTests {
         into db: PulseDatabase,
         hourStart: Date,
         keys: Int,
-        clicks: Int
+        clicks: Int,
+        distanceMm: Double = 0.0
     ) throws {
         try db.queue.write { db in
             try db.execute(
                 sql: """
                 INSERT INTO hour_summary (ts_hour, key_press_total, mouse_distance_mm, mouse_click_total, idle_seconds)
-                VALUES (?, ?, 0.0, ?, 0)
+                VALUES (?, ?, ?, ?, 0)
                 """,
-                arguments: [Int64(hourStart.timeIntervalSince1970), keys, clicks]
+                arguments: [Int64(hourStart.timeIntervalSince1970), keys, distanceMm, clicks]
+            )
+        }
+    }
+
+    private func insertSecKey(into db: PulseDatabase, second: Date, presses: Int) throws {
+        try db.queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO sec_key (ts_second, press_count) VALUES (?, ?)",
+                arguments: [Int64(second.timeIntervalSince1970), presses]
+            )
+        }
+    }
+
+    private func insertSecMouse(
+        into db: PulseDatabase,
+        second: Date,
+        clicks: Int,
+        distanceMm: Double
+    ) throws {
+        try db.queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO sec_mouse (ts_second, move_events, click_events, scroll_ticks, distance_mm) VALUES (?, 0, ?, 0, ?)",
+                arguments: [Int64(second.timeIntervalSince1970), clicks, distanceMm]
+            )
+        }
+    }
+
+    private func insertRawKeyEvent(into db: PulseDatabase, at instant: Date) throws {
+        try db.queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO raw_key_events (ts, key_code) VALUES (?, NULL)",
+                arguments: [Int64(instant.timeIntervalSince1970 * 1_000)]
+            )
+        }
+    }
+
+    private func insertRawMouseClick(into db: PulseDatabase, at instant: Date) throws {
+        try db.queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO raw_mouse_clicks (ts, display_id, x_norm, y_norm, button) VALUES (?, 1, 0.5, 0.5, 'left')",
+                arguments: [Int64(instant.timeIntervalSince1970 * 1_000)]
             )
         }
     }
@@ -272,6 +314,57 @@ struct AppUsageQueriesTests {
         try insertHourSummary(into: db, hourStart: outside, keys: 100, clicks: 50)
         let cells = try store.hourlyHeatmap(endingAt: endingAt, days: 7, calendar: calendar)
         #expect(cells.isEmpty)
+    }
+
+    @Test("todaySummary layers hour_summary + min_* + sec_* + raw for one metric")
+    func summaryLayersAcrossRollupStates() async throws {
+        let (store, db) = try makeStore()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let day = calendar.date(from: DateComponents(
+            timeZone: calendar.timeZone, year: 2026, month: 1, day: 10, hour: 0
+        ))!
+        let now = day.addingTimeInterval(9 * 3_600 + 30 * 60 + 15) // 09:30:15
+
+        // Hours 07:00 and 08:00 are fully rolled → in hour_summary.
+        try insertHourSummary(into: db, hourStart: day.addingTimeInterval(7 * 3_600), keys: 200, clicks: 30, distanceMm: 50_000)
+        try insertHourSummary(into: db, hourStart: day.addingTimeInterval(8 * 3_600), keys: 150, clicks: 20, distanceMm: 40_000)
+
+        // Minute 09:00 rolled to min_* but hour 9 hasn't promoted yet.
+        try insertMinKey(into: db, minute: day.addingTimeInterval(9 * 3_600), presses: 20)
+        try insertMinMouse(into: db, minute: day.addingTimeInterval(9 * 3_600), distanceMm: 1_500, clicks: 3)
+
+        // Seconds 09:30:00..09:30:09 rolled to sec_* but not min_* yet.
+        let secondsStart = day.addingTimeInterval(9 * 3_600 + 30 * 60)
+        for offset in 0..<10 {
+            let second = secondsStart.addingTimeInterval(Double(offset))
+            try insertSecKey(into: db, second: second, presses: 5)
+            try insertSecMouse(into: db, second: second, clicks: 1, distanceMm: 100)
+        }
+
+        // Raw rows that haven't been promoted to sec yet (next 5 seconds).
+        let rawStart = secondsStart.addingTimeInterval(10)
+        for offset in 0..<5 {
+            let instant = rawStart.addingTimeInterval(Double(offset))
+            try insertRawKeyEvent(into: db, at: instant)
+            try insertRawMouseClick(into: db, at: instant)
+        }
+
+        let summary = try store.todaySummary(
+            start: day,
+            end: day.addingTimeInterval(86_400),
+            capUntil: now
+        )
+
+        // Keys: 200 + 150 (hour) + 20 (min) + 50 (sec: 5×10) + 5 (raw) = 425.
+        let expectedKeys = 425
+        #expect(summary.totalKeyPresses == expectedKeys)
+        // Clicks: 30 + 20 (hour) + 3 (min) + 10 (sec) + 5 (raw) = 68.
+        let expectedClicks = 68
+        #expect(summary.totalMouseClicks == expectedClicks)
+        // Distance: 50_000 + 40_000 (hour) + 1_500 (min) + 1_000 (sec: 10×100) = 92_500 mm.
+        let expectedDistance: Double = 92_500
+        #expect(summary.totalMouseDistanceMillimeters == expectedDistance)
     }
 
     @Test("queries handle an empty database")
