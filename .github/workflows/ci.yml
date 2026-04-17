@@ -84,7 +84,7 @@ jobs:
             'recorded an issue at'
             'Expectation failed:'
             '^.{0,6}Test Case .* failed'
-            '^✘ '
+            '^✘ .*(failed|recorded an issue)'
           )
           HITS=""
           for pat in "${PATTERNS[@]}"; do
@@ -177,7 +177,7 @@ jobs:
               [ -s "$log" ] || continue
               # Match the same patterns as the truthfulness guard so the
               # PR comment always shows exactly what the guard tripped on.
-              errors=$(grep -nE '^[^[:space:]].*\.swift:[0-9]+:[0-9]+: error:|recorded an issue at|Expectation failed:|^.{0,6}Test Case .* failed|^✘ |FAIL|Test Suite .* failed|Process completed with exit code' "$log" || true)
+              errors=$(grep -nE '^[^[:space:]].*\.swift:[0-9]+:[0-9]+: error:|recorded an issue at|Expectation failed:|^.{0,6}Test Case .* failed|^✘ .*(failed|recorded an issue)|FAIL|Test Suite .* failed|Process completed with exit code' "$log" || true)
               if [ -n "$errors" ]; then
                 echo "### \`$log\` — flagged lines"
                 echo ""
