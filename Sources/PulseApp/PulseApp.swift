@@ -461,6 +461,15 @@ struct DashboardView: View {
         .frame(minWidth: 600, minHeight: 400)
         .onAppear { model.startPolling() }
         .onDisappear { model.stopPolling() }
+        .onReceive(
+            NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+        ) { _ in
+            // Refresh immediately on app activation instead of waiting for
+            // the next 5-second poll tick. The 5s cadence is fine while the
+            // user is actively looking at the window; the lag is what
+            // irritates when they switch back from another app.
+            Task { await model.refresh() }
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
