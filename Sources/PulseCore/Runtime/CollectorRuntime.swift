@@ -166,6 +166,14 @@ public actor CollectorRuntime {
         await ingest(event)
     }
 
+    /// Inject an externally-sourced event (e.g. from `SystemEventEmitter`
+    /// or `NSWorkspaceAppWatcher`) into the pipeline. Subject to the same
+    /// pause/idle/sampling gating as events coming from the primary
+    /// `EventSource`.
+    public func ingestExternalEvent(_ event: DomainEvent) async {
+        await ingest(event)
+    }
+
     public func tickRollupsForTesting(now: Date) throws -> Set<RollupScheduler.Job> {
         try scheduler.tick(now: now)
     }
@@ -176,6 +184,19 @@ public actor CollectorRuntime {
 
     public func setRunningForTesting() {
         isRunning = true
+    }
+
+    /// Drive the idle detector's time-based tick. The production supervisor
+    /// calls `idleDetector.tick(now:)` on a timer; tests bypass the timer
+    /// and invoke this hook directly so they can assert end-to-end that an
+    /// idleEntered transition makes its way into `system_events`.
+    public func tickIdleForTesting(now: Date) async {
+        if let transition = idleDetector.tick(now: now) {
+            switch transition {
+            case let .idleEntered(at): await writer.enqueue(.idleEntered(at: at))
+            case let .idleExited(at):  await writer.enqueue(.idleExited(at: at))
+            }
+        }
     }
 
     // MARK: - Private

@@ -97,6 +97,10 @@ public enum WriteOperation: Sendable, Equatable {
     case keyPress(tsMillis: Int64, keyCode: UInt16?)
     case systemEvent(tsMillis: Int64, category: String, payload: String?)
     case displaySnapshot(tsMillis: Int64, info: DisplayInfo)
+    /// UPSERT a per-second physical distance increment into `sec_mouse`.
+    /// Computed by the `EventWriter` from consecutive `NormalizedPoint`
+    /// deltas using `MileageConverter`. Accumulates rather than replaces.
+    case secMouseDistanceDelta(tsSecond: Int64, mm: Double)
 
     func execute(in db: Database) throws {
         switch self {
@@ -124,6 +128,14 @@ public enum WriteOperation: Sendable, Equatable {
             try db.execute(
                 sql: "INSERT OR REPLACE INTO display_snapshots (ts, display_id, width_px, height_px, dpi, is_primary) VALUES (?, ?, ?, ?, ?, ?)",
                 arguments: [ts, Int64(info.id), info.widthPx, info.heightPx, info.dpi, info.isPrimary ? 1 : 0]
+            )
+        case let .secMouseDistanceDelta(tsSecond, mm):
+            try db.execute(
+                sql: """
+                    INSERT INTO sec_mouse (ts_second, distance_mm) VALUES (?, ?)
+                    ON CONFLICT(ts_second) DO UPDATE SET distance_mm = sec_mouse.distance_mm + excluded.distance_mm
+                    """,
+                arguments: [tsSecond, mm]
             )
         }
     }

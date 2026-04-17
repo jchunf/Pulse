@@ -20,20 +20,35 @@ public actor EventWriter {
 
     private let store: EventStore
     private let displayProvider: @Sendable () -> [DisplayInfo]
+    private let mileageConverter: MileageConverter
     private var pending: [WriteOperation] = []
     private var stats: WriterStats = .empty
     private var lastFlushAt: Date?
+
+    /// The last observed normalized point per display. Used to compute
+    /// the physical millimeter delta between consecutive mouse moves —
+    /// the odometer (F-07) gets its raw input from here. A mouse move that
+    /// lands on a different display than the previous one resets the state
+    /// for that display.
+    private var lastPointPerDisplay: [UInt32: NormalizedPoint] = [:]
+
+    /// Per-second accumulator for distance (mm) pending write. Flushed
+    /// together with `pending` as a batch of UPSERT ops so sec_mouse
+    /// rows get distance_mm incremented atomically.
+    private var distanceBuffer: [Int64: Double] = [:]
 
     public init(
         store: EventStore,
         displayProvider: @escaping @Sendable () -> [DisplayInfo],
         flushInterval: TimeInterval = 1.0,
-        maxBufferedEvents: Int = 5_000
+        maxBufferedEvents: Int = 5_000,
+        mileageConverter: MileageConverter = MileageConverter()
     ) {
         self.store = store
         self.displayProvider = displayProvider
         self.flushInterval = flushInterval
         self.maxBufferedEvents = maxBufferedEvents
+        self.mileageConverter = mileageConverter
     }
 
     /// Append an event for later persistence. Returns the resulting buffer
@@ -50,8 +65,10 @@ public actor EventWriter {
     }
 
     /// Flush any buffered operations. Safe to call when the buffer is empty
-    /// (no-op).
+    /// (no-op). Also drains the per-second distance accumulator into a
+    /// batch of UPSERT operations against sec_mouse.
     public func flush() async {
+        drainDistanceBuffer()
         guard !pending.isEmpty else {
             stats = stats.recordingFlush(rows: 0, at: Date())
             lastFlushAt = Date()
@@ -86,7 +103,8 @@ public actor EventWriter {
     private func makeOperation(for event: DomainEvent) -> WriteOperation? {
         let ts = Int64(event.timestamp.timeIntervalSince1970 * 1_000)
         switch event {
-        case let .mouseMove(point, _):
+        case let .mouseMove(point, at):
+            accumulateDistance(for: point, at: at)
             return .mouseMove(tsMillis: ts, displayId: point.displayId, xNorm: point.x, yNorm: point.y)
         case let .mouseClick(button, point, doubleClick, _):
             return .mouseClick(tsMillis: ts, displayId: point.displayId, xNorm: point.x, yNorm: point.y, button: button, isDouble: doubleClick)
@@ -126,11 +144,46 @@ public actor EventWriter {
             // Snapshot every connected display whenever config changes.
             // The collector emits one event; the writer fans out into N
             // display_snapshots rows below by reading the current state.
+            // Also invalidate the distance-tracking last-point map because
+            // the coordinate system may have rescaled.
+            lastPointPerDisplay.removeAll(keepingCapacity: true)
             for info in displayProvider() {
                 pending.append(.displaySnapshot(tsMillis: ts, info: info))
             }
             return .systemEvent(tsMillis: ts, category: "display_change", payload: nil)
         }
+    }
+
+    /// Tracks delta from the previous move on the same display and credits
+    /// it to the current second's `sec_mouse.distance_mm`.
+    private func accumulateDistance(for point: NormalizedPoint, at instant: Date) {
+        defer { lastPointPerDisplay[point.displayId] = point }
+        guard let previous = lastPointPerDisplay[point.displayId] else {
+            return
+        }
+        guard let display = displayProvider().first(where: { $0.id == point.displayId }) else {
+            return
+        }
+        let mm = mileageConverter.millimeters(between: previous, and: point, on: display)
+        guard mm > 0, mm.isFinite else { return }
+        let tsSecond = Int64(AggregationRules.secondBucket(for: instant).timeIntervalSince1970)
+        distanceBuffer[tsSecond, default: 0] += mm
+    }
+
+    /// Converts the distance buffer into UPSERT ops appended to `pending`
+    /// so they ride the same flush transaction as the raw rows.
+    private func drainDistanceBuffer() {
+        guard !distanceBuffer.isEmpty else { return }
+        for (tsSecond, mm) in distanceBuffer {
+            pending.append(.secMouseDistanceDelta(tsSecond: tsSecond, mm: mm))
+        }
+        distanceBuffer.removeAll(keepingCapacity: true)
+    }
+
+    // MARK: - Test hooks
+
+    public var bufferedDistanceMillimeters: Double {
+        distanceBuffer.values.reduce(0, +)
     }
 }
 
