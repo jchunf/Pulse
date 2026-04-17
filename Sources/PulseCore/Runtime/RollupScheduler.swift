@@ -247,12 +247,13 @@ public final class RollupScheduler: @unchecked Sendable {
         let cutoffSeconds = Int64(AggregationRules.hourBucket(for: now).timeIntervalSince1970)
         try database.queue.write { db in
             try db.execute(sql: """
-                INSERT INTO hour_summary (ts_hour, key_press_total, mouse_distance_mm, mouse_click_total, idle_seconds)
+                INSERT INTO hour_summary (ts_hour, key_press_total, mouse_distance_mm, mouse_click_total, idle_seconds, scroll_ticks)
                 SELECT (mm.ts_minute / 3600) * 3600,
                        COALESCE(SUM(mk.press_count), 0),
                        COALESCE(SUM(mm.distance_mm), 0.0),
                        COALESCE(SUM(mm.click_events), 0),
-                       0
+                       0,
+                       COALESCE(SUM(mm.scroll_ticks), 0)
                 FROM min_mouse mm
                 LEFT JOIN min_key mk ON mk.ts_minute = mm.ts_minute
                 WHERE mm.ts_minute < ?
@@ -260,7 +261,8 @@ public final class RollupScheduler: @unchecked Sendable {
                 ON CONFLICT(ts_hour) DO UPDATE SET
                     key_press_total   = hour_summary.key_press_total   + excluded.key_press_total,
                     mouse_distance_mm = hour_summary.mouse_distance_mm + excluded.mouse_distance_mm,
-                    mouse_click_total = hour_summary.mouse_click_total + excluded.mouse_click_total
+                    mouse_click_total = hour_summary.mouse_click_total + excluded.mouse_click_total,
+                    scroll_ticks      = hour_summary.scroll_ticks      + excluded.scroll_ticks
                 """, arguments: [cutoffSeconds])
 
             // Idle aggregation is independent (only sourced from min_idle).

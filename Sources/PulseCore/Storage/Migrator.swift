@@ -88,7 +88,8 @@ enum BundledMigrations {
     /// a new `V{n}__*.sql` file.
     static let resourceNames: [String] = [
         "V1__initial.sql",
-        "V2__app_rollup.sql"
+        "V2__app_rollup.sql",
+        "V3__scroll_ticks.sql"
     ]
 
     /// Parses a filename of the form `V{int}__{name}.sql` into (version, name).

@@ -101,6 +101,10 @@ public enum WriteOperation: Sendable, Equatable {
     /// Computed by the `EventWriter` from consecutive `NormalizedPoint`
     /// deltas using `MileageConverter`. Accumulates rather than replaces.
     case secMouseDistanceDelta(tsSecond: Int64, mm: Double)
+    /// UPSERT a per-second scroll-tick increment into `sec_mouse`. Feeds
+    /// the B7 scroll pipeline: sec_mouse.scroll_ticks → min_mouse →
+    /// hour_summary. Accumulates rather than replaces.
+    case secMouseScrollDelta(tsSecond: Int64, ticks: Int64)
 
     func execute(in db: Database) throws {
         switch self {
@@ -136,6 +140,14 @@ public enum WriteOperation: Sendable, Equatable {
                     ON CONFLICT(ts_second) DO UPDATE SET distance_mm = sec_mouse.distance_mm + excluded.distance_mm
                     """,
                 arguments: [tsSecond, mm]
+            )
+        case let .secMouseScrollDelta(tsSecond, ticks):
+            try db.execute(
+                sql: """
+                    INSERT INTO sec_mouse (ts_second, scroll_ticks) VALUES (?, ?)
+                    ON CONFLICT(ts_second) DO UPDATE SET scroll_ticks = sec_mouse.scroll_ticks + excluded.scroll_ticks
+                    """,
+                arguments: [tsSecond, ticks]
             )
         }
     }
