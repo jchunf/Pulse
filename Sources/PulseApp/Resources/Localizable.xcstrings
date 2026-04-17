@@ -2337,6 +2337,262 @@
           }
         }
       }
+    },
+    "Show what Pulse has recorded…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show what Pulse has recorded…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看 Pulse 记录了什么…"
+          }
+        }
+      }
+    },
+    "Privacy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐私"
+          }
+        }
+      }
+    },
+    "Opens a window that lists the raw row counts and the full system-events ledger from the last hour — read live from your local SQLite.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens a window that lists the raw row counts and the full system-events ledger from the last hour — read live from your local SQLite."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开一个窗口，列出过去一小时的原始行数和完整的系统事件账本——直接从本地 SQLite 实时读取。"
+          }
+        }
+      }
+    },
+    "What Pulse has recorded": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What Pulse has recorded"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse 记录了什么"
+          }
+        }
+      }
+    },
+    "Every count and row below is read live from your local SQLite — this window is the ground truth, not a summary we maintain separately.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every count and row below is read live from your local SQLite — this window is the ground truth, not a summary we maintain separately."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下面每一个计数和行都是直接从你本地的 SQLite 实时读出的——这个窗口就是事实本身，而不是另一份独立维护的摘要。"
+          }
+        }
+      }
+    },
+    "Mouse move samples": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mouse move samples"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "鼠标移动采样"
+          }
+        }
+      }
+    },
+    "Mouse click samples": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mouse click samples"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "鼠标点击采样"
+          }
+        }
+      }
+    },
+    "Key press samples": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key press samples"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按键采样"
+          }
+        }
+      }
+    },
+    "Key codes stored": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key codes stored"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "存储的键码数"
+          }
+        }
+      }
+    },
+    "Reload": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reload"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新加载"
+          }
+        }
+      }
+    },
+    "Show database in Finder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show database in Finder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Finder 中显示数据库"
+          }
+        }
+      }
+    },
+    "System events (latest first)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System events (latest first)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统事件（最新在前）"
+          }
+        }
+      }
+    },
+    "No events in this window.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No events in this window."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个时段内没有事件。"
+          }
+        }
+      }
+    },
+    "Pulse runs entirely on your Mac. It makes no outbound network calls (the only potential exception is the future update checker, which will be opt-in and point only at GitHub releases).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse runs entirely on your Mac. It makes no outbound network calls (the only potential exception is the future update checker, which will be opt-in and point only at GitHub releases)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse 完全运行在你的 Mac 本地，不会发起任何出站网络请求（未来若加入更新检查将是可选项，并且仅指向 GitHub Releases）。"
+          }
+        }
+      }
+    },
+    "Reading the database…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading the database…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在读取数据库…"
+          }
+        }
+      }
+    },
+    "privacyAudit.window.template": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Window: %@ → %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时段: %@ → %@"
+          }
+        }
+      }
     }
   }
 }
