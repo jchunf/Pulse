@@ -18,6 +18,7 @@ public final class RollupScheduler: @unchecked Sendable {
         public let rawToSecondInterval: TimeInterval
         public let foregroundAppToMinInterval: TimeInterval
         public let minAppToHourInterval: TimeInterval
+        public let idleEventsToMinInterval: TimeInterval
 
         public init(
             rawToSecondInterval: TimeInterval = 60,
@@ -25,7 +26,8 @@ public final class RollupScheduler: @unchecked Sendable {
             minutesToHoursInterval: TimeInterval = 3_600,
             purgeInterval: TimeInterval = 86_400,
             foregroundAppToMinInterval: TimeInterval = 300,
-            minAppToHourInterval: TimeInterval = 3_600
+            minAppToHourInterval: TimeInterval = 3_600,
+            idleEventsToMinInterval: TimeInterval = 300
         ) {
             self.rawToSecondInterval = rawToSecondInterval
             self.secondsToMinutesInterval = secondsToMinutesInterval
@@ -33,6 +35,7 @@ public final class RollupScheduler: @unchecked Sendable {
             self.purgeInterval = purgeInterval
             self.foregroundAppToMinInterval = foregroundAppToMinInterval
             self.minAppToHourInterval = minAppToHourInterval
+            self.idleEventsToMinInterval = idleEventsToMinInterval
         }
 
         public static let `default` = Configuration()
@@ -44,6 +47,7 @@ public final class RollupScheduler: @unchecked Sendable {
         case minuteToHour
         case foregroundAppToMin
         case minAppToHour
+        case idleEventsToMin
         case purgeExpired
     }
 
@@ -53,6 +57,7 @@ public final class RollupScheduler: @unchecked Sendable {
         public var minuteToHour: Date?
         public var foregroundAppToMin: Date?
         public var minAppToHour: Date?
+        public var idleEventsToMin: Date?
         public var purgeExpired: Date?
 
         public static let empty = LastRunStamps(
@@ -61,6 +66,7 @@ public final class RollupScheduler: @unchecked Sendable {
             minuteToHour: nil,
             foregroundAppToMin: nil,
             minAppToHour: nil,
+            idleEventsToMin: nil,
             purgeExpired: nil
         )
     }
@@ -105,6 +111,7 @@ public final class RollupScheduler: @unchecked Sendable {
         case .minuteToHour:       try rollMinuteToHour(now: now)
         case .foregroundAppToMin: try rollForegroundAppToMin(now: now)
         case .minAppToHour:       try rollMinAppToHour(now: now)
+        case .idleEventsToMin:    try rollIdleEventsToMin(now: now)
         case .purgeExpired:       try purgeExpired(now: now)
         }
         lock.lock()
@@ -114,6 +121,7 @@ public final class RollupScheduler: @unchecked Sendable {
         case .minuteToHour:       lastRuns.minuteToHour = now
         case .foregroundAppToMin: lastRuns.foregroundAppToMin = now
         case .minAppToHour:       lastRuns.minAppToHour = now
+        case .idleEventsToMin:    lastRuns.idleEventsToMin = now
         case .purgeExpired:       lastRuns.purgeExpired = now
         }
         lock.unlock()
@@ -141,6 +149,9 @@ public final class RollupScheduler: @unchecked Sendable {
         case .minAppToHour:
             last = lastRuns.minAppToHour
             interval = configuration.minAppToHourInterval
+        case .idleEventsToMin:
+            last = lastRuns.idleEventsToMin
+            interval = configuration.idleEventsToMinInterval
         case .purgeExpired:
             last = lastRuns.purgeExpired
             interval = configuration.purgeInterval
@@ -396,6 +407,105 @@ public final class RollupScheduler: @unchecked Sendable {
                 sql: "DELETE FROM min_app WHERE ts_minute < ?",
                 arguments: [hourCutoffSec]
             )
+        }
+    }
+
+    /// Walks `idle_entered` / `idle_exited` transitions in `system_events`
+    /// and credits each idle interval's seconds to its containing
+    /// minute-bucket in `min_idle`. Same watermark + priorState pattern as
+    /// the foreground-app rollup: if the user was already idle at the
+    /// watermark boundary we open a synthetic interval at the watermark
+    /// and let it close on the next `idle_exited`. If the idle state is
+    /// still open at the minute cutoff we close the interval there
+    /// (the next tick will re-open it if the transition hasn't arrived).
+    private func rollIdleEventsToMin(now: Date) throws {
+        let minuteCutoffSec = Int64(AggregationRules.minuteBucket(for: now).timeIntervalSince1970)
+        let minuteCutoffMs = minuteCutoffSec * 1_000
+
+        try database.queue.write { db in
+            let watermarkMs = try Int64.fetchOne(
+                db,
+                sql: "SELECT last_processed_ms FROM rollup_watermarks WHERE job = 'idle_events_to_min'"
+            ) ?? 0
+            guard watermarkMs < minuteCutoffMs else { return }
+
+            // Was the user idle at the watermark boundary?
+            let priorCategory: String? = try String.fetchOne(db, sql: """
+                SELECT category FROM system_events
+                WHERE category IN ('idle_entered', 'idle_exited') AND ts < ?
+                ORDER BY ts DESC LIMIT 1
+                """, arguments: [watermarkMs])
+            let startedIdle = (priorCategory == "idle_entered")
+
+            let transitionRows = try Row.fetchAll(db, sql: """
+                SELECT ts, category FROM system_events
+                WHERE category IN ('idle_entered', 'idle_exited') AND ts >= ? AND ts < ?
+                ORDER BY ts
+                """, arguments: [watermarkMs, minuteCutoffMs])
+
+            var intervals: [(Int64, Int64)] = []
+            var idleStart: Int64? = startedIdle ? watermarkMs : nil
+            for row in transitionRows {
+                let ts: Int64 = row["ts"]
+                let category: String = row["category"]
+                if category == "idle_entered" {
+                    if idleStart == nil {
+                        idleStart = ts
+                    }
+                } else {
+                    if let start = idleStart {
+                        intervals.append((start, ts))
+                        idleStart = nil
+                    }
+                }
+            }
+            // Still idle at the cutoff → close the open interval at the
+            // cutoff. The next tick's priorState will reopen it if the
+            // exit hasn't happened by then.
+            if let start = idleStart {
+                intervals.append((start, minuteCutoffMs))
+            }
+
+            var byMinute: [Int64: Int64] = [:]
+            for (startMs, endMs) in intervals {
+                addIdleSecondsPerMinute(startMs: startMs, endMs: endMs, into: &byMinute)
+            }
+
+            for (minute, seconds) in byMinute where seconds > 0 {
+                try db.execute(sql: """
+                    INSERT INTO min_idle (ts_minute, idle_seconds)
+                    VALUES (?, ?)
+                    ON CONFLICT(ts_minute) DO UPDATE SET
+                        idle_seconds = min_idle.idle_seconds + excluded.idle_seconds
+                    """, arguments: [minute, seconds])
+            }
+
+            try db.execute(sql: """
+                INSERT INTO rollup_watermarks (job, last_processed_ms)
+                VALUES ('idle_events_to_min', ?)
+                ON CONFLICT(job) DO UPDATE SET last_processed_ms = excluded.last_processed_ms
+                """, arguments: [minuteCutoffMs])
+        }
+    }
+
+    /// Flat-bucket variant of `addSecondsPerMinute` — idle time is
+    /// attributed to a single scalar per minute (not nested by bundle).
+    private func addIdleSecondsPerMinute(
+        startMs: Int64,
+        endMs: Int64,
+        into byMinute: inout [Int64: Int64]
+    ) {
+        guard endMs > startMs else { return }
+        let startSec = startMs / 1_000
+        let endSec = endMs / 1_000
+        guard endSec > startSec else { return }
+        var cursor = startSec
+        while cursor < endSec {
+            let minuteBucket = (cursor / 60) * 60
+            let nextBoundary = minuteBucket + 60
+            let segEnd = min(endSec, nextBoundary)
+            byMinute[minuteBucket, default: 0] += (segEnd - cursor)
+            cursor = segEnd
         }
     }
 
