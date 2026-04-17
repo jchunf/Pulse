@@ -2321,6 +2321,22 @@
           }
         }
       }
+    },
+    "Export data…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export data…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出数据…"
+          }
+        }
+      }
     }
   }
 }
