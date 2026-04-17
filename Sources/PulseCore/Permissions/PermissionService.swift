@@ -8,6 +8,42 @@ public enum Permission: String, Sendable, Equatable, CaseIterable {
     case calendars
     case location
     case notifications
+
+    /// MVP requires these; others are optional and only land with their
+    /// feature-flagged consumers.
+    public static let required: [Permission] = [.inputMonitoring, .accessibility]
+
+    /// Deep-link URL that jumps straight to this permission's pane in
+    /// System Settings. Constructed as a pure `URL` (no AppKit) so it can
+    /// live in PulseCore; callers in PulsePlatform / PulseApp open it via
+    /// `NSWorkspace`.
+    public var systemSettingsURL: URL? {
+        switch self {
+        case .inputMonitoring:
+            return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")
+        case .accessibility:
+            return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+        case .calendars:
+            return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")
+        case .location:
+            return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices")
+        case .notifications:
+            return URL(string: "x-apple.systempreferences:com.apple.preference.notifications")
+        }
+    }
+
+    /// Human-facing label used by the permission-assistant UI. Stable
+    /// across locales at MVP; full localization lands with the app-wide
+    /// l10n pass.
+    public var displayName: String {
+        switch self {
+        case .inputMonitoring: return "Input Monitoring"
+        case .accessibility:   return "Accessibility"
+        case .calendars:       return "Calendars"
+        case .location:        return "Location Services"
+        case .notifications:   return "Notifications"
+        }
+    }
 }
 
 /// The status of a single permission.
@@ -41,8 +77,14 @@ public struct PermissionSnapshot: Sendable, Equatable {
     /// True only if every required permission is granted. `inputMonitoring`
     /// and `accessibility` are required for MVP; others are optional.
     public var isAllRequiredGranted: Bool {
-        requiredStatus(.inputMonitoring) == .granted
-            && requiredStatus(.accessibility) == .granted
+        Permission.required.allSatisfy { requiredStatus($0) == .granted }
+    }
+
+    /// Required permissions whose status is anything other than `.granted`.
+    /// The permission-assistant UI uses this to list the exact fixes the
+    /// user still needs to complete; order matches `Permission.required`.
+    public var missingRequired: [Permission] {
+        Permission.required.filter { requiredStatus($0) != .granted }
     }
 
     private func requiredStatus(_ permission: Permission) -> PermissionStatus {
