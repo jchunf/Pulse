@@ -2593,6 +2593,166 @@
           }
         }
       }
+    },
+    "Today's rhythm": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today's rhythm"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日节奏"
+          }
+        }
+      }
+    },
+    "Not enough app-switch data yet — keep using your Mac and this card will tell you whether today is a checker day or a deep-worker day.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not enough app-switch data yet — keep using your Mac and this card will tell you whether today is a checker day or a deep-worker day."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用切换数据还不够——继续使用你的 Mac，这张卡片会告诉你今天是「检查员模式」还是「深度工作者模式」。"
+          }
+        }
+      }
+    },
+    "Sessions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sessions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会话数"
+          }
+        }
+      }
+    },
+    "Median": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Median"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "中位数"
+          }
+        }
+      }
+    },
+    "Average": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Average"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "平均"
+          }
+        }
+      }
+    },
+    "Longest": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Longest"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最长"
+          }
+        }
+      }
+    },
+    "Deep-worker mode — most of your sessions today run half an hour or more.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deep-worker mode — most of your sessions today run half an hour or more."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "深度工作者模式——今天大多数会话都在半小时以上。"
+          }
+        }
+      }
+    },
+    "Steady flow — sessions are long enough to settle into real work.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steady flow — sessions are long enough to settle into real work."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "稳定心流——会话长度足以沉入真正的工作。"
+          }
+        }
+      }
+    },
+    "Short-form work — lots of 5-to-15-minute sessions today.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Short-form work — lots of 5-to-15-minute sessions today."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "短节奏工作——今天有不少 5 到 15 分钟的会话。"
+          }
+        }
+      }
+    },
+    "Checker mode — mostly quick dips today, not long-form focus.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checker mode — mostly quick dips today, not long-form focus."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查员模式——今天基本是短停留，不是长段深度专注。"
+          }
+        }
+      }
     }
   }
 }

@@ -531,6 +531,7 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var heatmapDays: Int = DashboardModel.defaultHeatmapDays
     @Published private(set) var trendPoints: [DailyTrendPoint] = []
     @Published private(set) var longestFocus: FocusSegment?
+    @Published private(set) var sessionPosture: SessionPosture = .empty
     @Published private(set) var goalProgress: [GoalProgress] = []
     @Published private(set) var lastRefreshAt: Date?
     @Published private(set) var errorMessage: String?
@@ -605,6 +606,7 @@ final class DashboardModel: ObservableObject {
             let heatmap = try store.hourlyHeatmap(endingAt: now, days: days)
             let trend = try store.dailyTrend(endingAt: now, days: Self.trendDays)
             let focus = try store.longestFocusSegment(on: dayStart, now: now)
+            let posture = try store.sessionPosture(on: dayStart, now: now)
             let switches = try store.appSwitchCount(on: dayStart, capUntil: now)
             let progress = GoalEvaluator.evaluate(
                 goals: goalsStore.enabledGoals(),
@@ -617,6 +619,7 @@ final class DashboardModel: ObservableObject {
             self.heatmapDays = days
             self.trendPoints = trend
             self.longestFocus = focus
+            self.sessionPosture = posture
             self.goalProgress = progress
             self.lastRefreshAt = now
             self.errorMessage = nil
@@ -916,6 +919,7 @@ struct DashboardView: View {
                     WeekTrendChart(points: model.trendPoints)
                     WeekHourlyHeatmap(cells: model.heatmapCells, days: model.heatmapDays)
                     DeepFocusCard(segment: model.longestFocus)
+                    UsagePostureCard(posture: model.sessionPosture)
                     AppRankingChart(rows: summary.topApps)
                     DiagnosticsCard(snapshot: healthModel.snapshot)
                 } else if model.errorMessage != nil {
@@ -1846,6 +1850,87 @@ struct DeepFocusCard: View {
         formatter.locale = .current
         formatter.setLocalizedDateFormatFromTemplate("HH:mm")
         return formatter.string(from: date)
+    }
+}
+
+/// Dashboard card that summarises today's session rhythm — how many
+/// sessions, avg / median duration, a classification label ranging
+/// from "quick checker" to "deep worker". Backed by `SessionPosture`
+/// per review §3.6 ("are you 5-min-per-jump or 40-min-per-slab?").
+struct UsagePostureCard: View {
+
+    let posture: SessionPosture
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Today's rhythm", bundle: .module)
+                .font(.headline)
+            if posture.sessionCount == 0 {
+                Text("Not enough app-switch data yet — keep using your Mac and this card will tell you whether today is a checker day or a deep-worker day.", bundle: .module)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.vertical, 8)
+            } else {
+                filled
+            }
+        }
+    }
+
+    private var filled: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 24) {
+                stat(
+                    label: Text("Sessions", bundle: .module),
+                    value: "\(posture.sessionCount)"
+                )
+                stat(
+                    label: Text("Median", bundle: .module),
+                    value: PulseFormat.duration(seconds: posture.medianDurationSeconds)
+                )
+                stat(
+                    label: Text("Average", bundle: .module),
+                    value: PulseFormat.duration(seconds: posture.averageDurationSeconds)
+                )
+                stat(
+                    label: Text("Longest", bundle: .module),
+                    value: PulseFormat.duration(seconds: posture.longestDurationSeconds)
+                )
+                Spacer()
+            }
+            Text(Self.classificationSentence(for: posture), bundle: .module)
+                .font(.body)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.gray.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    @ViewBuilder
+    private func stat(label: Text, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            label
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            Text(value)
+                .font(.title3.monospacedDigit().bold())
+        }
+    }
+
+    private static func classificationSentence(for posture: SessionPosture) -> LocalizedStringKey {
+        let median = posture.medianDurationSeconds
+        if median >= 30 * 60 {
+            return "Deep-worker mode — most of your sessions today run half an hour or more."
+        } else if median >= 15 * 60 {
+            return "Steady flow — sessions are long enough to settle into real work."
+        } else if median >= 5 * 60 {
+            return "Short-form work — lots of 5-to-15-minute sessions today."
+        } else {
+            return "Checker mode — mostly quick dips today, not long-form focus."
+        }
     }
 }
 
