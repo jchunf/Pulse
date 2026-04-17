@@ -1,0 +1,136 @@
+name: Package
+
+# Build an ad-hoc-signed Pulse.app on a hosted macOS runner and hand it
+# back as a downloadable artifact. No Apple Developer Secrets involved —
+# the produced bundle behaves identically to `make app` run locally
+# (ad-hoc codesign, triggers Gatekeeper on first launch, TCC permissions
+# must be granted by the user on their own Mac).
+#
+# On a version tag push (v*) the same bundle is also attached to a
+# GitHub Release so the maintainer can link friends at one URL. The
+# release is marked as a pre-release until Developer ID signing +
+# notarization land (see docs/07-distribution.md, tracked as v1.0
+# blocker in CHANGELOG.md).
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      universal:
+        description: 'Build universal (arm64 + x86_64) binary'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: package (macos-15)
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 16
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest-stable'
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Cache SwiftPM build
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-package-${{ hashFiles('**/Package.resolved', '**/Package.swift') }}
+          restore-keys: |
+            spm-package-
+
+      - name: Derive version string
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            raw="${GITHUB_REF#refs/tags/v}"
+            echo "version=$raw" >> "$GITHUB_OUTPUT"
+            echo "build=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+            echo "artifact=Pulse-$raw" >> "$GITHUB_OUTPUT"
+          else
+            short="$(git rev-parse --short HEAD)"
+            echo "version=0.0.0-ci.${GITHUB_RUN_NUMBER}+${short}" >> "$GITHUB_OUTPUT"
+            echo "build=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+            echo "artifact=Pulse-ci-${short}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Package .app
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD_NUMBER: ${{ steps.version.outputs.build }}
+          # Default to universal for tag builds and when manual dispatch
+          # asks for it; native-only for main / PR runs (keeps feedback
+          # fast). GHA string '0' is truthy, so we can't chain `||` on
+          # the result — collapse the condition to one ternary.
+          UNIVERSAL: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.universal)) && '1' || '0' }}
+        run: bash scripts/package.sh
+
+      - name: Zip bundle
+        id: zip
+        working-directory: dist
+        run: |
+          zip_name="${{ steps.version.outputs.artifact }}.zip"
+          # `ditto -c -k --keepParent` is the Apple-recommended way to
+          # zip a .app — it preserves extended attributes (including the
+          # codesign signature) that `zip -r` would quietly strip.
+          ditto -c -k --keepParent Pulse.app "$zip_name"
+          echo "zip_path=dist/$zip_name" >> "$GITHUB_OUTPUT"
+          echo "zip_name=$zip_name" >> "$GITHUB_OUTPUT"
+          shasum -a 256 "$zip_name" | tee "$zip_name.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact }}
+          path: |
+            ${{ steps.zip.outputs.zip_path }}
+            ${{ steps.zip.outputs.zip_path }}.sha256
+          # Pre-release artifacts are cheap; a week is enough for the
+          # maintainer to grab or for anyone reviewing a PR to try it.
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Create GitHub Release (tag only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: true
+          generate_release_notes: true
+          body: |
+            **Pre-release — unsigned (ad-hoc codesign only).**
+
+            This bundle is not signed with a Developer ID and not
+            notarized by Apple. macOS will warn on first launch:
+            right-click the `.app` in Finder and choose Open → Open,
+            or run `xattr -dr com.apple.quarantine Pulse.app` first.
+
+            Developer ID signing + notarization + Sparkle auto-update
+            are tracked as v1.0 blockers in `CHANGELOG.md` and
+            `docs/07-distribution.md`.
+
+            See the auto-generated changelog below for merged PRs
+            since the previous tag.
+          files: |
+            ${{ steps.zip.outputs.zip_path }}
+            ${{ steps.zip.outputs.zip_path }}.sha256
