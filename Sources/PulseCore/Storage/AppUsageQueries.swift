@@ -320,12 +320,14 @@ public extension EventStore {
         let rangeStartSec = Int64(startDay.timeIntervalSince1970)
         let rangeEndSec = Int64(rangeEnd.timeIntervalSince1970)
 
-        let rows = try database.queue.read { db -> [(Int64, Int, Double, Int)] in
+        let rows = try database.queue.read { db -> [(Int64, Int, Double, Int, Int, Int)] in
             try Row.fetchAll(db, sql: """
                 SELECT ts_hour,
                        key_press_total,
                        mouse_distance_mm,
-                       mouse_click_total
+                       mouse_click_total,
+                       scroll_ticks,
+                       idle_seconds
                 FROM hour_summary
                 WHERE ts_hour >= ? AND ts_hour < ?
                 """, arguments: [rangeStartSec, rangeEndSec]).map { row in
@@ -333,36 +335,48 @@ public extension EventStore {
                     row["ts_hour"] as Int64,
                     row["key_press_total"] as Int,
                     row["mouse_distance_mm"] as Double,
-                    row["mouse_click_total"] as Int
+                    row["mouse_click_total"] as Int,
+                    row["scroll_ticks"] as Int,
+                    row["idle_seconds"] as Int
                 )
             }
         }
 
         // Aggregate hourly rows into per-day buckets.
-        var buckets: [Int: (keys: Int, distance: Double, clicks: Int)] = [:]
-        for (tsHour, keys, distance, clicks) in rows {
+        struct DayAgg {
+            var keys: Int = 0
+            var distance: Double = 0
+            var clicks: Int = 0
+            var scrolls: Int = 0
+            var idle: Int = 0
+        }
+        var buckets: [Int: DayAgg] = [:]
+        for (tsHour, keys, distance, clicks, scrolls, idle) in rows {
             let date = Date(timeIntervalSince1970: TimeInterval(tsHour))
             let dayStart = calendar.startOfDay(for: date)
             guard let daysFromStart = calendar.dateComponents([.day], from: startDay, to: dayStart).day else {
                 continue
             }
-            let current = buckets[daysFromStart] ?? (0, 0.0, 0)
-            buckets[daysFromStart] = (
-                keys: current.keys + keys,
-                distance: current.distance + distance,
-                clicks: current.clicks + clicks
-            )
+            var agg = buckets[daysFromStart] ?? DayAgg()
+            agg.keys += keys
+            agg.distance += distance
+            agg.clicks += clicks
+            agg.scrolls += scrolls
+            agg.idle += idle
+            buckets[daysFromStart] = agg
         }
 
         // Emit points for every day in the window, padding zeros.
         return (0..<days).compactMap { index in
             guard let day = calendar.date(byAdding: .day, value: index, to: startDay) else { return nil }
-            let agg = buckets[index] ?? (0, 0.0, 0)
+            let agg = buckets[index] ?? DayAgg()
             return DailyTrendPoint(
                 day: day,
                 keyPresses: agg.keys,
                 mouseClicks: agg.clicks,
-                mouseDistanceMillimeters: agg.distance
+                mouseDistanceMillimeters: agg.distance,
+                scrollTicks: agg.scrolls,
+                idleSeconds: agg.idle
             )
         }
     }
@@ -592,6 +606,8 @@ public struct DailyTrendPoint: Sendable, Equatable, Identifiable {
     public let keyPresses: Int
     public let mouseClicks: Int
     public let mouseDistanceMillimeters: Double
+    public let scrollTicks: Int
+    public let idleSeconds: Int
 
     public var id: TimeInterval { day.timeIntervalSince1970 }
 
@@ -599,12 +615,16 @@ public struct DailyTrendPoint: Sendable, Equatable, Identifiable {
         day: Date,
         keyPresses: Int,
         mouseClicks: Int,
-        mouseDistanceMillimeters: Double
+        mouseDistanceMillimeters: Double,
+        scrollTicks: Int = 0,
+        idleSeconds: Int = 0
     ) {
         self.day = day
         self.keyPresses = keyPresses
         self.mouseClicks = mouseClicks
         self.mouseDistanceMillimeters = mouseDistanceMillimeters
+        self.scrollTicks = scrollTicks
+        self.idleSeconds = idleSeconds
     }
 
     /// Convenience: total "intentional event" count for single-metric charts.
