@@ -213,6 +213,84 @@ struct RollupSchedulerTests {
         #expect(total == 420)
     }
 
+    // MARK: - B6 idle rollup
+
+    private func insertIdleEvent(
+        into db: PulseDatabase,
+        atMillis ts: Int64,
+        entered: Bool
+    ) throws {
+        try db.queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO system_events (ts, category, payload) VALUES (?, ?, NULL)",
+                arguments: [ts, entered ? "idle_entered" : "idle_exited"]
+            )
+        }
+    }
+
+    @Test("idleEventsToMin attributes paired idle intervals to minute buckets")
+    func idleEventsToMinBasic() throws {
+        let (scheduler, db, clock) = try makeScheduler()
+        let minuteStartSec: Int64 = 1_700_000_000 - (1_700_000_000 % 60)
+        let baseMs: Int64 = minuteStartSec * 1_000
+
+        // Idle from minute+10s to minute+50s → 40 seconds in minute 0.
+        try insertIdleEvent(into: db, atMillis: baseMs + 10_000, entered: true)
+        try insertIdleEvent(into: db, atMillis: baseMs + 50_000, entered: false)
+
+        clock.advance(120)
+        try scheduler.runOnce(.idleEventsToMin, now: clock.now)
+
+        let rows: [(Int64, Int64)] = try db.queue.read { db in
+            try Row.fetchAll(
+                db,
+                sql: "SELECT ts_minute, idle_seconds FROM min_idle ORDER BY ts_minute"
+            ).map { row in
+                (row["ts_minute"] as Int64, row["idle_seconds"] as Int64)
+            }
+        }
+        #expect(rows.count == 1)
+        #expect(rows[0] == (minuteStartSec, 40))
+    }
+
+    @Test("idleEventsToMin is idempotent: second tick does not double-count")
+    func idleEventsToMinIdempotent() throws {
+        let (scheduler, db, clock) = try makeScheduler()
+        let minuteStartSec: Int64 = 1_700_000_000 - (1_700_000_000 % 60)
+        let baseMs: Int64 = minuteStartSec * 1_000
+        try insertIdleEvent(into: db, atMillis: baseMs + 10_000, entered: true)
+        try insertIdleEvent(into: db, atMillis: baseMs + 40_000, entered: false)
+
+        clock.advance(120)
+        try scheduler.runOnce(.idleEventsToMin, now: clock.now)
+        try scheduler.runOnce(.idleEventsToMin, now: clock.now)
+
+        let total: Int64 = try db.queue.read { db in
+            try Int64.fetchOne(db, sql: "SELECT COALESCE(SUM(idle_seconds), 0) FROM min_idle") ?? -1
+        }
+        #expect(total == 30)
+    }
+
+    @Test("idleEventsToMin carries an idle state open across the watermark")
+    func idleEventsToMinCarriesOpenInterval() throws {
+        let (scheduler, db, clock) = try makeScheduler()
+        let minuteStartSec: Int64 = 1_700_000_000 - (1_700_000_000 % 60)
+        let baseMs: Int64 = minuteStartSec * 1_000
+
+        // Idle entered 2 minutes before the fake clock; no exit.
+        try insertIdleEvent(into: db, atMillis: baseMs - 120_000, entered: true)
+
+        clock.advance(120)
+        try scheduler.runOnce(.idleEventsToMin, now: clock.now)
+
+        // Clock is at +120s → minuteCutoff = +120. Idle was open from -120
+        // through +120 → 4 minutes of idle spanning M-2, M-1, M0, M1.
+        let total: Int64 = try db.queue.read { db in
+            try Int64.fetchOne(db, sql: "SELECT COALESCE(SUM(idle_seconds), 0) FROM min_idle") ?? -1
+        }
+        #expect(total == 240)
+    }
+
     @Test("minAppToHour aggregates into hour_app and deletes min_app rows")
     func minAppToHourPromotes() throws {
         let (scheduler, db, clock) = try makeScheduler()
