@@ -30,25 +30,43 @@ struct SamplingPolicyTests {
         #expect(policy.shouldRecord(at: clock.now) == true)
     }
 
-    @Test("after idleWindow elapses with no activity, fall back to idle rate")
-    func fallsBackToIdleRate() {
+    @Test("first event after an idleWindow gap is classified as idle-rate but always accepted")
+    func firstPostIdleEventAccepted() {
         let clock = FakeClock()
         let policy = SamplingPolicy(
             clock: clock,
             configuration: .init(activeRateHz: 30, idleRateHz: 1, idleWindow: 5)
         )
-        // Prime with an active event.
+        // Prime.
         _ = policy.shouldRecord(at: clock.now)
-        // Wait beyond the idle window so the next event sees idleness.
+        // Wait beyond idleWindow. The next event is classified as idle (gap
+        // since lastActivity ≥ idleWindow), evaluated at idleRate 1 Hz, and
+        // always accepted because the lastAccepted gap is 10s ≫ 1/1 Hz.
         clock.advance(10)
-        // First event after gap: accepted.
         #expect(policy.shouldRecord(at: clock.now) == true)
-        // 0.5s later at idle rate (1Hz): too soon, dropped.
+    }
+
+    @Test("once activity resumes, sampling re-evaluates as active (gap-based)")
+    func resumedActivityIsActive() {
+        // Documents that SamplingPolicy is gap-based, not sticky-idle: the
+        // FIRST event after a long gap uses idleRate, but subsequent events
+        // within idleWindow of that event are classified active again and
+        // throttled at activeRate. This matches the design in
+        // docs/04-architecture.md#4.2: "drop to 1 Hz when no events for N s".
+        let clock = FakeClock()
+        let policy = SamplingPolicy(
+            clock: clock,
+            configuration: .init(activeRateHz: 30, idleRateHz: 1, idleWindow: 5)
+        )
+        _ = policy.shouldRecord(at: clock.now)
+        clock.advance(10)
+        _ = policy.shouldRecord(at: clock.now)
+        // 0.5s later: gap < idleWindow ⇒ active rate ⇒ 0.5s > 1/30 s ⇒ accepted.
         clock.advance(0.5)
-        #expect(policy.shouldRecord(at: clock.now) == false)
-        // 1s later: accepted.
-        clock.advance(0.6)
         #expect(policy.shouldRecord(at: clock.now) == true)
+        // 1 ms later: still active, but 1 ms < 1/30 s ⇒ dropped.
+        clock.advance(0.001)
+        #expect(policy.shouldRecord(at: clock.now) == false)
     }
 
     @Test("activity reverts to active rate the moment it resumes")
