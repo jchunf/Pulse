@@ -353,6 +353,8 @@ struct HealthMenuView: View {
 
             PermissionList(snapshot: model.snapshot.permissions)
 
+            PermissionAssistantView(snapshot: model.snapshot.permissions)
+
             if let message = model.errorMessage {
                 Divider()
                 Text(message)
@@ -841,6 +843,47 @@ struct PermissionList: View {
                 }
                 .font(.footnote)
             }
+        }
+    }
+}
+
+/// Shown only when one or more required permissions aren't granted.
+/// Lists the missing permissions and provides a single-click path into
+/// the relevant System Settings pane via `Permission.systemSettingsURL`.
+/// The B4/A5 roadmap note about mid-session permission loss motivates
+/// this — the user has to recover, and guiding them to the exact pane
+/// is a major onboarding / error-recovery win.
+struct PermissionAssistantView: View {
+
+    let snapshot: PermissionSnapshot
+
+    var body: some View {
+        let missing = snapshot.missingRequired
+        if missing.isEmpty {
+            EmptyView()
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Permissions needed", systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote.bold())
+                    .foregroundStyle(.orange)
+                Text("Pulse can't collect without the following permissions. Grant them in System Settings, then relaunch Pulse.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                ForEach(missing, id: \.self) { permission in
+                    Button {
+                        if let url = permission.systemSettingsURL {
+                            NSWorkspace.shared.open(url)
+                        }
+                    } label: {
+                        Label("Open \(permission.displayName) settings", systemImage: "arrow.up.forward.app")
+                            .font(.footnote)
+                    }
+                    .buttonStyle(.link)
+                }
+            }
+            .padding(10)
+            .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
         }
     }
 }
