@@ -778,6 +778,7 @@ struct SummaryCardsView: View {
             metric(title: "Clicks", value: format(summary.totalMouseClicks))
             metric(title: "Keystrokes", value: format(summary.totalKeyPresses))
             metric(title: "Active time", value: formatDuration(summary.totalActiveSeconds))
+            metric(title: "Idle time", value: formatDuration(summary.totalIdleSeconds))
         }
     }
 

@@ -84,6 +84,20 @@ public extension EventStore {
                 SELECT COUNT(*) FROM raw_key_events WHERE ts >= ? AND ts < ?
                 """, arguments: [startMs, endMs]) ?? 0
 
+            // Idle seconds — rolled L3 (hour_summary) + un-rolled L2
+            // (min_idle). `idle_events_to_min` rollup (B6) is the
+            // producer for both layers; a pre-rollup install will read
+            // zero here, same deliberate staleness the trend + heatmap
+            // charts accept.
+            let idleHour = try Int.fetchOne(db, sql: """
+                SELECT COALESCE(SUM(idle_seconds), 0) FROM hour_summary
+                WHERE ts_hour >= ? AND ts_hour < ?
+                """, arguments: [startSec, endSec]) ?? 0
+            let idleMin = try Int.fetchOne(db, sql: """
+                SELECT COALESCE(SUM(idle_seconds), 0) FROM min_idle
+                WHERE ts_minute >= ? AND ts_minute < ?
+                """, arguments: [startSec, endSec]) ?? 0
+
             // App ranking — run the interval query then sum its result.
             let topApps = try Self.runAppUsageQuery(
                 db: db,
@@ -100,6 +114,7 @@ public extension EventStore {
                 totalMouseMovesRaw: rawMoves,
                 totalMouseDistanceMillimeters: mouseDistanceHour + mouseDistanceMin + mouseDistanceSec,
                 totalActiveSeconds: totalActiveSeconds,
+                totalIdleSeconds: idleHour + idleMin,
                 topApps: topApps
             )
         }
@@ -399,6 +414,7 @@ public struct TodaySummary: Sendable, Equatable {
     public let totalMouseMovesRaw: Int
     public let totalMouseDistanceMillimeters: Double
     public let totalActiveSeconds: Int
+    public let totalIdleSeconds: Int
     public let topApps: [AppUsageRow]
 
     public init(
@@ -407,6 +423,7 @@ public struct TodaySummary: Sendable, Equatable {
         totalMouseMovesRaw: Int,
         totalMouseDistanceMillimeters: Double,
         totalActiveSeconds: Int,
+        totalIdleSeconds: Int,
         topApps: [AppUsageRow]
     ) {
         self.totalKeyPresses = totalKeyPresses
@@ -414,6 +431,7 @@ public struct TodaySummary: Sendable, Equatable {
         self.totalMouseMovesRaw = totalMouseMovesRaw
         self.totalMouseDistanceMillimeters = totalMouseDistanceMillimeters
         self.totalActiveSeconds = totalActiveSeconds
+        self.totalIdleSeconds = totalIdleSeconds
         self.topApps = topApps
     }
 }

@@ -53,15 +53,25 @@ struct AppUsageQueriesTests {
         hourStart: Date,
         keys: Int,
         clicks: Int,
-        distanceMm: Double = 0.0
+        distanceMm: Double = 0.0,
+        idleSeconds: Int = 0
     ) throws {
         try db.queue.write { db in
             try db.execute(
                 sql: """
                 INSERT INTO hour_summary (ts_hour, key_press_total, mouse_distance_mm, mouse_click_total, idle_seconds)
-                VALUES (?, ?, ?, ?, 0)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                arguments: [Int64(hourStart.timeIntervalSince1970), keys, distanceMm, clicks]
+                arguments: [Int64(hourStart.timeIntervalSince1970), keys, distanceMm, clicks, idleSeconds]
+            )
+        }
+    }
+
+    private func insertMinIdle(into db: PulseDatabase, minute: Date, seconds: Int) throws {
+        try db.queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO min_idle (ts_minute, idle_seconds) VALUES (?, ?)",
+                arguments: [Int64(minute.timeIntervalSince1970), seconds]
             )
         }
     }
@@ -504,6 +514,31 @@ struct AppUsageQueriesTests {
         let xcodeSeconds = rows.first(where: { $0.bundleId == "com.apple.dt.Xcode" })?.secondsUsed
         #expect(safariSeconds == 630)  // 600 from hour_app + 30 raw
         #expect(xcodeSeconds == 30)    // from min_app only
+    }
+
+    @Test("todaySummary sums idle seconds across hour_summary + min_idle")
+    func summaryLayersIdleSeconds() async throws {
+        let (store, db) = try makeStore()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let day = calendar.date(from: DateComponents(
+            timeZone: calendar.timeZone, year: 2026, month: 1, day: 10, hour: 0
+        ))!
+        let now = day.addingTimeInterval(9 * 3_600 + 30 * 60)
+
+        // 2 completed hours of idle in hour_summary (480 s each) — rolled
+        // already — plus one minute of idle in min_idle (37 s) still
+        // awaiting promotion.
+        try insertHourSummary(into: db, hourStart: day.addingTimeInterval(7 * 3_600), keys: 0, clicks: 0, idleSeconds: 480)
+        try insertHourSummary(into: db, hourStart: day.addingTimeInterval(8 * 3_600), keys: 0, clicks: 0, idleSeconds: 480)
+        try insertMinIdle(into: db, minute: day.addingTimeInterval(9 * 3_600), seconds: 37)
+
+        let summary = try store.todaySummary(
+            start: day,
+            end: day.addingTimeInterval(86_400),
+            capUntil: now
+        )
+        #expect(summary.totalIdleSeconds == 480 + 480 + 37)
     }
 
     @Test("queries handle an empty database")
