@@ -142,47 +142,33 @@ jobs:
             test.log
           if-no-files-found: ignore
 
-      - name: Post CI summary as PR comment (failures + warnings)
+      - name: Post failure logs as PR comment
         # Self-debugging hook: paste log excerpts into the PR conversation
-        # whenever CI either (a) fails outright or (b) succeeds but emitted
-        # warnings / "error:" lines / failed assertions that did not flip
-        # the job to failure. The agent has no GitHub auth from its sandbox,
-        # so PR comments are the only channel back. See docs/WORKFLOW.md.
-        if: always() && github.event_name == 'pull_request'
+        # when CI fails. We rely on the "Fail on hidden compile errors in
+        # logs" step above to promote silent compile errors to real failures,
+        # so `if: failure()` now faithfully catches every case worth seeing.
+        # Clean green runs and benign-warning runs post nothing.
+        if: failure() && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
-          JOB_STATUS: ${{ job.status }}
         run: |
           set +e
-          ISSUE_LINES=""
-          for log in resolve.log build.log test.log; do
-            [ -s "$log" ] || continue
-            matches=$(grep -nE 'error:|warning:|FAIL|Assertion|Test Suite .* failed|unexpected error|Process completed with exit code' "$log" || true)
-            if [ -n "$matches" ]; then
-              ISSUE_LINES+="\n### \`$log\` — flagged lines\n\n\`\`\`\n$matches\n\`\`\`\n"
-            fi
-          done
-
-          if [ "$JOB_STATUS" = "success" ] && [ -z "$ISSUE_LINES" ]; then
-            echo "Clean success on ${{ matrix.runner }} — no PR comment needed."
-            exit 0
-          fi
-
-          HEADER_ICON="❌"
-          HEADER_LABEL="failed"
-          if [ "$JOB_STATUS" = "success" ]; then
-            HEADER_ICON="⚠️"
-            HEADER_LABEL="passed with warnings"
-          fi
-
           {
-            echo "## $HEADER_ICON CI $HEADER_LABEL on \`${{ matrix.runner }}\`"
+            echo "## ❌ CI failed on \`${{ matrix.runner }}\`"
             echo ""
             echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             echo ""
-            echo -e "$ISSUE_LINES"
             for log in resolve.log build.log test.log; do
               [ -s "$log" ] || continue
+              errors=$(grep -nE '^[^[:space:]].*\.swift:[0-9]+:[0-9]+: error:|FAIL|Test Suite .* failed|Process completed with exit code' "$log" || true)
+              if [ -n "$errors" ]; then
+                echo "### \`$log\` — error lines"
+                echo ""
+                echo '```'
+                echo "$errors" | head -40
+                echo '```'
+                echo ""
+              fi
               echo "### \`$log\` — last 120 lines"
               echo ""
               echo '```'
@@ -192,8 +178,8 @@ jobs:
             done
           } > /tmp/comment.md
 
-          # Echo to the run's step summary first so logs are always viewable
-          # in the Actions UI, even if the comment post below fails.
+          # Mirror to the run's step summary so logs are visible in Actions UI
+          # even if the PR comment post fails.
           cat /tmp/comment.md >> "$GITHUB_STEP_SUMMARY"
 
           if ! gh pr comment ${{ github.event.pull_request.number }} \
