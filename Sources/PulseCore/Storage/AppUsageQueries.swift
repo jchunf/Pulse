@@ -434,6 +434,31 @@ public extension EventStore {
         }
     }
 
+    // MARK: - App switch count (A20)
+
+    /// Returns the number of `foreground_app` transitions recorded on
+    /// `day` up to `capUntil` (defaults to now). Reads straight from
+    /// `system_events` since that table is the permanent source of
+    /// truth; `min_switches` lags one rollup tick behind.
+    func appSwitchCount(
+        on day: Date,
+        capUntil: Date = Date(),
+        calendar: Calendar = .current
+    ) throws -> Int {
+        let dayStart = calendar.startOfDay(for: day)
+        let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
+        let endCap = min(capUntil, dayEnd)
+        let startMs = Int64(dayStart.timeIntervalSince1970 * 1_000)
+        let endMs = Int64(endCap.timeIntervalSince1970 * 1_000)
+        guard endMs > startMs else { return 0 }
+        return try database.queue.read { db in
+            try Int.fetchOne(db, sql: """
+                SELECT COUNT(*) FROM system_events
+                WHERE category = 'foreground_app' AND ts >= ? AND ts < ?
+                """, arguments: [startMs, endMs]) ?? 0
+        }
+    }
+
     // MARK: - Longest focus segment (A16)
 
     /// Returns today's longest uninterrupted run of the user in a single
