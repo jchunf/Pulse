@@ -34,7 +34,8 @@ struct PulseApp: App {
                 model: appDelegate.healthModel,
                 anomalyMonitor: appDelegate.anomalyMonitor,
                 briefingTrigger: appDelegate.briefingTrigger,
-                privacyAuditTrigger: appDelegate.privacyAuditTrigger
+                privacyAuditTrigger: appDelegate.privacyAuditTrigger,
+                onboardingTrigger: appDelegate.onboardingTrigger
             )
         }
         .menuBarExtraStyle(.window)
@@ -58,6 +59,15 @@ struct PulseApp: App {
         }
         .defaultSize(width: 560, height: 520)
 
+        Window("Welcome to Pulse", id: "onboarding") {
+            OnboardingView(
+                model: appDelegate.onboardingModel,
+                onFinish: { appDelegate.finishOnboarding() }
+            )
+        }
+        .defaultSize(width: 600, height: 540)
+        .windowResizability(.contentSize)
+
         Settings {
             SettingsView(
                 goalsStore: appDelegate.goalsStore,
@@ -78,6 +88,7 @@ struct MenuBarLabel: View {
     @ObservedObject var anomalyMonitor: AnomalyMonitor
     let briefingTrigger: PassthroughSubject<Void, Never>
     let privacyAuditTrigger: PassthroughSubject<Void, Never>
+    let onboardingTrigger: PassthroughSubject<Void, Never>
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -99,6 +110,10 @@ struct MenuBarLabel: View {
             openWindow(id: "privacyAudit")
             NSApp.activate(ignoringOtherApps: true)
         }
+        .onReceive(onboardingTrigger) { _ in
+            openWindow(id: "onboarding")
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 }
 
@@ -113,6 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let dashboardModel: DashboardModel
     let briefingModel: DailyBriefingModel
     let privacyAuditModel: PrivacyAuditModel
+    let onboardingModel: OnboardingModel
     let anomalyMonitor: AnomalyMonitor
     let goalsStore: GoalsStore
 
@@ -129,6 +145,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `@Environment(\.openWindow)` (Settings scenes run in a nested
     /// environment where that handle is unreliable).
     let privacyAuditTrigger = PassthroughSubject<Void, Never>()
+
+    /// Trigger that asks the MenuBarLabel to open the onboarding window.
+    /// Same invisible-listener pattern as briefing / privacy audit; fired
+    /// once on `applicationDidFinishLaunching` for first-time users.
+    let onboardingTrigger = PassthroughSubject<Void, Never>()
 
     private let database: PulseDatabase?
     private let runtime: CollectorRuntime?
@@ -185,6 +206,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.anomalyMonitor = AnomalyMonitor(
             store: dbResult.database.map { EventStore(database: $0) }
         )
+        self.onboardingModel = OnboardingModel(permissionService: permissions)
         super.init()
     }
 
@@ -199,9 +221,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             await MainActor.run {
-                self?.showBriefingIfDueToday()
-                self?.generateWeeklyReportIfDue()
+                guard let self else { return }
+                if !OnboardingModel.hasCompleted() {
+                    // Brand-new install. Show onboarding before nudging
+                    // any retention surfaces; the briefing / weekly
+                    // report trigger off "first day" gates that wouldn't
+                    // make sense on the very first launch anyway.
+                    self.onboardingTrigger.send(())
+                } else {
+                    self.showBriefingIfDueToday()
+                    self.generateWeeklyReportIfDue()
+                }
             }
+        }
+    }
+
+    /// Closes out the onboarding flow: marks the gate done (the model's
+    /// "Open Pulse" button already did this, but a redundant write is
+    /// safe) and dismisses the window. The user lands on a Mac with the
+    /// menu bar icon live; from there one click opens the Dashboard,
+    /// which is the spec from `docs/06-onboarding-permissions.md` §五.
+    func finishOnboarding() {
+        OnboardingModel.markCompleted()
+        for window in NSApp.windows where window.identifier?.rawValue == "onboarding" {
+            window.close()
         }
     }
 

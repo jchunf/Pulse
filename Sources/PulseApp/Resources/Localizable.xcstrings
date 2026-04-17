@@ -2753,6 +2753,454 @@
           }
         }
       }
+    },
+    "Welcome to Pulse": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Welcome to Pulse"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "欢迎使用 Pulse"
+          }
+        }
+      }
+    },
+    "A local-first dashboard for the way you actually use your Mac. Pulse turns the noisy stream of clicks, key presses, scrolls and app switches into a daily story you can read in 30 seconds.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A local-first dashboard for the way you actually use your Mac. Pulse turns the noisy stream of clicks, key presses, scrolls and app switches into a daily story you can read in 30 seconds."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地优先的仪表盘，记录你真正使用 Mac 的方式。Pulse 把点击、按键、滚动、应用切换这些嘈杂的事件流，整理成 30 秒就能读完的每日故事。"
+          }
+        }
+      }
+    },
+    "Privacy promises": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy promises"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐私承诺"
+          }
+        }
+      }
+    },
+    "Before we ask for any permissions, here is what Pulse will and will not do — read it first.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before we ask for any permissions, here is what Pulse will and will not do — read it first."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在请求任何权限之前，先把 Pulse 会做和不会做的事讲清楚——请先读完。"
+          }
+        }
+      }
+    },
+    "All raw data stays inside ~/Library/Application Support/Pulse/. Nothing is ever uploaded.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All raw data stays inside ~/Library/Application Support/Pulse/. Nothing is ever uploaded."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有原始数据保留在 ~/Library/Application Support/Pulse/，永远不会上传。"
+          }
+        }
+      }
+    },
+    "No keystroke contents — only press counts. By default the key code is not stored either.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No keystroke contents — only press counts. By default the key code is not stored either."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不记录按键内容——只记录按键次数。默认情况下连键码也不存。"
+          }
+        }
+      }
+    },
+    "No clipboard, no screen recording, no microphone, no camera, ever.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No clipboard, no screen recording, no microphone, no camera, ever."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "永远不读剪贴板、不录屏、不开麦克风、不开摄像头。"
+          }
+        }
+      }
+    },
+    "Window titles are SHA-256 hashed before being persisted.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Window titles are SHA-256 hashed before being persisted."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "窗口标题在落盘前会被 SHA-256 哈希。"
+          }
+        }
+      }
+    },
+    "Pulse makes zero outbound network calls (a future opt-in update checker is the only exception, and it would only hit GitHub Releases).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse makes zero outbound network calls (a future opt-in update checker is the only exception, and it would only hit GitHub Releases)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse 不会发起任何出站网络请求（未来若加入更新检查也将是可选项，并且仅指向 GitHub Releases）。"
+          }
+        }
+      }
+    },
+    "I've read these promises and want to continue.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I've read these promises and want to continue."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "我已经读过这些承诺，希望继续。"
+          }
+        }
+      }
+    },
+    "Grant Input Monitoring": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grant Input Monitoring"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "授权 Input Monitoring"
+          }
+        }
+      }
+    },
+    "Grant Accessibility": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grant Accessibility"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "授权 Accessibility"
+          }
+        }
+      }
+    },
+    "Grant permission": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grant permission"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "授权"
+          }
+        }
+      }
+    },
+    "Pulse uses Input Monitoring to count clicks, key presses and scroll ticks system-wide. **It only counts events — it never records what you type.** macOS will quit and relaunch Pulse the moment you flip the switch; that's normal.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse uses Input Monitoring to count clicks, key presses and scroll ticks system-wide. **It only counts events — it never records what you type.** macOS will quit and relaunch Pulse the moment you flip the switch; that's normal."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse 使用 Input Monitoring 在系统层面统计点击、按键、滚动次数。**只数事件本身，绝不记录你打了什么。** 你勾选这个开关时 macOS 会立即退出并重启 Pulse，这是正常现象。"
+          }
+        }
+      }
+    },
+    "Pulse uses Accessibility to read which app is in the foreground and (optionally) the title of the active window. Window titles are hashed before being stored.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse uses Accessibility to read which app is in the foreground and (optionally) the title of the active window. Window titles are hashed before being stored."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse 使用 Accessibility 来识别当前前台应用，以及（可选地）当前活跃窗口的标题。窗口标题会先被哈希再落盘。"
+          }
+        }
+      }
+    },
+    "This permission is required for Pulse to function.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This permission is required for Pulse to function."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse 需要这个权限才能正常工作。"
+          }
+        }
+      }
+    },
+    "Click **Open System Settings** below.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click **Open System Settings** below."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点下方的 **打开系统设置**。"
+          }
+        }
+      }
+    },
+    "Find **Pulse** in the list.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find **Pulse** in the list."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在列表中找到 **Pulse**。"
+          }
+        }
+      }
+    },
+    "Toggle the switch on. macOS may ask for your password.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toggle the switch on. macOS may ask for your password."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把开关打开。macOS 可能会让你输入密码。"
+          }
+        }
+      }
+    },
+    "macOS quits Pulse to apply the change. Reopen Pulse after — onboarding will resume here.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS quits Pulse to apply the change. Reopen Pulse after — onboarding will resume here."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS 会退出 Pulse 以使设置生效。重新打开 Pulse 后，引导流程会回到这里。"
+          }
+        }
+      }
+    },
+    "Open System Settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open System Settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开系统设置"
+          }
+        }
+      }
+    },
+    "Granted": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Granted"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已授权"
+          }
+        }
+      }
+    },
+    "Waiting…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待中…"
+          }
+        }
+      }
+    },
+    "You're set": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You're set"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "准备好了"
+          }
+        }
+      }
+    },
+    "Pulse is now collecting your activity locally. Open the menu bar icon any time to pause, peek at today's numbers, or read the privacy ledger.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse is now collecting your activity locally. Open the menu bar icon any time to pause, peek at today's numbers, or read the privacy ledger."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse 已经在本地采集你的活动了。任何时候点击菜单栏图标都能暂停、查看今日数据，或翻阅隐私账本。"
+          }
+        }
+      }
+    },
+    "Back": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一步"
+          }
+        }
+      }
+    },
+    "Continue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "继续"
+          }
+        }
+      }
+    },
+    "Open Pulse": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Pulse"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "进入 Pulse"
+          }
+        }
+      }
     }
   }
 }
