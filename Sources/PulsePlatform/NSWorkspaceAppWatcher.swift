@@ -4,19 +4,27 @@ import PulseCore
 import Foundation
 
 /// Emits `.foregroundApp` events whenever the active application changes.
-/// Thin wrapper over `NSWorkspace.didActivateApplicationNotification`; does
-/// not need Input Monitoring (only Accessibility, and only for window
-/// titles which arrive in a later PR).
+/// When a non-nil `windowReader` is supplied, also emits a follow-up
+/// `.windowTitleHash` event built from the new frontmost window's title.
+///
+/// Privacy: titles are only ever stored as SHA-256; force-redacted apps
+/// (Messages / 1Password / etc.) emit a sentinel hash. See
+/// `docs/05-privacy.md#4.2` and `AccessibilityWindowReader`.
 public final class NSWorkspaceAppWatcher: @unchecked Sendable {
 
     private let clock: Clock
+    private let windowReader: AccessibilityWindowReader?
     private let queue: OperationQueue
     private var observer: NSObjectProtocol?
     private var handler: (@Sendable (DomainEvent) -> Void)?
     private let lock = NSLock()
 
-    public init(clock: Clock = SystemClock()) {
+    public init(
+        clock: Clock = SystemClock(),
+        windowReader: AccessibilityWindowReader? = AccessibilityWindowReader()
+    ) {
         self.clock = clock
+        self.windowReader = windowReader
         self.queue = OperationQueue()
         self.queue.name = "com.pulse.NSWorkspaceAppWatcher"
         self.queue.qualityOfService = .utility
@@ -56,7 +64,13 @@ public final class NSWorkspaceAppWatcher: @unchecked Sendable {
               let bundleId = app.bundleIdentifier else {
             return
         }
-        handler(.foregroundApp(bundleId: bundleId, at: clock.now))
+
+        let now = clock.now
+        handler(.foregroundApp(bundleId: bundleId, at: now))
+
+        if let windowReader, let titleEvent = windowReader.readFrontmostWindowEvent(for: app, at: now) {
+            handler(titleEvent)
+        }
     }
 }
 #endif

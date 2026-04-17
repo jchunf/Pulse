@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 import PulseCore
 
 /// Umbrella entry point for the `PulsePlatform` module. Exposes a single
@@ -18,12 +19,28 @@ public enum PulsePlatform {
         #endif
     }
 
+    /// Returns the best-available display registry for the current platform.
+    /// On non-macOS the registry reports an empty display list.
+    public static func displayRegistry() -> DisplayRegistry {
+        #if canImport(AppKit)
+        return LiveDisplayRegistry()
+        #else
+        return EmptyDisplayRegistry()
+        #endif
+    }
+
     /// Static build fingerprint useful for health diagnostics.
-    public static let buildFingerprint: String = "pulse-b1-foundations"
+    public static let buildFingerprint: String = "pulse-b2-live-collector"
 }
 
 /// Fallback service used on unsupported platforms.
 private struct DenyAllPermissionService: PermissionService {
     func status(of permission: Permission) -> PermissionStatus { .denied }
     func requestAccess(for permission: Permission) async {}
+}
+
+/// Fallback display registry used on unsupported platforms.
+private struct EmptyDisplayRegistry: DisplayRegistry {
+    var displays: [DisplayInfo] { [] }
+    func display(containing globalPoint: CGPoint) -> DisplayInfo? { nil }
 }
