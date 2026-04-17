@@ -5,6 +5,7 @@ import PulsePlatform
 #if canImport(SwiftUI) && canImport(AppKit)
 import SwiftUI
 import AppKit
+import Charts
 
 @main
 struct PulseApp: App {
@@ -22,6 +23,11 @@ struct PulseApp: App {
         }
         .menuBarExtraStyle(.window)
 
+        Window("Pulse Dashboard", id: "dashboard") {
+            DashboardView(model: appDelegate.dashboardModel)
+        }
+        .defaultSize(width: 720, height: 480)
+
         Settings {
             SettingsPlaceholder()
         }
@@ -36,6 +42,7 @@ struct PulseApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     let healthModel: HealthModel
+    let dashboardModel: DashboardModel
 
     private let database: PulseDatabase?
     private let runtime: CollectorRuntime?
@@ -74,6 +81,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.healthModel = HealthModel(
             permissionService: permissions,
             errorMessage: dbResult.errorMessage
+        )
+        self.dashboardModel = DashboardModel(
+            store: dbResult.database.map { EventStore(database: $0) }
         )
         super.init()
     }
@@ -220,11 +230,68 @@ final class HealthModel: ObservableObject {
     }
 }
 
+// MARK: - Dashboard model
+
+/// Owns the read-side query state for the Dashboard window. Refreshes on a
+/// 5-second cadence whenever the window is open. The model holds the
+/// `EventStore` directly (rather than going through the runtime actor)
+/// because reads are cheap, lock-protected by GRDB, and don't need any of
+/// the runtime's gating.
+@MainActor
+final class DashboardModel: ObservableObject {
+
+    @Published private(set) var summary: TodaySummary?
+    @Published private(set) var lastRefreshAt: Date?
+    @Published private(set) var errorMessage: String?
+
+    private let store: EventStore?
+    private var refreshTask: Task<Void, Never>?
+
+    init(store: EventStore?) {
+        self.store = store
+    }
+
+    /// Begin polling. Idempotent — calling twice is a no-op.
+    func startPolling() {
+        guard refreshTask == nil else { return }
+        refreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.refresh()
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+            }
+        }
+    }
+
+    func stopPolling() {
+        refreshTask?.cancel()
+        refreshTask = nil
+    }
+
+    func refresh() async {
+        guard let store else {
+            errorMessage = "Database not available."
+            return
+        }
+        let now = Date()
+        let dayStart = Calendar.current.startOfDay(for: now)
+        let dayEnd = dayStart.addingTimeInterval(86_400)
+        do {
+            let summary = try store.todaySummary(start: dayStart, end: dayEnd, capUntil: now)
+            self.summary = summary
+            self.lastRefreshAt = now
+            self.errorMessage = nil
+        } catch {
+            self.errorMessage = "Failed to load summary: \(error.localizedDescription)"
+        }
+    }
+}
+
 // MARK: - Views
 
 struct HealthMenuView: View {
 
     @ObservedObject var model: HealthModel
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -255,13 +322,164 @@ struct HealthMenuView: View {
             Divider()
 
             HStack {
+                Button("Open Dashboard") {
+                    openWindow(id: "dashboard")
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+                Spacer()
                 Button("Quit Pulse") { NSApp.terminate(nil) }
                     .keyboardShortcut("q")
-                Spacer()
             }
         }
         .padding(14)
         .frame(width: 360)
+    }
+}
+
+struct DashboardView: View {
+
+    @ObservedObject var model: DashboardModel
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                header
+                if let summary = model.summary {
+                    SummaryCardsView(summary: summary)
+                    AppRankingChart(rows: summary.topApps)
+                } else if model.errorMessage != nil {
+                    Text(model.errorMessage ?? "")
+                        .foregroundStyle(.red)
+                } else {
+                    ProgressView("Loading today's data…")
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 40)
+                }
+            }
+            .padding(24)
+        }
+        .frame(minWidth: 600, minHeight: 400)
+        .onAppear { model.startPolling() }
+        .onDisappear { model.stopPolling() }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task { await model.refresh() }
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+            }
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Today")
+                .font(.largeTitle.bold())
+            if let last = model.lastRefreshAt {
+                Text("Updated \(formatRelative(last))")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func formatRelative(_ instant: Date) -> String {
+        let seconds = Int(Date().timeIntervalSince(instant))
+        if seconds < 5 { return "just now" }
+        if seconds < 60 { return "\(seconds)s ago" }
+        if seconds < 3_600 { return "\(seconds / 60)m ago" }
+        return "\(seconds / 3_600)h ago"
+    }
+}
+
+struct SummaryCardsView: View {
+
+    let summary: TodaySummary
+
+    var body: some View {
+        let columns = [GridItem(.adaptive(minimum: 160), spacing: 12)]
+        LazyVGrid(columns: columns, spacing: 12) {
+            metric(title: "Distance", value: formatMeters(summary.totalMouseDistanceMillimeters))
+            metric(title: "Clicks", value: format(summary.totalMouseClicks))
+            metric(title: "Keystrokes", value: format(summary.totalKeyPresses))
+            metric(title: "Active time", value: formatDuration(summary.totalActiveSeconds))
+        }
+    }
+
+    private func metric(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.title2.monospacedDigit())
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func format(_ value: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+
+    private func formatMeters(_ mm: Double) -> String {
+        let meters = mm / 1_000.0
+        if meters < 1 { return String(format: "%.0f mm", mm) }
+        if meters < 1_000 { return String(format: "%.1f m", meters) }
+        return String(format: "%.2f km", meters / 1_000.0)
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        if seconds < 60 { return "\(seconds)s" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(minutes)m" }
+        let hours = minutes / 60
+        let remMinutes = minutes % 60
+        return "\(hours)h \(remMinutes)m"
+    }
+}
+
+struct AppRankingChart: View {
+
+    let rows: [AppUsageRow]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Top apps")
+                .font(.headline)
+            if rows.isEmpty {
+                Text("No app activity recorded yet today.")
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 12)
+            } else {
+                Chart(rows) { row in
+                    BarMark(
+                        x: .value("Seconds", row.secondsUsed),
+                        y: .value("App", row.bundleId)
+                    )
+                    .annotation(position: .trailing) {
+                        Text(formatDuration(row.secondsUsed))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .chartXAxis(.hidden)
+                .frame(height: max(120, CGFloat(rows.count) * 32))
+            }
+        }
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        if seconds < 60 { return "\(seconds)s" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(minutes)m" }
+        let hours = minutes / 60
+        let remMinutes = minutes % 60
+        return remMinutes == 0 ? "\(hours)h" : "\(hours)h \(remMinutes)m"
     }
 }
 

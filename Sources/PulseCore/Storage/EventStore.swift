@@ -10,7 +10,7 @@ import GRDB
 /// `appendBatch(_:)` call to amortize fsync.
 public struct EventStore: Sendable {
 
-    private let database: PulseDatabase
+    let database: PulseDatabase
 
     public init(database: PulseDatabase) {
         self.database = database
