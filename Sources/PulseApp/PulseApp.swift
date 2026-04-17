@@ -245,7 +245,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private static func writeExportToDisk(data: Data, endingAt: Date) throws -> URL {
+    private nonisolated static func writeExportToDisk(data: Data, endingAt: Date) throws -> URL {
         let fm = FileManager.default
         let support = try fm.url(
             for: .applicationSupportDirectory,
