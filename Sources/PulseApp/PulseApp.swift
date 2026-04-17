@@ -266,6 +266,7 @@ final class DashboardModel: ObservableObject {
 
     @Published private(set) var summary: TodaySummary?
     @Published private(set) var heatmapCells: [HeatmapCell] = []
+    @Published private(set) var heatmapDays: Int = DashboardModel.defaultHeatmapDays
     @Published private(set) var trendPoints: [DailyTrendPoint] = []
     @Published private(set) var lastRefreshAt: Date?
     @Published private(set) var errorMessage: String?
@@ -273,9 +274,11 @@ final class DashboardModel: ObservableObject {
     private let store: EventStore?
     private var refreshTask: Task<Void, Never>?
 
-    /// Number of calendar days the week heatmap and trend chart span.
-    /// Today is always the most recent day.
-    static let heatmapDays = 7
+    /// Default heatmap window (in days). The user can override via the
+    /// Settings panel; the `refresh()` loop re-reads the preference on
+    /// every tick so changes take effect on the next poll.
+    static let defaultHeatmapDays = 7
+    /// Weekly trend chart span — fixed at 7 days for MVP; not user-tunable.
     static let trendDays = 7
 
     init(store: EventStore?) {
@@ -304,6 +307,14 @@ final class DashboardModel: ObservableObject {
     /// can seed the same value.
     static let defaultRefreshIntervalSeconds: Double = 5.0
 
+    /// Reads the heatmap-days preference and clamps to the allowed range.
+    /// Centralised so the polling loop and the Settings picker can't drift.
+    static func resolvedHeatmapDays() -> Int {
+        let raw = UserDefaults.standard.integer(forKey: PulsePreferenceKey.heatmapDays)
+        let value = raw > 0 ? raw : defaultHeatmapDays
+        return min(30, max(3, value))
+    }
+
     func stopPolling() {
         refreshTask?.cancel()
         refreshTask = nil
@@ -317,12 +328,14 @@ final class DashboardModel: ObservableObject {
         let now = Date()
         let dayStart = Calendar.current.startOfDay(for: now)
         let dayEnd = dayStart.addingTimeInterval(86_400)
+        let days = Self.resolvedHeatmapDays()
         do {
             let summary = try store.todaySummary(start: dayStart, end: dayEnd, capUntil: now)
-            let heatmap = try store.hourlyHeatmap(endingAt: now, days: Self.heatmapDays)
+            let heatmap = try store.hourlyHeatmap(endingAt: now, days: days)
             let trend = try store.dailyTrend(endingAt: now, days: Self.trendDays)
             self.summary = summary
             self.heatmapCells = heatmap
+            self.heatmapDays = days
             self.trendPoints = trend
             self.lastRefreshAt = now
             self.errorMessage = nil
@@ -458,7 +471,7 @@ struct DashboardView: View {
                     MileageHeroCard(distanceMillimeters: summary.totalMouseDistanceMillimeters)
                     SummaryCardsView(summary: summary)
                     WeekTrendChart(points: model.trendPoints)
-                    WeekHourlyHeatmap(cells: model.heatmapCells, days: DashboardModel.heatmapDays)
+                    WeekHourlyHeatmap(cells: model.heatmapCells, days: model.heatmapDays)
                     AppRankingChart(rows: summary.topApps)
                     DiagnosticsCard(snapshot: healthModel.snapshot)
                 } else if model.errorMessage != nil {
@@ -747,9 +760,18 @@ struct WeekHourlyHeatmap: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Weekly heatmap")
+            Text(headline)
                 .font(.headline)
             content
+        }
+    }
+
+    private var headline: String {
+        switch days {
+        case ..<7:   return "Recent heatmap"
+        case 7:      return "Weekly heatmap"
+        case 8...14: return "Two-week heatmap"
+        default:     return "\(days)-day heatmap"
         }
     }
 
@@ -1056,6 +1078,7 @@ struct PermissionAssistantView: View {
 /// stored value.
 enum PulsePreferenceKey {
     static let dashboardRefreshIntervalSeconds = "pulse.dashboard.refreshIntervalSeconds"
+    static let heatmapDays = "pulse.dashboard.heatmapDays"
 }
 
 extension UserDefaults {
@@ -1064,7 +1087,8 @@ extension UserDefaults {
     /// first run reads sane values instead of `0` / `nil`.
     static func registerPulseDefaults() {
         UserDefaults.standard.register(defaults: [
-            PulsePreferenceKey.dashboardRefreshIntervalSeconds: DashboardModel.defaultRefreshIntervalSeconds
+            PulsePreferenceKey.dashboardRefreshIntervalSeconds: DashboardModel.defaultRefreshIntervalSeconds,
+            PulsePreferenceKey.heatmapDays: DashboardModel.defaultHeatmapDays
         ])
     }
 }
@@ -1073,6 +1097,8 @@ struct SettingsView: View {
 
     @AppStorage(PulsePreferenceKey.dashboardRefreshIntervalSeconds)
     private var refreshIntervalSeconds: Double = DashboardModel.defaultRefreshIntervalSeconds
+    @AppStorage(PulsePreferenceKey.heatmapDays)
+    private var heatmapDays: Int = DashboardModel.defaultHeatmapDays
 
     var body: some View {
         Form {
@@ -1084,6 +1110,17 @@ struct SettingsView: View {
                     Text("30 seconds").tag(30.0)
                 }
                 Text("How often the Dashboard window re-queries the local database. Reducing the interval uses a tiny bit more CPU; raising it is fine for passive monitoring.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Picker("Heatmap window", selection: $heatmapDays) {
+                    Text("3 days").tag(3)
+                    Text("7 days").tag(7)
+                    Text("14 days").tag(14)
+                    Text("30 days").tag(30)
+                }
+                Text("How many past days the weekly heatmap covers. Longer windows make each cell smaller; shorter windows emphasise recent pattern.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
