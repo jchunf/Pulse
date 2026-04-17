@@ -465,7 +465,7 @@ final class DashboardModel: ObservableObject {
     /// Weekly trend chart span — fixed at 7 days for MVP; not user-tunable.
     static let trendDays = 7
 
-    init(store: EventStore?, goalsStore: GoalsStore = GoalsStore()) {
+    init(store: EventStore?, goalsStore: GoalsStore) {
         self.store = store
         self.goalsStore = goalsStore
     }
