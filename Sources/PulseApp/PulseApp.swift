@@ -612,7 +612,7 @@ struct DashboardView: View {
                 if let summary = model.summary {
                     MileageHeroCard(distanceMillimeters: summary.totalMouseDistanceMillimeters)
                     LandmarkProgressPanel(distanceMillimeters: summary.totalMouseDistanceMillimeters)
-                    SummaryCardsView(summary: summary)
+                    SummaryCardsView(summary: summary, trend: model.trendPoints)
                     WeekTrendChart(points: model.trendPoints)
                     WeekHourlyHeatmap(cells: model.heatmapCells, days: model.heatmapDays)
                     DeepFocusCard(segment: model.longestFocus)
@@ -917,25 +917,44 @@ struct LandmarkProgressRow: View {
 struct SummaryCardsView: View {
 
     let summary: TodaySummary
+    let trend: [DailyTrendPoint]
 
     private static let narrative = NarrativeEngine.standard
 
     var body: some View {
         let columns = [GridItem(.adaptive(minimum: 160), spacing: 12)]
         LazyVGrid(columns: columns, spacing: 12) {
-            metric(titleKey: "Distance",
-                   value: PulseFormat.distance(millimeters: summary.totalMouseDistanceMillimeters))
-            metric(titleKey: "Clicks",
-                   value: PulseFormat.integer(summary.totalMouseClicks))
-            metric(titleKey: "Scrolls",
-                   value: PulseFormat.integer(summary.totalScrollTicks))
-            metric(titleKey: "Keystrokes",
-                   value: PulseFormat.integer(summary.totalKeyPresses),
-                   narrativeSubtitle: keystrokesNarrative)
-            metric(titleKey: "Active time",
-                   value: PulseFormat.duration(seconds: summary.totalActiveSeconds))
-            metric(titleKey: "Idle time",
-                   value: PulseFormat.duration(seconds: summary.totalIdleSeconds))
+            SummaryMetricCard(
+                titleKey: "Distance",
+                value: PulseFormat.distance(millimeters: summary.totalMouseDistanceMillimeters),
+                series: trend.map(\.mouseDistanceMillimeters)
+            )
+            SummaryMetricCard(
+                titleKey: "Clicks",
+                value: PulseFormat.integer(summary.totalMouseClicks),
+                series: trend.map { Double($0.mouseClicks) }
+            )
+            SummaryMetricCard(
+                titleKey: "Scrolls",
+                value: PulseFormat.integer(summary.totalScrollTicks),
+                series: trend.map { Double($0.scrollTicks) }
+            )
+            SummaryMetricCard(
+                titleKey: "Keystrokes",
+                value: PulseFormat.integer(summary.totalKeyPresses),
+                series: trend.map { Double($0.keyPresses) },
+                narrativeSubtitle: keystrokesNarrative
+            )
+            SummaryMetricCard(
+                titleKey: "Active time",
+                value: PulseFormat.duration(seconds: summary.totalActiveSeconds),
+                series: [] // no per-day series for active time yet
+            )
+            SummaryMetricCard(
+                titleKey: "Idle time",
+                value: PulseFormat.duration(seconds: summary.totalIdleSeconds),
+                series: trend.map { Double($0.idleSeconds) }
+            )
         }
     }
 
@@ -944,16 +963,31 @@ struct SummaryCardsView: View {
             .bestMatch(metric: .keystrokes, value: Double(summary.totalKeyPresses))
             .map { PulseFormat.narrativeSentence(for: $0) }
     }
+}
 
-    private func metric(
-        titleKey: LocalizedStringKey,
-        value: String,
-        narrativeSubtitle: String? = nil
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(titleKey, bundle: .module)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+/// One summary tile. Shows title + big value + optional 7-day sparkline
+/// + optional delta-vs-yesterday chip + optional narrative subtitle. The
+/// sparkline and delta come from the same `series`; passing an empty
+/// series (or an all-zero one) hides both gracefully, so pre-rollup
+/// installs don't render blank charts.
+struct SummaryMetricCard: View {
+
+    let titleKey: LocalizedStringKey
+    let value: String
+    let series: [Double]
+    var narrativeSubtitle: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(titleKey, bundle: .module)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if let delta = deltaVsYesterday {
+                    DeltaChip(deltaFraction: delta)
+                }
+            }
             Text(value)
                 .font(.title2.monospacedDigit())
             if let narrativeSubtitle {
@@ -962,10 +996,76 @@ struct SummaryCardsView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
+            if showSparkline {
+                Sparkline(points: series)
+                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 1.2, lineJoin: .round))
+                    .frame(height: 20)
+                    .opacity(0.85)
+            }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var showSparkline: Bool {
+        series.count >= 2 && !series.allSatisfy({ $0 == 0 })
+    }
+
+    /// Fractional change (yesterday → today). Returns nil when there is
+    /// no yesterday (series < 2 points) or when yesterday was zero (can't
+    /// normalise).
+    private var deltaVsYesterday: Double? {
+        guard series.count >= 2 else { return nil }
+        let yesterday = series[series.count - 2]
+        let today = series.last ?? 0
+        guard yesterday > 0 else { return nil }
+        return (today - yesterday) / yesterday
+    }
+}
+
+/// Tiny ±N% chip with an up / down arrow. Used next to metric titles to
+/// signal "vs yesterday" movement at a glance.
+struct DeltaChip: View {
+
+    let deltaFraction: Double
+
+    var body: some View {
+        let pct = Int((deltaFraction * 100).rounded())
+        let isUp = deltaFraction >= 0
+        HStack(spacing: 2) {
+            Image(systemName: isUp ? "arrow.up.right" : "arrow.down.right")
+                .font(.caption2.bold())
+            Text("\(abs(pct))%")
+                .font(.caption2.monospacedDigit())
+        }
+        .foregroundStyle(isUp ? Color.green : Color.orange)
+    }
+}
+
+/// Line-only sparkline that stretches to fill its container. Uses raw
+/// `Path` (not SwiftUI Charts) because Chart has more overhead than
+/// warranted for a 40×20 tile.
+struct Sparkline: Shape {
+
+    let points: [Double]
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        guard points.count >= 2 else { return path }
+        let maxVal = max(points.max() ?? 1, 1)
+        let step = points.count > 1 ? rect.width / CGFloat(points.count - 1) : rect.width
+        for (index, value) in points.enumerated() {
+            let x = CGFloat(index) * step
+            let normalised = maxVal > 0 ? CGFloat(value / maxVal) : 0
+            let y = rect.height * (1 - normalised)
+            if index == 0 {
+                path.move(to: CGPoint(x: x, y: y))
+            } else {
+                path.addLine(to: CGPoint(x: x, y: y))
+            }
+        }
+        return path
     }
 }
 

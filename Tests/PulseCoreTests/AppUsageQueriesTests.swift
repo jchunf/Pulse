@@ -54,15 +54,16 @@ struct AppUsageQueriesTests {
         keys: Int,
         clicks: Int,
         distanceMm: Double = 0.0,
-        idleSeconds: Int = 0
+        idleSeconds: Int = 0,
+        scrollTicks: Int = 0
     ) throws {
         try db.queue.write { db in
             try db.execute(
                 sql: """
-                INSERT INTO hour_summary (ts_hour, key_press_total, mouse_distance_mm, mouse_click_total, idle_seconds)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO hour_summary (ts_hour, key_press_total, mouse_distance_mm, mouse_click_total, idle_seconds, scroll_ticks)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                arguments: [Int64(hourStart.timeIntervalSince1970), keys, distanceMm, clicks, idleSeconds]
+                arguments: [Int64(hourStart.timeIntervalSince1970), keys, distanceMm, clicks, idleSeconds, scrollTicks]
             )
         }
     }
@@ -298,6 +299,30 @@ struct AppUsageQueriesTests {
         #expect(today.keyPresses == 60)
         #expect(today.mouseClicks == 20)
         #expect(today.totalEvents == 80)
+    }
+
+    @Test("dailyTrend carries scroll_ticks and idle_seconds per day")
+    func trendCarriesScrollAndIdle() async throws {
+        let (store, db) = try makeStore()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let endingAt = calendar.date(from: DateComponents(
+            timeZone: calendar.timeZone,
+            year: 2026, month: 1, day: 10, hour: 14
+        ))!
+        let endDay = calendar.startOfDay(for: endingAt)
+
+        try insertHourSummary(into: db, hourStart: endDay.addingTimeInterval(9 * 3600),
+                              keys: 0, clicks: 0,
+                              idleSeconds: 120, scrollTicks: 25)
+        try insertHourSummary(into: db, hourStart: endDay.addingTimeInterval(10 * 3600),
+                              keys: 0, clicks: 0,
+                              idleSeconds: 30, scrollTicks: 70)
+
+        let points = try store.dailyTrend(endingAt: endingAt, days: 3, calendar: calendar)
+        let today = points.last!
+        #expect(today.idleSeconds == 150)
+        #expect(today.scrollTicks == 95)
     }
 
     @Test("hourlyHeatmap maps ts_hour rows to dayOffset + hour cells")
