@@ -90,6 +90,13 @@ public actor EventWriter {
             return .mouseMove(tsMillis: ts, displayId: point.displayId, xNorm: point.x, yNorm: point.y)
         case let .mouseClick(button, point, doubleClick, _):
             return .mouseClick(tsMillis: ts, displayId: point.displayId, xNorm: point.x, yNorm: point.y, button: button, isDouble: doubleClick)
+        case let .mouseScroll(delta, horizontal, _):
+            // Scroll events are recorded as system_events rather than a
+            // dedicated raw table in V1. Payload encodes "<axis>:<delta>".
+            // A dedicated raw_mouse_scroll table can arrive in a later
+            // schema version if we need finer-grained analytics.
+            let axis = horizontal ? "h" : "v"
+            return .systemEvent(tsMillis: ts, category: "mouse_scroll", payload: "\(axis):\(delta)")
         case let .keyPress(keyCode, _):
             return .keyPress(tsMillis: ts, keyCode: keyCode)
         case let .foregroundApp(bundleId, _):

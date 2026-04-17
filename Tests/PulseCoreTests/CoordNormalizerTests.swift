@@ -68,7 +68,7 @@ struct CoordNormalizerTests {
 
     @Test("NaN in input produces 0, never a NaN normalized value")
     func nanInputIsZero() {
-        let point = normalizer.normalize(localPoint: CGPoint(x: .nan, y: .nan), on: fhd)
+        let point = normalizer.normalize(localPoint: CGPoint(x: CGFloat.nan, y: CGFloat.nan), on: fhd)
         #expect(!point.x.isNaN)
         #expect(!point.y.isNaN)
         #expect(point.x == 0)

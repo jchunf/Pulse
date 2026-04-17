@@ -30,12 +30,15 @@ For every change worth shipping:
    check right now.
 
 6. **Read results**:
-   - All `conclusion: success` → proceed to merge (step 8).
-   - Any `conclusion: failure` → read the PR comments via
-     `mcp__github__pull_request_read get_comments`. `ci.yml` posts
-     failure logs as comments on failure (see §"CI itself" below).
-     Parse, diagnose, push a fix to the same branch, then poll again.
+   - Any `conclusion: failure` → read the "❌ CI failed" PR comment via
+     `mcp__github__pull_request_read get_comments`. It contains distilled
+     error lines + last 120 lines of each log. Parse, diagnose, push a
+     fix, poll again.
    - Any `status: in_progress` → poll again until completed.
+   - All `conclusion: success` → proceed to merge. The CI also contains
+     a "Fail on hidden compile errors in logs" step that promotes any
+     silent compile error to a real failure, so a green conclusion is
+     trustworthy. Benign warnings do not produce a PR comment.
 
 7. **Never** end a turn describing work as "done" if CI is still pending
    or red. "Waiting for CI" is not a completion state.
@@ -69,8 +72,11 @@ For every change worth shipping:
   - `swift build --build-tests | tee build.log`
   - `swift test --parallel --enable-code-coverage | tee test.log`
   - `xcrun llvm-cov` produces a coverage report (warns if < 85%)
-  - on **failure**: uploads `*.log` as artifacts AND posts a comment on
-    the PR with the relevant log excerpts so the agent can self-debug
+  - always uploads `*.log` as artifacts
+  - **on failure only**: posts a comment on the PR with distilled error
+    lines + last 120 lines of each log so the agent can self-debug
+  - **on success**: posts nothing (the "Fail on hidden compile errors"
+    step above guarantees a green job actually compiled+tested cleanly)
 
 ## Nightly CI
 
