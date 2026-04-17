@@ -25,6 +25,7 @@ on:
 
 permissions:
   contents: write
+  actions: write   # needs to be `write` so `gh workflow run` can dispatch package.yml
 
 jobs:
   tag:
@@ -67,4 +68,20 @@ jobs:
           fi
           git tag -a "$tag" -m "$msg"
           git push origin "$tag"
-          echo "::notice::pushed $tag — package workflow will now build + publish the release"
+          echo "::notice::pushed $tag"
+
+      # GitHub deliberately does **not** trigger downstream workflows
+      # from events created by GITHUB_TOKEN (recursion guard); see
+      # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow.
+      # `workflow_dispatch` is one of the documented exceptions, so we
+      # ask `package.yml` to fire explicitly against the new tag ref.
+      # `--ref <tag>` makes `github.ref` resolve to `refs/tags/<tag>`
+      # inside that run, satisfying the `if: startsWith(github.ref,
+      # 'refs/tags/v')` gate that creates the GitHub Release.
+      - name: Trigger package workflow against the new tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ inputs.tag }}"
+          gh workflow run package.yml --ref "$tag"
+          echo "::notice::package.yml dispatched for $tag — Release will be published when it finishes"
