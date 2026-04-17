@@ -1052,6 +1052,8 @@ struct AppRankingChart: View {
 
     let rows: [AppUsageRow]
 
+    private static let displayNameCache = BundleDisplayNameCache()
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Top apps")
@@ -1064,7 +1066,7 @@ struct AppRankingChart: View {
                 Chart(rows) { row in
                     BarMark(
                         x: .value("Seconds", row.secondsUsed),
-                        y: .value("App", row.bundleId)
+                        y: .value("App", displayName(for: row.bundleId))
                     )
                     .annotation(position: .trailing) {
                         Text(formatDuration(row.secondsUsed))
@@ -1078,6 +1080,10 @@ struct AppRankingChart: View {
         }
     }
 
+    private func displayName(for bundleId: String) -> String {
+        Self.displayNameCache.name(for: bundleId)
+    }
+
     private func formatDuration(_ seconds: Int) -> String {
         if seconds < 60 { return "\(seconds)s" }
         let minutes = seconds / 60
@@ -1085,6 +1091,51 @@ struct AppRankingChart: View {
         let hours = minutes / 60
         let remMinutes = minutes % 60
         return remMinutes == 0 ? "\(hours)h" : "\(hours)h \(remMinutes)m"
+    }
+}
+
+/// Resolves macOS bundle identifiers (e.g. `com.apple.Safari`) to the
+/// human-readable display name visible to the user (e.g. "Safari").
+/// Looks up the installed app via `NSWorkspace`, reads
+/// `CFBundleDisplayName` / `CFBundleName` from the target bundle, and
+/// memoises the result because every Dashboard refresh hits the same
+/// handful of bundle IDs. Falls back to the raw bundle string for apps
+/// that aren't installed (or aren't resolvable) so the UI never shows
+/// an empty row.
+final class BundleDisplayNameCache: @unchecked Sendable {
+
+    private let lock = NSLock()
+    private var cache: [String: String] = [:]
+
+    func name(for bundleId: String) -> String {
+        lock.lock()
+        if let cached = cache[bundleId] {
+            lock.unlock()
+            return cached
+        }
+        lock.unlock()
+
+        let resolved = Self.resolve(bundleId)
+        lock.lock()
+        cache[bundleId] = resolved
+        lock.unlock()
+        return resolved
+    }
+
+    private static func resolve(_ bundleId: String) -> String {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId),
+              let bundle = Bundle(url: url) else {
+            return bundleId
+        }
+        if let display = bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
+           !display.isEmpty {
+            return display
+        }
+        if let plain = bundle.object(forInfoDictionaryKey: "CFBundleName") as? String,
+           !plain.isEmpty {
+            return plain
+        }
+        return bundleId
     }
 }
 
