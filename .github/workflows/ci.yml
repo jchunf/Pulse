@@ -28,8 +28,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Select Xcode 16
+        # Pin Xcode 16+ on both runners so `import Testing` (Swift Testing)
+        # is available — Xcode 15 ships Swift 5.10 without the bundled
+        # Testing module. Both macos-14 and macos-15 images carry Xcode 16
+        # alongside the older toolchain; this just chooses the new one.
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest-stable'
+
       - name: Show Xcode / Swift versions
         run: |
+          xcode-select -p
           xcodebuild -version
           swift --version
 
