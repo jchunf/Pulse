@@ -80,7 +80,12 @@ struct DataExportTests {
     @Test("bundle round-trips through JSONEncoder / JSONDecoder")
     func bundleCodableRoundtrip() throws {
         let (store, _) = try makeStore()
-        let bundle = try store.buildExportBundle(days: 7)
+        // `.iso8601` strategy drops sub-second precision, so pin endingAt
+        // to whole seconds to keep the round-trip value-equal.
+        let bundle = try store.buildExportBundle(
+            endingAt: Date(timeIntervalSince1970: 1_700_000_000),
+            days: 7
+        )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(bundle)
