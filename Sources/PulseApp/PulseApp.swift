@@ -786,9 +786,10 @@ struct HealthMenuView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Pulse", bundle: .module).font(.headline)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Pulse", bundle: .module)
+                    .font(.system(.headline, design: .rounded, weight: .semibold))
                 Spacer()
                 Text(localizedStatusHeadline(for: model.snapshot), bundle: .module)
                     .font(.footnote)
@@ -796,11 +797,11 @@ struct HealthMenuView: View {
                     .multilineTextAlignment(.trailing)
             }
 
-            Divider()
+            Divider().overlay(PulseDesign.warmGray(0.14))
 
             CountersView(snapshot: model.snapshot)
 
-            Divider()
+            Divider().overlay(PulseDesign.warmGray(0.14))
 
             PauseControlsView(
                 pause: model.snapshot.pause,
@@ -809,36 +810,39 @@ struct HealthMenuView: View {
                 onResume: onResume
             )
 
-            Divider()
+            Divider().overlay(PulseDesign.warmGray(0.14))
 
             PermissionList(snapshot: model.snapshot.permissions)
 
             PermissionAssistantView(snapshot: model.snapshot.permissions)
 
             if let message = model.errorMessage {
-                Divider()
+                Divider().overlay(PulseDesign.warmGray(0.14))
                 Text(message)
                     .font(.footnote)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(PulseDesign.critical)
             }
 
-            Divider()
+            Divider().overlay(PulseDesign.warmGray(0.14))
 
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 HStack {
                     Button {
                         openWindow(id: "dashboard")
                         NSApp.activate(ignoringOtherApps: true)
                     } label: {
                         Text("Open Dashboard", bundle: .module)
+                            .padding(.horizontal, 4)
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(PulseDesign.coral)
                     Spacer()
                     Button { NSApp.terminate(nil) } label: {
                         Text("Quit Pulse", bundle: .module)
                     }
                     .keyboardShortcut("q")
                 }
-                HStack(spacing: 16) {
+                HStack(spacing: 14) {
                     Button(action: onShowBriefing) {
                         Text("Yesterday's briefing", bundle: .module)
                             .font(.footnote)
@@ -858,7 +862,7 @@ struct HealthMenuView: View {
                 }
             }
         }
-        .padding(14)
+        .padding(16)
         .frame(width: 360)
     }
 
@@ -907,8 +911,8 @@ struct PauseControlsView: View {
                     } icon: {
                         Image(systemName: "pause.circle.fill")
                     }
-                    .font(.footnote.bold())
-                    .foregroundStyle(.orange)
+                    .font(.footnote)
+                    .foregroundStyle(PulseDesign.amber)
                     Text("Resumes \(PulseFormat.countdown(from: capturedAt, to: resumesAt))", bundle: .module)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -2192,14 +2196,14 @@ struct PermissionAssistantView: View {
         if missing.isEmpty {
             EmptyView()
         } else {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 Label {
                     Text("Permissions needed", bundle: .module)
                 } icon: {
                     Image(systemName: "exclamationmark.triangle.fill")
                 }
-                .font(.footnote.bold())
-                .foregroundStyle(.orange)
+                .font(.footnote)
+                .foregroundStyle(PulseDesign.amber)
                 Text("Pulse can't collect without the following permissions. Grant them in System Settings, then relaunch Pulse.", bundle: .module)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -2220,8 +2224,11 @@ struct PermissionAssistantView: View {
                     .buttonStyle(.link)
                 }
             }
-            .padding(10)
-            .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(PulseDesign.amber.opacity(0.10))
+            )
         }
     }
 }
@@ -2409,11 +2416,13 @@ struct DailyBriefingView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-                .padding([.top, .leading, .trailing], 20)
-            Divider().padding(.top, 16)
+                .padding([.top, .leading, .trailing], 24)
+            Divider()
+                .overlay(PulseDesign.warmGray(0.14))
+                .padding(.top, 18)
             if let summary = model.summary {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 18) {
                         MileageHeroCard(
                             distanceMillimeters: summary.totalMouseDistanceMillimeters
                         )
@@ -2422,12 +2431,12 @@ struct DailyBriefingView: View {
                             BriefingFocusRow(segment: focus)
                         }
                     }
-                    .padding(20)
+                    .padding(22)
                 }
             } else if let error = model.errorMessage {
                 Text(error)
-                    .foregroundStyle(.red)
-                    .padding(20)
+                    .foregroundStyle(PulseDesign.critical)
+                    .padding(24)
             } else {
                 ProgressView()
                     .frame(maxWidth: .infinity)
@@ -2435,26 +2444,31 @@ struct DailyBriefingView: View {
             }
             Spacer(minLength: 0)
             Divider()
+                .overlay(PulseDesign.warmGray(0.14))
             HStack {
                 Spacer()
                 Button {
                     dismissWindow(id: "briefing")
                 } label: {
                     Text("Got it", bundle: .module)
+                        .padding(.horizontal, 6)
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(PulseDesign.coral)
                 .keyboardShortcut(.defaultAction)
             }
-            .padding(12)
+            .padding(14)
         }
+        .background(PulseDesign.surface)
         .task { await model.load(for: .yesterday) }
-        .frame(minWidth: 400, minHeight: 420)
+        .frame(minWidth: 440, minHeight: 460)
     }
 
     @ViewBuilder
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text("Yesterday in Pulse", bundle: .module)
-                .font(.title2.bold())
+                .font(.system(.title2, design: .rounded, weight: .semibold))
             if let day = model.day {
                 Text(Self.headerDateFormatter.string(from: day))
                     .font(.footnote)
@@ -2479,16 +2493,14 @@ struct BriefingStatRow: View {
     let summary: TodaySummary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             row("Keystrokes", PulseFormat.integer(summary.totalKeyPresses))
             row("Clicks",     PulseFormat.integer(summary.totalMouseClicks))
             row("Scrolls",    PulseFormat.integer(summary.totalScrollTicks))
             row("Active time", PulseFormat.duration(seconds: summary.totalActiveSeconds))
             row("Idle time",   PulseFormat.duration(seconds: summary.totalIdleSeconds))
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+        .pulseFeaturedCard()
     }
 
     @ViewBuilder
@@ -2515,20 +2527,25 @@ struct BriefingFocusRow: View {
         let app = Self.displayNameCache.name(for: segment.bundleId)
         let start = Self.clockTime(segment.startedAt)
         let end = Self.clockTime(segment.endedAt)
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text("Deep focus today", bundle: .module)
-                .font(.caption)
+                .font(PulseDesign.labelFont)
+                .tracking(0.3)
                 .foregroundStyle(.secondary)
-                .textCase(.uppercase)
             Text(PulseFormat.duration(seconds: segment.durationSeconds))
-                .font(.title3.monospacedDigit().bold())
+                .font(PulseDesign.heroSecondaryFont)
+                .monospacedDigit()
+                .foregroundStyle(PulseDesign.coral)
             Text("\(app) · \(start) – \(end)", bundle: .module)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
-        .padding(12)
+        .padding(PulseDesign.cardPadding * 0.75)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .background(
+            RoundedRectangle(cornerRadius: PulseDesign.cardCornerRadius)
+                .fill(PulseDesign.coral.opacity(0.06))
+        )
     }
 
     private static func clockTime(_ date: Date) -> String {
@@ -2587,15 +2604,15 @@ struct PrivacyAuditView: View {
     @ObservedObject var model: PrivacyAuditModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 18) {
             header
             if let snap = model.snapshot {
                 countsGrid(snap)
-                Divider()
+                Divider().overlay(PulseDesign.warmGray(0.14))
                 systemEventsSection(snap)
             } else if let error = model.errorMessage {
                 Text(error)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(PulseDesign.critical)
             } else {
                 HStack {
                     ProgressView()
@@ -2604,20 +2621,21 @@ struct PrivacyAuditView: View {
                 }
             }
             Spacer()
-            Divider()
+            Divider().overlay(PulseDesign.warmGray(0.14))
             footer
         }
-        .padding(18)
-        .frame(minWidth: 520, minHeight: 480)
+        .padding(22)
+        .background(PulseDesign.surface)
+        .frame(minWidth: 560, minHeight: 520)
         .task {
             if model.snapshot == nil { await model.reload() }
         }
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text("What Pulse has recorded", bundle: .module)
-                .font(.title2.bold())
+                .font(.system(.title2, design: .rounded, weight: .semibold))
             Text(
                 "Every count and row below is read live from your local SQLite — this window is the ground truth, not a summary we maintain separately.",
                 bundle: .module
@@ -2652,7 +2670,7 @@ struct PrivacyAuditView: View {
                 countRow(
                     label: Text("Key codes stored", bundle: .module),
                     value: snap.keyCodesRecorded,
-                    highlight: snap.keyCodesRecorded == 0 ? .green : .orange
+                    highlight: snap.keyCodesRecorded == 0 ? PulseDesign.sage : PulseDesign.amber
                 )
             }
             HStack {
@@ -2684,10 +2702,10 @@ struct PrivacyAuditView: View {
     }
 
     private func systemEventsSection(_ snap: PrivacyAuditSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("System events (latest first)", bundle: .module)
-                    .font(.headline)
+                    .font(PulseDesign.cardTitleFont)
                 Spacer()
                 Text("\(snap.systemEvents.count)")
                     .font(.subheadline.monospacedDigit())
@@ -2699,27 +2717,32 @@ struct PrivacyAuditView: View {
                     .foregroundStyle(.secondary)
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 4) {
                         ForEach(Array(snap.systemEvents.enumerated()), id: \.offset) { _, row in
-                            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            HStack(alignment: .firstTextBaseline, spacing: 12) {
                                 Text(PrivacyAuditView.clockTime(row.timestamp))
                                     .font(.footnote.monospacedDigit())
                                     .foregroundStyle(.secondary)
-                                    .frame(width: 64, alignment: .leading)
+                                    .frame(width: 68, alignment: .leading)
                                 Text(row.category)
                                     .font(.footnote.monospacedDigit())
-                                    .frame(width: 140, alignment: .leading)
+                                    .frame(width: 144, alignment: .leading)
                                 Text(row.payload ?? "—")
                                     .font(.footnote.monospacedDigit())
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                                     .truncationMode(.middle)
                             }
+                            .padding(.vertical, 1)
                         }
                     }
+                    .padding(10)
                 }
-                .frame(minHeight: 180, maxHeight: 260)
-                .background(Color.black.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+                .frame(minHeight: 200, maxHeight: 280)
+                .background(
+                    RoundedRectangle(cornerRadius: PulseDesign.cardCornerRadius * 0.75)
+                        .fill(PulseDesign.warmGray(0.06))
+                )
             }
         }
     }

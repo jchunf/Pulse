@@ -120,7 +120,8 @@ struct OnboardingView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             footer
         }
-        .frame(minWidth: 560, minHeight: 480)
+        .background(PulseDesign.surface)
+        .frame(minWidth: 600, minHeight: 520)
         .task { model.startPollingPermissions() }
         .onDisappear { model.stopPollingPermissions() }
     }
@@ -128,13 +129,13 @@ struct OnboardingView: View {
     private var progressBar: some View {
         HStack(spacing: 6) {
             ForEach(OnboardingModel.Step.allCases, id: \.self) { step in
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(step.index <= model.step.index ? Color.accentColor : Color.gray.opacity(0.25))
-                    .frame(height: 4)
+                Capsule()
+                    .fill(step.index <= model.step.index ? PulseDesign.coral : PulseDesign.warmGray(0.18))
+                    .frame(height: 3)
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 16)
+        .padding(.horizontal, 28)
+        .padding(.top, 20)
     }
 
     @ViewBuilder
@@ -175,24 +176,26 @@ struct OnboardingView: View {
                     onFinish()
                 } label: {
                     Text("Open Pulse", bundle: .module)
-                        .padding(.horizontal, 8)
+                        .padding(.horizontal, 10)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(PulseDesign.coral)
                 .keyboardShortcut(.defaultAction)
             } else {
                 Button {
                     model.advance()
                 } label: {
                     Text("Continue", bundle: .module)
-                        .padding(.horizontal, 8)
+                        .padding(.horizontal, 10)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(PulseDesign.coral)
                 .keyboardShortcut(.defaultAction)
                 .disabled(!model.canAdvance(from: model.step))
             }
         }
-        .padding(20)
-        .background(.background.secondary)
+        .padding(22)
+        .background(PulseDesign.warmGray(0.04))
     }
 }
 
@@ -200,13 +203,25 @@ struct OnboardingView: View {
 
 private struct WelcomeStep: View {
     var body: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 20) {
             Spacer(minLength: 0)
-            Image(systemName: "waveform.path.ecg.rectangle")
-                .font(.system(size: 64, weight: .light))
-                .foregroundStyle(.tint)
+            // Concentric-circle pulse glyph to echo the app name in motion.
+            ZStack {
+                Circle()
+                    .fill(PulseDesign.coral.opacity(0.10))
+                    .frame(width: 96, height: 96)
+                    .pulseHeartbeat(amplitude: .hero)
+                Circle()
+                    .fill(PulseDesign.coral.opacity(0.18))
+                    .frame(width: 58, height: 58)
+                    .pulseHeartbeat(amplitude: .hero)
+                Image(systemName: "waveform.path.ecg")
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundStyle(PulseDesign.coral)
+            }
+            .padding(.bottom, 4)
             Text("Welcome to Pulse", bundle: .module)
-                .font(.largeTitle.bold())
+                .font(.system(.largeTitle, design: .rounded, weight: .semibold))
             Text("A local-first dashboard for the way you actually use your Mac. Pulse turns the noisy stream of clicks, key presses, scrolls and app switches into a daily story you can read in 30 seconds.", bundle: .module)
                 .font(.body)
                 .multilineTextAlignment(.center)
@@ -214,7 +229,7 @@ private struct WelcomeStep: View {
                 .frame(maxWidth: 460)
             Spacer(minLength: 0)
         }
-        .padding(28)
+        .padding(32)
     }
 }
 
@@ -223,13 +238,13 @@ private struct PledgeStep: View {
     @Binding var accepted: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 18) {
             Text("Privacy promises", bundle: .module)
-                .font(.title2.bold())
+                .font(.system(.title2, design: .rounded, weight: .semibold))
             Text("Before we ask for any permissions, here is what Pulse will and will not do — read it first.", bundle: .module)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 pledge("All raw data stays inside ~/Library/Application Support/Pulse/. Nothing is ever uploaded.")
                 pledge("No keystroke contents — only press counts. By default the key code is not stored either.")
                 pledge("No clipboard, no screen recording, no microphone, no camera, ever.")
@@ -242,17 +257,17 @@ private struct PledgeStep: View {
                     .font(.body)
             }
             .toggleStyle(.checkbox)
-            .padding(.top, 4)
+            .padding(.top, 6)
             Spacer()
         }
-        .padding(28)
+        .padding(32)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func pledge(_ key: LocalizedStringKey) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
             Image(systemName: "checkmark.shield.fill")
-                .foregroundStyle(.green)
+                .foregroundStyle(PulseDesign.sage)
             Text(key, bundle: .module)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -289,9 +304,9 @@ private struct PermissionStep: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 20) {
             Text(headline, bundle: .module)
-                .font(.title2.bold())
+                .font(.system(.title2, design: .rounded, weight: .semibold))
             Text(body1, bundle: .module)
                 .font(.body)
                 .foregroundStyle(.secondary)
@@ -302,20 +317,21 @@ private struct PermissionStep: View {
             HStack(spacing: 12) {
                 Button(action: onOpenSettings) {
                     Text("Open System Settings", bundle: .module)
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, 8)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.borderedProminent)
+                .tint(PulseDesign.coral)
                 statusChip
                 Spacer()
             }
             Spacer()
         }
-        .padding(28)
+        .padding(32)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var instructionsBox: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             instructionRow(number: 1, text: "Click **Open System Settings** below.")
             instructionRow(number: 2, text: "Find **Pulse** in the list.")
             instructionRow(number: 3, text: "Toggle the switch on. macOS may ask for your password.")
@@ -323,16 +339,19 @@ private struct PermissionStep: View {
                 instructionRow(number: 4, text: "macOS quits Pulse to apply the change. Reopen Pulse after — onboarding will resume here.")
             }
         }
-        .padding(14)
-        .background(Color.gray.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(PulseDesign.warmGray(0.05))
+        )
     }
 
     private func instructionRow(number: Int, text: LocalizedStringKey) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("\(number).")
-                .font(.body.monospacedDigit().bold())
-                .foregroundStyle(.secondary)
-                .frame(width: 16, alignment: .leading)
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text("\(number)")
+                .font(.body.monospacedDigit())
+                .foregroundStyle(PulseDesign.coral)
+                .frame(width: 18, alignment: .leading)
             Text(text, bundle: .module)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -347,27 +366,34 @@ private struct PermissionStep: View {
             } icon: {
                 Image(systemName: "checkmark.circle.fill")
             }
-            .foregroundStyle(.green)
+            .foregroundStyle(PulseDesign.sage)
         case .denied, .notDetermined, .unknown:
             Label {
                 Text("Waiting…", bundle: .module)
             } icon: {
                 Image(systemName: "clock")
             }
-            .foregroundStyle(.orange)
+            .foregroundStyle(PulseDesign.amber)
         }
     }
 }
 
 private struct ReadyStep: View {
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 18) {
             Spacer(minLength: 0)
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 60, weight: .regular))
-                .foregroundStyle(.green)
+            ZStack {
+                Circle()
+                    .fill(PulseDesign.sage.opacity(0.10))
+                    .frame(width: 96, height: 96)
+                    .pulseHeartbeat(amplitude: .hero)
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 44, weight: .regular))
+                    .foregroundStyle(PulseDesign.sage)
+            }
+            .padding(.bottom, 4)
             Text("You're set", bundle: .module)
-                .font(.largeTitle.bold())
+                .font(.system(.largeTitle, design: .rounded, weight: .semibold))
             Text("Pulse is now collecting your activity locally. Open the menu bar icon any time to pause, peek at today's numbers, or read the privacy ledger.", bundle: .module)
                 .font(.body)
                 .multilineTextAlignment(.center)
@@ -375,7 +401,7 @@ private struct ReadyStep: View {
                 .frame(maxWidth: 460)
             Spacer(minLength: 0)
         }
-        .padding(28)
+        .padding(32)
     }
 }
 
