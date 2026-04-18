@@ -23,23 +23,32 @@ import CoreGraphics
 public struct CoordNormalizer: Sendable {
     public init() {}
 
-    /// Normalize a pixel point inside the display's local coordinate space
-    /// (where 0,0 is the display's top-left). Clamps to `[0, 1]` so
-    /// off-by-one boundary events don't produce out-of-range data.
+    /// Normalize a **point-space** coordinate inside the display's local
+    /// coordinate space (where 0,0 is the display's top-left) into the
+    /// `[0, 1]` range. `localPoint` must be in points — which is what
+    /// `CGEvent.location` and `CGDisplayBounds` both return — not native
+    /// pixels. Dividing by `widthPoints` / `heightPoints` keeps the
+    /// normalized value a true fraction of the screen regardless of
+    /// Retina backing scale.
+    ///
+    /// Pre-A26 this divided by `widthPx` / `heightPx` (native pixels),
+    /// which on a 2x Retina display produced normalized values half as
+    /// large as they should be; the mileage pipeline then compounded
+    /// that into a 50% distance under-count. See `MileageConverter`.
     public func normalize(localPoint: CGPoint, on display: DisplayInfo) -> NormalizedPoint {
-        let width = max(Double(display.widthPx), 1.0)
-        let height = max(Double(display.heightPx), 1.0)
+        let width = max(Double(display.widthPoints), 1.0)
+        let height = max(Double(display.heightPoints), 1.0)
         let x = clamp01(Double(localPoint.x) / width)
         let y = clamp01(Double(localPoint.y) / height)
         return NormalizedPoint(displayId: display.id, x: x, y: y)
     }
 
-    /// Inverse of `normalize`. Useful when rendering historical heatmaps
-    /// against a known display snapshot.
+    /// Inverse of `normalize`. Returns a point-space coordinate (not
+    /// native pixels), matching what `normalize` consumed.
     public func denormalize(_ point: NormalizedPoint, on display: DisplayInfo) -> CGPoint {
         CGPoint(
-            x: point.x * Double(display.widthPx),
-            y: point.y * Double(display.heightPx)
+            x: point.x * Double(display.widthPoints),
+            y: point.y * Double(display.heightPoints)
         )
     }
 
