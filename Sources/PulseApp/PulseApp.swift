@@ -978,17 +978,35 @@ struct DashboardView: View {
                     )
                 }
                 if let summary = model.summary {
+                    // ── Section 1 — Today's pulse (above the fold) ──
+                    // Goals first when intent is set, then the hero
+                    // mileage on the left + 6 summary tiles on the
+                    // right. Together this is the "30-second glance".
                     if !model.goalProgress.isEmpty {
                         GoalsCard(progress: model.goalProgress)
                     }
-                    MileageHeroCard(distanceMillimeters: summary.totalMouseDistanceMillimeters)
-                    LandmarkProgressPanel(distanceMillimeters: summary.totalMouseDistanceMillimeters)
-                    SummaryCardsView(summary: summary, trend: model.trendPoints)
+                    todayPulseSection(summary: summary)
+
+                    // ── Section 2 — Rhythm (trends across the week) ──
+                    DashboardSectionHeader(titleKey: "Rhythm")
                     WeekTrendChart(points: model.trendPoints)
                     WeekHourlyHeatmap(cells: model.heatmapCells, days: model.heatmapDays)
-                    DeepFocusCard(segment: model.longestFocus)
-                    UsagePostureCard(posture: model.sessionPosture)
+
+                    // ── Section 3 — Focus (depth + sessions) ──
+                    DashboardSectionHeader(titleKey: "Focus")
+                    HStack(alignment: .top, spacing: PulseDesign.cardSpacing) {
+                        DeepFocusCard(segment: model.longestFocus)
+                            .frame(maxWidth: .infinity)
+                        UsagePostureCard(posture: model.sessionPosture)
+                            .frame(maxWidth: .infinity)
+                    }
+
+                    // ── Section 4 — Apps ──
+                    DashboardSectionHeader(titleKey: "Apps")
                     AppRankingChart(rows: summary.topApps)
+
+                    // ── Section 5 — Health (diagnostics, kept last) ──
+                    DashboardSectionHeader(titleKey: "Health")
                     DiagnosticsCard(snapshot: healthModel.snapshot)
                 } else if model.errorMessage != nil {
                     Text(model.errorMessage ?? "")
@@ -1004,7 +1022,7 @@ struct DashboardView: View {
             .padding(28)
         }
         .background(PulseDesign.surface)
-        .frame(minWidth: 640, minHeight: 420)
+        .frame(minWidth: 820, minHeight: 540)
         .onAppear { model.startPolling() }
         .onDisappear { model.stopPolling() }
         .onReceive(
@@ -1041,6 +1059,47 @@ struct DashboardView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// First section of the dashboard — the "30-second glance" the user
+    /// sees without scrolling. Mileage hero + landmark progress on the
+    /// left (the dramatic story); 6 summary tiles on the right (the
+    /// raw counters). At min window width (820pt) the two columns each
+    /// get ~390pt, comfortably fitting a 2-column tile grid on the right.
+    @ViewBuilder
+    private func todayPulseSection(summary: TodaySummary) -> some View {
+        DashboardSectionHeader(titleKey: "Today's pulse")
+        HStack(alignment: .top, spacing: PulseDesign.cardSpacing) {
+            VStack(alignment: .leading, spacing: PulseDesign.cardSpacing * 0.6) {
+                MileageHeroCard(distanceMillimeters: summary.totalMouseDistanceMillimeters)
+                LandmarkProgressPanel(distanceMillimeters: summary.totalMouseDistanceMillimeters)
+            }
+            .frame(maxWidth: .infinity)
+
+            SummaryCardsView(summary: summary, trend: model.trendPoints)
+                .frame(maxWidth: .infinity)
+        }
+    }
+}
+
+/// Section title used to break the Dashboard's long scroll into a few
+/// scannable groups (Apple Health pattern). Rounded title3 + a short
+/// coral accent capsule that gives the eye an anchor without shouting.
+struct DashboardSectionHeader: View {
+
+    let titleKey: LocalizedStringKey
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text(titleKey, bundle: .module)
+                .font(.system(.title3, design: .rounded, weight: .semibold))
+                .foregroundStyle(.primary)
+            Capsule()
+                .fill(PulseDesign.coral.opacity(0.5))
+                .frame(width: 28, height: 2)
+            Spacer()
+        }
+        .padding(.top, 4)
     }
 }
 
@@ -1403,7 +1462,14 @@ struct SummaryCardsView: View {
     private static let narrative = NarrativeEngine.standard
 
     var body: some View {
-        let columns = [GridItem(.adaptive(minimum: 160), spacing: 12)]
+        // Pinned 2 columns (instead of `.adaptive`) so the right-side
+        // 6-tile grid in the "Today's pulse" section keeps a consistent
+        // 3-row × 2-col shape no matter how wide the window grows. The
+        // column widths flex to fill whatever space the parent gives.
+        let columns = [
+            GridItem(.flexible(), spacing: 12),
+            GridItem(.flexible(), spacing: 12)
+        ]
         LazyVGrid(columns: columns, spacing: 12) {
             SummaryMetricCard(
                 titleKey: "Distance",
