@@ -20,7 +20,7 @@ enum PulseFormat {
     static func ago(from instant: Date, to now: Date) -> String {
         let seconds = now.timeIntervalSince(instant)
         if seconds < 1 {
-            return String(localized: "just now", defaultValue: "just now")
+            return String(localized: "just now", defaultValue: "just now", bundle: .module)
         }
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
@@ -100,7 +100,7 @@ enum PulseFormat {
     static func localizedLandmarkName(for landmark: Landmark) -> String {
         NSLocalizedString(
             "landmark.\(landmark.key).name",
-            bundle: .main,
+            bundle: .module,
             value: landmark.displayName,
             comment: "Localised landmark display name for the mileage comparison"
         )
@@ -115,7 +115,7 @@ enum PulseFormat {
     static func localizedAnchorName(for anchor: NarrativeAnchor) -> String {
         NSLocalizedString(
             anchor.key,
-            bundle: .main,
+            bundle: .module,
             value: anchor.displayName,
             comment: "Localised NarrativeEngine anchor name"
         )
@@ -132,20 +132,20 @@ enum PulseFormat {
         if m < 1 {
             let pct = Int((m * 100).rounded())
             return String.localizedStringWithFormat(
-                String(localized: "mileage.comparison.percent"),
+                String(localized: "mileage.comparison.percent", bundle: .module),
                 pct,
                 name
             )
         } else if m < 2 {
             return String.localizedStringWithFormat(
-                String(localized: "mileage.comparison.aboutOne"),
+                String(localized: "mileage.comparison.aboutOne", bundle: .module),
                 name
             )
         } else {
             let rounded = (m * 10).rounded() / 10
             let multiplierString = rounded.formatted(.number.precision(.fractionLength(1)))
             return String.localizedStringWithFormat(
-                String(localized: "mileage.comparison.multi"),
+                String(localized: "mileage.comparison.multi", bundle: .module),
                 multiplierString,
                 name
             )
@@ -160,26 +160,26 @@ enum PulseFormat {
         let m = comparison.multiplier
         if m < 0.01 {
             return String.localizedStringWithFormat(
-                String(localized: "mileage.comparison.tiny"),
+                String(localized: "mileage.comparison.tiny", bundle: .module),
                 name
             )
         } else if m < 1 {
             let pct = Int((m * 100).rounded())
             return String.localizedStringWithFormat(
-                String(localized: "mileage.comparison.percent"),
+                String(localized: "mileage.comparison.percent", bundle: .module),
                 pct,
                 name
             )
         } else if m < 2 {
             return String.localizedStringWithFormat(
-                String(localized: "mileage.comparison.aboutOne"),
+                String(localized: "mileage.comparison.aboutOne", bundle: .module),
                 name
             )
         } else {
             let rounded = (m * 10).rounded() / 10
             let multiplierString = rounded.formatted(.number.precision(.fractionLength(1)))
             return String.localizedStringWithFormat(
-                String(localized: "mileage.comparison.multi"),
+                String(localized: "mileage.comparison.multi", bundle: .module),
                 multiplierString,
                 name
             )

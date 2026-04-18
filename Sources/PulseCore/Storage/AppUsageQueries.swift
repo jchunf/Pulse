@@ -224,7 +224,7 @@ public extension EventStore {
         }
 
         return byBundle
-            .filter { $0.value > 0 }
+            .filter { $0.value > 0 && !SystemAppFilter.excludedBundles.contains($0.key) }
             .sorted { $0.value > $1.value }
             .prefix(limit)
             .map { AppUsageRow(bundleId: $0.key, secondsUsed: Int($0.value)) }
@@ -539,8 +539,13 @@ public extension EventStore {
 
             // For each interval, verify every minute it covers is active
             // (meets the per-minute threshold). Keep the longest qualifier.
+            // Skip bundles in `SystemAppFilter.excludedBundles` —
+            // `loginwindow` is the most important here: macOS sets it as
+            // the foreground while the screen is locked, and pre-A26g a
+            // 12-hour overnight lock got credited as "deep focus".
             var best: FocusSegment?
             for (startMs, endMs, bundle) in intervals {
+                if SystemAppFilter.excludedBundles.contains(bundle) { continue }
                 let durationSeconds = (endMs - startMs) / 1_000
                 if durationSeconds < 60 { continue } // <1 min can't be focus
                 let firstMinuteStart = (startMs / 1_000 / 60) * 60
