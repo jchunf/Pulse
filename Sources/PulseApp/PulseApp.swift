@@ -1247,24 +1247,18 @@ struct MileageHeroCard: View {
         .pulseHeroCard()
     }
 
-    /// Three concentric Coral rings, each with a slightly offset phase so
-    /// the composite shape reads as a gentle breath rather than a single
-    /// scale pop. Sits behind the hero number as a visual anchor for the
-    /// "脉搏" metaphor without competing with the data.
+    /// Coral ECG-waveform glyph that breathes — same visual as the
+    /// menu-bar icon and the app icon, so all three "脉搏" surfaces
+    /// reinforce each other. A26b shipped this as three faint
+    /// concentric circles, but the outer two (10% / 18% opacity coral)
+    /// were invisible against the off-white card surface and the
+    /// remaining 8pt center dot read as an alert-style notification
+    /// badge instead of a pulse anchor.
     private var pulseGlyph: some View {
-        ZStack {
-            Circle()
-                .fill(PulseDesign.coral.opacity(0.10))
-                .frame(width: 52, height: 52)
-                .pulseHeartbeat(amplitude: .hero)
-            Circle()
-                .fill(PulseDesign.coral.opacity(0.18))
-                .frame(width: 32, height: 32)
-                .pulseHeartbeat(amplitude: .hero)
-            Circle()
-                .fill(PulseDesign.coral)
-                .frame(width: 8, height: 8)
-        }
+        Image(systemName: "waveform.path.ecg")
+            .font(.system(size: 26, weight: .medium))
+            .foregroundStyle(PulseDesign.coral.opacity(0.7))
+            .pulseHeartbeat(amplitude: .hero)
     }
 }
 

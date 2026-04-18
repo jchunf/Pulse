@@ -94,26 +94,36 @@ public extension EventStore {
                 """, arguments: [dayStartMs])
 
             let transitions = try Row.fetchAll(db, sql: """
-                SELECT ts FROM system_events
+                SELECT ts, payload FROM system_events
                 WHERE category = 'foreground_app' AND ts >= ? AND ts < ?
                 ORDER BY ts
                 """, arguments: [dayStartMs, dayEndMs])
 
+            // Track current bundle so we can skip lock-screen +
+            // system-chrome intervals — same `SystemAppFilter` exclusion
+            // list as `appUsageRanking` / `longestFocusSegment`. Without
+            // this, a 12-hour overnight lock would credit a 12-hour
+            // "session" against `com.apple.loginwindow`.
             var durations: [Int] = []
             var currentStart = dayStartMs
-            var hasCurrentBundle = priorBundle != nil
+            var currentBundle: String? = priorBundle
             for row in transitions {
                 let ts: Int64 = row["ts"]
-                if hasCurrentBundle, ts > currentStart {
+                let payload: String = row["payload"]
+                if let bundle = currentBundle,
+                   ts > currentStart,
+                   !SystemAppFilter.excludedBundles.contains(bundle) {
                     let secs = Int((ts - currentStart) / 1_000)
                     if secs >= minSessionSeconds {
                         durations.append(secs)
                     }
                 }
                 currentStart = ts
-                hasCurrentBundle = true
+                currentBundle = payload
             }
-            if hasCurrentBundle, dayEndMs > currentStart {
+            if let bundle = currentBundle,
+               dayEndMs > currentStart,
+               !SystemAppFilter.excludedBundles.contains(bundle) {
                 let secs = Int((dayEndMs - currentStart) / 1_000)
                 if secs >= minSessionSeconds {
                     durations.append(secs)
