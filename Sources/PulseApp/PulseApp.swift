@@ -94,9 +94,18 @@ struct MenuBarLabel: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Image(systemName: model.menuBarIconName)
+                // Let the icon actually *pulse* while the collector is
+                // healthy — literalising the app name in the ambient
+                // UI. Pauses / permission failures / silent-failure
+                // states freeze the icon so the user notices something
+                // is up without needing to read text.
+                .pulseHeartbeat(
+                    active: model.isLivelyCollecting,
+                    amplitude: .menuBar
+                )
             if anomalyMonitor.hasAnomaly {
                 Circle()
-                    .fill(Color.red)
+                    .fill(PulseDesign.critical)
                     .frame(width: 5, height: 5)
                     .offset(x: 2, y: -2)
                     .accessibilityLabel(Text("Anomaly", bundle: .module))
@@ -542,6 +551,18 @@ final class HealthModel: ObservableObject {
         if snapshot.pause.isActive { return "pause.circle" }
         if snapshot.isSilentlyFailing { return "exclamationmark.circle" }
         return "waveform.path.ecg"
+    }
+
+    /// `true` when the collector is in a healthy steady state and the
+    /// menu-bar icon should breathe. Any abnormal state (missing
+    /// permissions / paused / silently failing / error) returns
+    /// `false` so the icon freezes — a one-glance "something is off"
+    /// signal that doesn't need to be read as text.
+    var isLivelyCollecting: Bool {
+        errorMessage == nil
+            && snapshot.permissions.isAllRequiredGranted
+            && !snapshot.pause.isActive
+            && !snapshot.isSilentlyFailing
     }
 
     private static func bootstrapSnapshot(permissions: PermissionSnapshot) -> HealthSnapshot {

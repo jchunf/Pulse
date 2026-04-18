@@ -76,6 +76,14 @@ for b in "$BUILD_DIR"/*.bundle; do
 done
 shopt -u nullglob
 
+echo "==> generate + embed app icon"
+# Every build regenerates the .icns so a palette tweak in
+# scripts/generate-icon.swift propagates on the very next run without
+# anyone having to remember to commit a binary blob.
+swift "$ROOT/scripts/generate-icon.swift"
+iconutil -c icns "$ROOT/apple/Pulse.iconset" -o "$ROOT/apple/Pulse.icns"
+cp "$ROOT/apple/Pulse.icns" "$RESOURCES/Pulse.icns"
+
 echo "==> write Info.plist"
 python3 - "$ROOT/apple/Info.plist" "$CONTENTS/Info.plist" \
     "$APP_NAME" "$EXEC_NAME" "$BUNDLE_ID" "$VERSION" "$BUILD_NUMBER" <<'PY'
