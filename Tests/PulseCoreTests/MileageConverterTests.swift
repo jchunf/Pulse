@@ -43,6 +43,47 @@ struct MileageConverterTests {
         let mm = converter.millimeters(between: a, and: b, on: display)
         #expect(abs(mm - 500) < 0.01)
     }
+
+    @Test("Retina @2x display: point-space delta reports physical distance (not half-distance)")
+    func retinaPointsMath() {
+        // 13" MBP-ish: 2560×1664 native pixels, 1280×832 points, 286 mm
+        // physical width. mmPerPoint = 286/1280 ≈ 0.2234 mm.
+        // Expected physical width: if a = (0,0) and b = (1,0) the cursor
+        // traversed the whole screen → 286 mm.
+        let retina = DisplayInfo(
+            id: 7,
+            widthPx: 2_560,
+            heightPx: 1_664,
+            widthPoints: 1_280,
+            heightPoints: 832,
+            dpi: 2_560 / (286.0 / 25.4),  // = 227.3 PPI (matches Apple's 227 PPI Retina)
+            isPrimary: true
+        )
+        let a = NormalizedPoint(displayId: 7, x: 0, y: 0)
+        let b = NormalizedPoint(displayId: 7, x: 1, y: 0)
+        let mm = converter.millimeters(between: a, and: b, on: retina)
+        // Pre-A26 this returned 143mm (half). Post-A26 it returns 286mm
+        // (the actual physical panel width).
+        #expect(abs(mm - 286.0) < 1.0)
+    }
+
+    @Test("non-Retina fallback: omitted widthPoints defaults to widthPx (1x behaviour unchanged)")
+    func nonRetinaBackwardsCompatible() {
+        // Pre-A26 test fixtures didn't know about widthPoints. The
+        // default-nil init param keeps them computing the same mm they
+        // always did.
+        let legacy = DisplayInfo(
+            id: 9,
+            widthPx: 1_000,
+            heightPx: 1_000,
+            dpi: 25.4,
+            isPrimary: true
+        )
+        let a = NormalizedPoint(displayId: 9, x: 0, y: 0)
+        let b = NormalizedPoint(displayId: 9, x: 0.3, y: 0.4)
+        let mm = converter.millimeters(between: a, and: b, on: legacy)
+        #expect(abs(mm - 500) < 0.01)
+    }
 }
 
 @Suite("LandmarkLibrary — drama-preserving comparison selection")

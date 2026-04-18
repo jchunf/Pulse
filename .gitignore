@@ -17,6 +17,13 @@ xcuserdata/
 # Build outputs
 build/
 .build-release/
+dist/
+
+# Regenerated on every `scripts/package.sh`; the source of truth is
+# `scripts/generate-icon.swift`, so committing the derived assets would
+# just churn the repo on every palette tweak.
+apple/Pulse.iconset/
+apple/Pulse.icns
 
 # macOS
 .DS_Store

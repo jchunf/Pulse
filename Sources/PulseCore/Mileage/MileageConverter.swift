@@ -28,11 +28,18 @@ public struct MileageConverter: Sendable {
     /// display, and converts the result to millimeters. The two points MUST
     /// be on the same display — callers are responsible for splitting
     /// cross-display segments.
+    ///
+    /// A26: The math now uses **logical points**, not native pixels. Pre-A26
+    /// the code took point-space deltas, multiplied by `widthPx` (native
+    /// pixels), then multiplied by `mm/pixel` — which quietly undercounted
+    /// distance by the backing-scale factor on every Retina Mac. Post-A26,
+    /// we scale by `widthPoints` + use `millimetersPerPoint`, which gives
+    /// physically correct mm on both Retina and non-Retina.
     public func millimeters(between a: NormalizedPoint, and b: NormalizedPoint, on display: DisplayInfo) -> Double {
         precondition(a.displayId == b.displayId, "distance between points on different displays is undefined")
-        let dx = (a.x - b.x) * Double(display.widthPx)
-        let dy = (a.y - b.y) * Double(display.heightPx)
-        let pixels = (dx * dx + dy * dy).squareRoot()
-        return millimeters(pixels: pixels, on: display)
+        let dx = (a.x - b.x) * Double(display.widthPoints)
+        let dy = (a.y - b.y) * Double(display.heightPoints)
+        let points = (dx * dx + dy * dy).squareRoot()
+        return points * display.millimetersPerPoint
     }
 }

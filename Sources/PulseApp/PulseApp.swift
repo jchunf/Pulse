@@ -94,9 +94,18 @@ struct MenuBarLabel: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Image(systemName: model.menuBarIconName)
+                // Let the icon actually *pulse* while the collector is
+                // healthy — literalising the app name in the ambient
+                // UI. Pauses / permission failures / silent-failure
+                // states freeze the icon so the user notices something
+                // is up without needing to read text.
+                .pulseHeartbeat(
+                    active: model.isLivelyCollecting,
+                    amplitude: .menuBar
+                )
             if anomalyMonitor.hasAnomaly {
                 Circle()
-                    .fill(Color.red)
+                    .fill(PulseDesign.critical)
                     .frame(width: 5, height: 5)
                     .offset(x: 2, y: -2)
                     .accessibilityLabel(Text("Anomaly", bundle: .module))
@@ -544,6 +553,18 @@ final class HealthModel: ObservableObject {
         return "waveform.path.ecg"
     }
 
+    /// `true` when the collector is in a healthy steady state and the
+    /// menu-bar icon should breathe. Any abnormal state (missing
+    /// permissions / paused / silently failing / error) returns
+    /// `false` so the icon freezes — a one-glance "something is off"
+    /// signal that doesn't need to be read as text.
+    var isLivelyCollecting: Bool {
+        errorMessage == nil
+            && snapshot.permissions.isAllRequiredGranted
+            && !snapshot.pause.isActive
+            && !snapshot.isSilentlyFailing
+    }
+
     private static func bootstrapSnapshot(permissions: PermissionSnapshot) -> HealthSnapshot {
         HealthSnapshot(
             capturedAt: Date(),
@@ -786,9 +807,10 @@ struct HealthMenuView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Pulse", bundle: .module).font(.headline)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Pulse", bundle: .module)
+                    .font(.system(.headline, design: .rounded, weight: .semibold))
                 Spacer()
                 Text(localizedStatusHeadline(for: model.snapshot), bundle: .module)
                     .font(.footnote)
@@ -796,11 +818,11 @@ struct HealthMenuView: View {
                     .multilineTextAlignment(.trailing)
             }
 
-            Divider()
+            Divider().overlay(PulseDesign.warmGray(0.14))
 
             CountersView(snapshot: model.snapshot)
 
-            Divider()
+            Divider().overlay(PulseDesign.warmGray(0.14))
 
             PauseControlsView(
                 pause: model.snapshot.pause,
@@ -809,36 +831,39 @@ struct HealthMenuView: View {
                 onResume: onResume
             )
 
-            Divider()
+            Divider().overlay(PulseDesign.warmGray(0.14))
 
             PermissionList(snapshot: model.snapshot.permissions)
 
             PermissionAssistantView(snapshot: model.snapshot.permissions)
 
             if let message = model.errorMessage {
-                Divider()
+                Divider().overlay(PulseDesign.warmGray(0.14))
                 Text(message)
                     .font(.footnote)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(PulseDesign.critical)
             }
 
-            Divider()
+            Divider().overlay(PulseDesign.warmGray(0.14))
 
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 HStack {
                     Button {
                         openWindow(id: "dashboard")
                         NSApp.activate(ignoringOtherApps: true)
                     } label: {
                         Text("Open Dashboard", bundle: .module)
+                            .padding(.horizontal, 4)
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(PulseDesign.coral)
                     Spacer()
                     Button { NSApp.terminate(nil) } label: {
                         Text("Quit Pulse", bundle: .module)
                     }
                     .keyboardShortcut("q")
                 }
-                HStack(spacing: 16) {
+                HStack(spacing: 14) {
                     Button(action: onShowBriefing) {
                         Text("Yesterday's briefing", bundle: .module)
                             .font(.footnote)
@@ -858,7 +883,7 @@ struct HealthMenuView: View {
                 }
             }
         }
-        .padding(14)
+        .padding(16)
         .frame(width: 360)
     }
 
@@ -907,8 +932,8 @@ struct PauseControlsView: View {
                     } icon: {
                         Image(systemName: "pause.circle.fill")
                     }
-                    .font(.footnote.bold())
-                    .foregroundStyle(.orange)
+                    .font(.footnote)
+                    .foregroundStyle(PulseDesign.amber)
                     Text("Resumes \(PulseFormat.countdown(from: capturedAt, to: resumesAt))", bundle: .module)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -943,7 +968,7 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: PulseDesign.cardSpacing) {
                 header
                 DashboardPermissionBanner(permissions: healthModel.snapshot.permissions)
                 if let achievement = model.recentAchievement {
@@ -967,7 +992,7 @@ struct DashboardView: View {
                     DiagnosticsCard(snapshot: healthModel.snapshot)
                 } else if model.errorMessage != nil {
                     Text(model.errorMessage ?? "")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(PulseDesign.critical)
                 } else {
                     ProgressView {
                         Text("Loading today's data…", bundle: .module)
@@ -976,9 +1001,10 @@ struct DashboardView: View {
                     .padding(.top, 40)
                 }
             }
-            .padding(24)
+            .padding(28)
         }
-        .frame(minWidth: 600, minHeight: 400)
+        .background(PulseDesign.surface)
+        .frame(minWidth: 640, minHeight: 420)
         .onAppear { model.startPolling() }
         .onDisappear { model.stopPolling() }
         .onReceive(
@@ -1006,9 +1032,9 @@ struct DashboardView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text("Today", bundle: .module)
-                .font(.largeTitle.bold())
+                .font(.system(.largeTitle, design: .rounded, weight: .semibold))
             if let last = model.lastRefreshAt {
                 Text("Updated \(PulseFormat.ago(from: last, to: Date()))", bundle: .module)
                     .font(.footnote)
@@ -1033,12 +1059,12 @@ struct DashboardPermissionBanner: View {
         if missing.isEmpty {
             EmptyView()
         } else {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(PulseDesign.amber)
                     Text("Pulse isn't collecting right now", bundle: .module)
-                        .font(.headline)
+                        .font(PulseDesign.cardTitleFont)
                 }
                 Text("Grant the permissions below in System Settings, then relaunch Pulse. Until then the numbers on this page won't update.", bundle: .module)
                     .font(.footnote)
@@ -1060,12 +1086,15 @@ struct DashboardPermissionBanner: View {
                     }
                 }
             }
-            .padding(16)
+            .padding(PulseDesign.cardPadding * 0.75)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+            .background(
+                RoundedRectangle(cornerRadius: PulseDesign.cardCornerRadius)
+                    .fill(PulseDesign.amber.opacity(0.10))
+            )
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(Color.orange.opacity(0.35), lineWidth: 1)
+                RoundedRectangle(cornerRadius: PulseDesign.cardCornerRadius)
+                    .strokeBorder(PulseDesign.amber.opacity(0.25), lineWidth: 0.5)
             )
         }
     }
@@ -1084,15 +1113,15 @@ struct MilestoneAchievementBanner: View {
         let landmarkName = PulseFormat.localizedLandmarkName(for: achievement.landmark)
         let landmarkDistance = PulseFormat.metersWhole(achievement.landmark.distanceMeters)
         let movedSoFar = PulseFormat.metersWhole(achievement.metersReached)
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "sparkles")
-                .font(.title2)
-                .foregroundStyle(Color.accentColor)
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.title3)
+                .foregroundStyle(PulseDesign.sage)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Milestone reached", bundle: .module)
-                    .font(.caption.bold())
-                    .foregroundStyle(Color.accentColor)
-                    .textCase(.uppercase)
+                    .font(PulseDesign.labelFont)
+                    .tracking(0.3)
+                    .foregroundStyle(PulseDesign.sage)
                 Text("Today's mileage just hit \(landmarkName) — \(landmarkDistance).", bundle: .module)
                     .font(.body)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1103,25 +1132,14 @@ struct MilestoneAchievementBanner: View {
             Spacer(minLength: 8)
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
-                    .font(.footnote.bold())
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(.borderless)
             .help(Text("Dismiss", bundle: .module))
         }
-        .padding(14)
-        .background(
-            LinearGradient(
-                colors: [Color.accentColor.opacity(0.22), Color.accentColor.opacity(0.08)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
-        )
+        .pulseFeaturedCard()
     }
 }
 
@@ -1145,32 +1163,49 @@ struct MileageHeroCard: View {
         let meters = distanceMillimeters / 1_000.0
         let comparison = library.bestMatch(forMeters: meters)
 
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Mouse mileage today", bundle: .module)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-            Text(PulseFormat.distance(millimeters: distanceMillimeters))
-                .font(.system(size: 52, weight: .bold, design: .rounded))
-                .monospacedDigit()
-            Text(PulseFormat.landmarkComparisonSentence(for: comparison))
-                .font(.title3)
-                .foregroundStyle(.secondary)
+        ZStack(alignment: .topTrailing) {
+            // Concentric-circle heartbeat accent in the top-right,
+            // breathing at the `.hero` amplitude (+8% every 3.2s).
+            pulseGlyph
+                .padding([.top, .trailing], 18)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Mouse mileage today", bundle: .module)
+                    .font(PulseDesign.labelFont)
+                    .tracking(0.4)
+                    .foregroundStyle(.secondary)
+                Text(PulseFormat.distance(millimeters: distanceMillimeters))
+                    .font(PulseDesign.heroFont)
+                    .monospacedDigit()
+                    .foregroundStyle(PulseDesign.coral)
+                Text(PulseFormat.landmarkComparisonSentence(for: comparison))
+                    .font(.title3)
+                    .foregroundStyle(.primary)
+                    .opacity(0.75)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [Color.accentColor.opacity(0.18), Color.accentColor.opacity(0.05)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(Color.accentColor.opacity(0.25), lineWidth: 1)
-        )
+        .pulseHeroCard()
+    }
+
+    /// Three concentric Coral rings, each with a slightly offset phase so
+    /// the composite shape reads as a gentle breath rather than a single
+    /// scale pop. Sits behind the hero number as a visual anchor for the
+    /// "脉搏" metaphor without competing with the data.
+    private var pulseGlyph: some View {
+        ZStack {
+            Circle()
+                .fill(PulseDesign.coral.opacity(0.10))
+                .frame(width: 52, height: 52)
+                .pulseHeartbeat(amplitude: .hero)
+            Circle()
+                .fill(PulseDesign.coral.opacity(0.18))
+                .frame(width: 32, height: 32)
+                .pulseHeartbeat(amplitude: .hero)
+            Circle()
+                .fill(PulseDesign.coral)
+                .frame(width: 8, height: 8)
+        }
     }
 }
 
@@ -1192,25 +1227,16 @@ struct GoalsCard: View {
     let progress: [GoalProgress]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("Today I want to", bundle: .module)
-                .font(.headline)
-            VStack(spacing: 6) {
+                .font(PulseDesign.cardTitleFont)
+            VStack(spacing: 10) {
                 ForEach(progress) { row in
                     GoalProgressRow(progress: row)
                 }
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [Color.accentColor.opacity(0.14), Color.accentColor.opacity(0.04)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .pulseFeaturedCard()
     }
 }
 
@@ -1219,7 +1245,7 @@ struct GoalProgressRow: View {
     let progress: GoalProgress
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text(GoalPresetLocalizer.title(for: progress.definition), bundle: .module)
                     .font(.footnote)
@@ -1230,8 +1256,8 @@ struct GoalProgressRow: View {
                     } icon: {
                         Image(systemName: "checkmark.circle.fill")
                     }
-                    .font(.caption.bold())
-                    .foregroundStyle(.green)
+                    .font(.caption)
+                    .foregroundStyle(PulseDesign.sage)
                 } else {
                     Text(GoalPresetLocalizer.progressText(for: progress))
                         .font(.caption.monospacedDigit())
@@ -1240,14 +1266,14 @@ struct GoalProgressRow: View {
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.accentColor.opacity(0.12))
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(progress.isAchieved ? Color.green : Color.accentColor)
+                    Capsule()
+                        .fill(PulseDesign.warmGray(0.08))
+                    Capsule()
+                        .fill(progress.isAchieved ? PulseDesign.sage : PulseDesign.coral)
                         .frame(width: geo.size.width * CGFloat(progress.fractionTowardsTarget))
                 }
             }
-            .frame(height: 6)
+            .frame(height: 4)
         }
     }
 }
@@ -1312,15 +1338,16 @@ struct LandmarkProgressPanel: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("Landmarks", bundle: .module)
-                .font(.headline)
-            VStack(spacing: 8) {
+                .font(PulseDesign.cardTitleFont)
+            VStack(spacing: 10) {
                 ForEach(rows, id: \.0.key) { row in
                     LandmarkProgressRow(landmark: row.0, ratio: row.1)
                 }
             }
         }
+        .pulseFeaturedCard()
     }
 }
 
@@ -1330,8 +1357,13 @@ struct LandmarkProgressRow: View {
     let ratio: Double
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
+                if ratio >= 1 {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(PulseDesign.sage)
+                }
                 Text(PulseFormat.localizedLandmarkName(for: landmark))
                     .font(.footnote)
                 Spacer()
@@ -1341,20 +1373,14 @@ struct LandmarkProgressRow: View {
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.accentColor.opacity(0.12))
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.orange.opacity(0.85), Color.accentColor],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                    Capsule()
+                        .fill(PulseDesign.warmGray(0.08))
+                    Capsule()
+                        .fill(ratio >= 1 ? PulseDesign.sage : PulseDesign.coral)
                         .frame(width: geo.size.width * min(1, max(0, ratio)))
                 }
             }
-            .frame(height: 6)
+            .frame(height: 4)
         }
     }
 
@@ -1436,7 +1462,8 @@ struct SummaryMetricCard: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text(titleKey, bundle: .module)
-                    .font(.caption)
+                    .font(PulseDesign.labelFont)
+                    .tracking(0.3)
                     .foregroundStyle(.secondary)
                 Spacer()
                 if let delta = deltaVsYesterday {
@@ -1444,7 +1471,7 @@ struct SummaryMetricCard: View {
                 }
             }
             Text(value)
-                .font(.title2.monospacedDigit())
+                .font(PulseDesign.metricFont)
             if let narrativeSubtitle {
                 Text(narrativeSubtitle)
                     .font(.caption2)
@@ -1452,15 +1479,21 @@ struct SummaryMetricCard: View {
                     .lineLimit(2)
             }
             if showSparkline {
-                Sparkline(points: series)
-                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 1.2, lineJoin: .round))
-                    .frame(height: 20)
-                    .opacity(0.85)
+                ZStack(alignment: .bottom) {
+                    Sparkline(points: series, closed: true)
+                        .fill(PulseDesign.coral.opacity(0.10))
+                    Sparkline(points: series, closed: false)
+                        .stroke(PulseDesign.coral, style: StrokeStyle(lineWidth: 1.2, lineJoin: .round))
+                }
+                .frame(height: 22)
             }
         }
-        .padding(12)
+        .padding(PulseDesign.cardPadding * 0.7)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+        .background(
+            RoundedRectangle(cornerRadius: PulseDesign.cardCornerRadius * 0.75)
+                .fill(PulseDesign.warmGray(0.04))
+        )
     }
 
     private var showSparkline: Bool {
@@ -1479,8 +1512,9 @@ struct SummaryMetricCard: View {
     }
 }
 
-/// Tiny ±N% chip with an up / down arrow. Used next to metric titles to
-/// signal "vs yesterday" movement at a glance.
+/// Tiny ±N% chip next to metric titles — signals "vs yesterday"
+/// movement. Uses `+` / `−` typographic marks and the Vital Pulse
+/// sage/amber palette instead of the previous green/orange arrows.
 struct DeltaChip: View {
 
     let deltaFraction: Double
@@ -1488,22 +1522,26 @@ struct DeltaChip: View {
     var body: some View {
         let pct = Int((deltaFraction * 100).rounded())
         let isUp = deltaFraction >= 0
-        HStack(spacing: 2) {
-            Image(systemName: isUp ? "arrow.up.right" : "arrow.down.right")
-                .font(.caption2.bold())
-            Text("\(abs(pct))%")
-                .font(.caption2.monospacedDigit())
-        }
-        .foregroundStyle(isUp ? Color.green : Color.orange)
+        Text(isUp ? "+\(pct)%" : "−\(abs(pct))%")
+            .font(.caption2.monospacedDigit())
+            .foregroundStyle(isUp ? PulseDesign.deltaPositive : PulseDesign.deltaNegative)
     }
 }
 
-/// Line-only sparkline that stretches to fill its container. Uses raw
-/// `Path` (not SwiftUI Charts) because Chart has more overhead than
-/// warranted for a 40×20 tile.
+/// Line + optional area sparkline that stretches to fill its container.
+/// Uses raw `Path` (not SwiftUI Charts) because Chart has more overhead
+/// than warranted for a 40×22 tile. When `closed` is true, a baseline +
+/// closing segment at the bottom make the shape fillable, which the
+/// summary-card layout uses for a soft area tint under the line.
 struct Sparkline: Shape {
 
     let points: [Double]
+    let closed: Bool
+
+    init(points: [Double], closed: Bool = false) {
+        self.points = points
+        self.closed = closed
+    }
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
@@ -1520,6 +1558,11 @@ struct Sparkline: Shape {
                 path.addLine(to: CGPoint(x: x, y: y))
             }
         }
+        if closed {
+            path.addLine(to: CGPoint(x: rect.width, y: rect.height))
+            path.addLine(to: CGPoint(x: 0, y: rect.height))
+            path.closeSubpath()
+        }
         return path
     }
 }
@@ -1533,9 +1576,9 @@ struct WeekTrendChart: View {
     let points: [DailyTrendPoint]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("Weekly trend", bundle: .module)
-                .font(.headline)
+                .font(PulseDesign.cardTitleFont)
             if points.allSatisfy({ $0.totalEvents == 0 }) {
                 Text("No rolled-up activity yet. Check back once hourly roll-ups have run.", bundle: .module)
                     .foregroundStyle(.secondary)
@@ -1547,15 +1590,35 @@ struct WeekTrendChart: View {
                         y: .value("Events", point.totalEvents)
                     )
                     .interpolationMethod(.monotone)
+                    .foregroundStyle(PulseDesign.coral)
+
+                    AreaMark(
+                        x: .value("Day", point.day, unit: .day),
+                        y: .value("Events", point.totalEvents)
+                    )
+                    .interpolationMethod(.monotone)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [PulseDesign.coral.opacity(0.18), PulseDesign.coral.opacity(0.02)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
 
                     PointMark(
                         x: .value("Day", point.day, unit: .day),
                         y: .value("Events", point.totalEvents)
                     )
-                    .symbolSize(40)
+                    .symbolSize(32)
+                    .foregroundStyle(PulseDesign.coral)
                 }
                 .chartYAxis {
-                    AxisMarks(position: .leading)
+                    AxisMarks(position: .leading) { _ in
+                        AxisValueLabel()
+                            .foregroundStyle(.secondary)
+                        AxisGridLine()
+                            .foregroundStyle(PulseDesign.warmGray(0.10))
+                    }
                 }
                 .chartXAxis {
                     AxisMarks(values: .stride(by: .day)) { value in
@@ -1563,6 +1626,7 @@ struct WeekTrendChart: View {
                             AxisValueLabel {
                                 Text(shortDay(date))
                                     .font(.caption2)
+                                    .foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -1570,6 +1634,7 @@ struct WeekTrendChart: View {
                 .frame(height: 160)
             }
         }
+        .pulseFeaturedCard()
     }
 
     /// Short weekday name ("Mon" / "周一") via `DateFormatter` using
@@ -1598,11 +1663,12 @@ struct WeekHourlyHeatmap: View {
     private static let hourLabels = [0, 6, 12, 18]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            headlineText.font(.headline)
+        VStack(alignment: .leading, spacing: 14) {
+            headlineText.font(PulseDesign.cardTitleFont)
             content
             insightFooter
         }
+        .pulseFeaturedCard()
     }
 
     @ViewBuilder
@@ -1684,16 +1750,15 @@ struct WeekHourlyHeatmap: View {
         }
     }
 
-    /// Maps intensity ∈ [0, 1] onto a cool → warm color ramp so the heatmap
-    /// shows hotter peaks in orange and quieter hours in a low-saturation
-    /// green. `intensity = 0` still renders a visible cell (min saturation)
-    /// so empty hours stay distinguishable from missing-data regions.
+    /// Maps intensity ∈ [0, 1] onto a single-colour opacity ramp in the
+    /// Vital Pulse Coral hue. Replaces the previous HSB rainbow (green →
+    /// yellow → orange → red) which made the dashboard look like a
+    /// data-centre control panel. Empty hours still render at 0.04 so the
+    /// grid shape stays readable against the card background.
     private static func heatColor(intensity: Double) -> Color {
         let clamped = max(0, min(1, intensity))
-        let hue = 0.35 - 0.30 * clamped       // 0.35 (green) → 0.05 (orange-red)
-        let saturation = 0.15 + 0.70 * clamped
-        let brightness = 0.55 + 0.40 * clamped
-        return Color(hue: hue, saturation: saturation, brightness: brightness)
+        let opacity = 0.04 + 0.82 * clamped  // 0.04 → 0.86
+        return PulseDesign.coral.opacity(opacity)
     }
 
     @ViewBuilder
@@ -1745,9 +1810,9 @@ struct DiagnosticsCard: View {
     let snapshot: HealthSnapshot
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Diagnostics", bundle: .module)
-                .font(.headline)
+                .font(PulseDesign.cardTitleFont)
 
             if snapshot.isSilentlyFailing {
                 Label {
@@ -1756,9 +1821,12 @@ struct DiagnosticsCard: View {
                     Image(systemName: "exclamationmark.circle.fill")
                 }
                 .font(.footnote)
-                .foregroundStyle(.orange)
-                .padding(8)
-                .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+                .foregroundStyle(PulseDesign.amber)
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(PulseDesign.amber.opacity(0.10))
+                )
             }
 
             metricRow(labelKey: "Last data point",
@@ -1774,15 +1842,15 @@ struct DiagnosticsCard: View {
 
             if let error = snapshot.writer.lastErrorDescription,
                let errorAt = snapshot.writer.lastErrorAt {
-                Divider()
-                VStack(alignment: .leading, spacing: 2) {
+                Divider().overlay(PulseDesign.warmGray(0.12))
+                VStack(alignment: .leading, spacing: 4) {
                     Label {
                         Text("Last writer error", bundle: .module)
                     } icon: {
                         Image(systemName: "exclamationmark.triangle")
                     }
-                    .font(.footnote.bold())
-                    .foregroundStyle(.orange)
+                    .font(.footnote)
+                    .foregroundStyle(PulseDesign.amber)
                     Text("\(PulseFormat.ago(from: errorAt, to: snapshot.capturedAt)): \(error)")
                         .font(.footnote.monospacedDigit())
                         .foregroundStyle(.secondary)
@@ -1791,9 +1859,7 @@ struct DiagnosticsCard: View {
                 }
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+        .pulseFeaturedCard()
     }
 
     @ViewBuilder
@@ -1835,29 +1901,37 @@ struct DeepFocusCard: View {
     private static let narrative = NarrativeEngine.standard
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Deep focus today", bundle: .module)
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "waveform.path.ecg")
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(segment == nil ? 0.35 : 0.85)
+                Text("Deep focus today", bundle: .module)
+                    .font(PulseDesign.cardTitleFont)
+            }
             if let segment {
                 filled(segment)
             } else {
                 empty
             }
         }
+        .pulseFeaturedCard()
     }
 
     @ViewBuilder
     private func filled(_ segment: FocusSegment) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text(PulseFormat.duration(seconds: segment.durationSeconds))
-                .font(.system(size: 36, weight: .semibold, design: .rounded))
+                .font(PulseDesign.heroSecondaryFont)
                 .monospacedDigit()
+                .foregroundStyle(PulseDesign.coral)
             let app = Self.displayNameCache.name(for: segment.bundleId)
             let start = Self.clockTime(segment.startedAt)
             let end = Self.clockTime(segment.endedAt)
             Text("\(app) · \(start) – \(end)", bundle: .module)
                 .font(.body)
                 .foregroundStyle(.primary)
+                .opacity(0.8)
             if let narrative = Self.narrative.bestMatch(
                 metric: .focusDurationSeconds,
                 value: Double(segment.durationSeconds)
@@ -1868,16 +1942,6 @@ struct DeepFocusCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [Color.accentColor.opacity(0.14), Color.accentColor.opacity(0.04)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     private var empty: some View {
@@ -1885,7 +1949,7 @@ struct DeepFocusCard: View {
             .font(.footnote)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.vertical, 8)
+            .padding(.vertical, 4)
     }
 
     private static func clockTime(_ date: Date) -> String {
@@ -1905,24 +1969,25 @@ struct UsagePostureCard: View {
     let posture: SessionPosture
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("Today's rhythm", bundle: .module)
-                .font(.headline)
+                .font(PulseDesign.cardTitleFont)
             if posture.sessionCount == 0 {
                 Text("Not enough app-switch data yet — keep using your Mac and this card will tell you whether today is a checker day or a deep-worker day.", bundle: .module)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 4)
             } else {
                 filled
             }
         }
+        .pulseFeaturedCard()
     }
 
     private var filled: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 24) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 28) {
                 stat(
                     label: Text("Sessions", bundle: .module),
                     value: "\(posture.sessionCount)"
@@ -1943,24 +2008,30 @@ struct UsagePostureCard: View {
             }
             Text(Self.classificationSentence(for: posture), bundle: .module)
                 .font(.body)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Self.classificationColor(for: posture))
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.gray.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 
     @ViewBuilder
     private func stat(label: Text, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             label
-                .font(.caption)
+                .font(PulseDesign.labelFont)
+                .tracking(0.3)
                 .foregroundStyle(.secondary)
-                .textCase(.uppercase)
             Text(value)
-                .font(.title3.monospacedDigit().bold())
+                .font(PulseDesign.metricFont)
         }
+    }
+
+    /// Color each classification according to its "depth":
+    ///   deep-worker  → Sage (positive, steady)
+    ///   steady-flow  → Sage
+    ///   short-form   → Amber (not bad, just shallow)
+    ///   checker      → Amber (more shallow)
+    private static func classificationColor(for posture: SessionPosture) -> Color {
+        posture.medianDurationSeconds >= 15 * 60 ? PulseDesign.sage : PulseDesign.amber
     }
 
     private static func classificationSentence(for posture: SessionPosture) -> LocalizedStringKey {
@@ -1984,29 +2055,38 @@ struct AppRankingChart: View {
     private static let displayNameCache = BundleDisplayNameCache()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("Top apps", bundle: .module)
-                .font(.headline)
+                .font(PulseDesign.cardTitleFont)
             if rows.isEmpty {
                 Text("No app activity recorded yet today.", bundle: .module)
                     .foregroundStyle(.secondary)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 4)
             } else {
                 Chart(rows) { row in
                     BarMark(
                         x: .value("Seconds", row.secondsUsed),
                         y: .value("App", displayName(for: row.bundleId))
                     )
+                    .foregroundStyle(PulseDesign.coral.opacity(0.85))
+                    .cornerRadius(3)
                     .annotation(position: .trailing) {
                         Text(PulseFormat.duration(seconds: row.secondsUsed))
-                            .font(.caption2)
+                            .font(.caption2.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                 }
                 .chartXAxis(.hidden)
+                .chartYAxis {
+                    AxisMarks(position: .leading) { _ in
+                        AxisValueLabel()
+                            .foregroundStyle(.primary)
+                    }
+                }
                 .frame(height: max(120, CGFloat(rows.count) * 32))
             }
         }
+        .pulseFeaturedCard()
     }
 
     private func displayName(for bundleId: String) -> String {
@@ -2137,14 +2217,14 @@ struct PermissionAssistantView: View {
         if missing.isEmpty {
             EmptyView()
         } else {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 Label {
                     Text("Permissions needed", bundle: .module)
                 } icon: {
                     Image(systemName: "exclamationmark.triangle.fill")
                 }
-                .font(.footnote.bold())
-                .foregroundStyle(.orange)
+                .font(.footnote)
+                .foregroundStyle(PulseDesign.amber)
                 Text("Pulse can't collect without the following permissions. Grant them in System Settings, then relaunch Pulse.", bundle: .module)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -2165,8 +2245,11 @@ struct PermissionAssistantView: View {
                     .buttonStyle(.link)
                 }
             }
-            .padding(10)
-            .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(PulseDesign.amber.opacity(0.10))
+            )
         }
     }
 }
@@ -2354,11 +2437,13 @@ struct DailyBriefingView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-                .padding([.top, .leading, .trailing], 20)
-            Divider().padding(.top, 16)
+                .padding([.top, .leading, .trailing], 24)
+            Divider()
+                .overlay(PulseDesign.warmGray(0.14))
+                .padding(.top, 18)
             if let summary = model.summary {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 18) {
                         MileageHeroCard(
                             distanceMillimeters: summary.totalMouseDistanceMillimeters
                         )
@@ -2367,12 +2452,12 @@ struct DailyBriefingView: View {
                             BriefingFocusRow(segment: focus)
                         }
                     }
-                    .padding(20)
+                    .padding(22)
                 }
             } else if let error = model.errorMessage {
                 Text(error)
-                    .foregroundStyle(.red)
-                    .padding(20)
+                    .foregroundStyle(PulseDesign.critical)
+                    .padding(24)
             } else {
                 ProgressView()
                     .frame(maxWidth: .infinity)
@@ -2380,26 +2465,31 @@ struct DailyBriefingView: View {
             }
             Spacer(minLength: 0)
             Divider()
+                .overlay(PulseDesign.warmGray(0.14))
             HStack {
                 Spacer()
                 Button {
                     dismissWindow(id: "briefing")
                 } label: {
                     Text("Got it", bundle: .module)
+                        .padding(.horizontal, 6)
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(PulseDesign.coral)
                 .keyboardShortcut(.defaultAction)
             }
-            .padding(12)
+            .padding(14)
         }
+        .background(PulseDesign.surface)
         .task { await model.load(for: .yesterday) }
-        .frame(minWidth: 400, minHeight: 420)
+        .frame(minWidth: 440, minHeight: 460)
     }
 
     @ViewBuilder
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text("Yesterday in Pulse", bundle: .module)
-                .font(.title2.bold())
+                .font(.system(.title2, design: .rounded, weight: .semibold))
             if let day = model.day {
                 Text(Self.headerDateFormatter.string(from: day))
                     .font(.footnote)
@@ -2424,16 +2514,14 @@ struct BriefingStatRow: View {
     let summary: TodaySummary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             row("Keystrokes", PulseFormat.integer(summary.totalKeyPresses))
             row("Clicks",     PulseFormat.integer(summary.totalMouseClicks))
             row("Scrolls",    PulseFormat.integer(summary.totalScrollTicks))
             row("Active time", PulseFormat.duration(seconds: summary.totalActiveSeconds))
             row("Idle time",   PulseFormat.duration(seconds: summary.totalIdleSeconds))
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+        .pulseFeaturedCard()
     }
 
     @ViewBuilder
@@ -2460,20 +2548,25 @@ struct BriefingFocusRow: View {
         let app = Self.displayNameCache.name(for: segment.bundleId)
         let start = Self.clockTime(segment.startedAt)
         let end = Self.clockTime(segment.endedAt)
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text("Deep focus today", bundle: .module)
-                .font(.caption)
+                .font(PulseDesign.labelFont)
+                .tracking(0.3)
                 .foregroundStyle(.secondary)
-                .textCase(.uppercase)
             Text(PulseFormat.duration(seconds: segment.durationSeconds))
-                .font(.title3.monospacedDigit().bold())
+                .font(PulseDesign.heroSecondaryFont)
+                .monospacedDigit()
+                .foregroundStyle(PulseDesign.coral)
             Text("\(app) · \(start) – \(end)", bundle: .module)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
-        .padding(12)
+        .padding(PulseDesign.cardPadding * 0.75)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .background(
+            RoundedRectangle(cornerRadius: PulseDesign.cardCornerRadius)
+                .fill(PulseDesign.coral.opacity(0.06))
+        )
     }
 
     private static func clockTime(_ date: Date) -> String {
@@ -2532,15 +2625,15 @@ struct PrivacyAuditView: View {
     @ObservedObject var model: PrivacyAuditModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 18) {
             header
             if let snap = model.snapshot {
                 countsGrid(snap)
-                Divider()
+                Divider().overlay(PulseDesign.warmGray(0.14))
                 systemEventsSection(snap)
             } else if let error = model.errorMessage {
                 Text(error)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(PulseDesign.critical)
             } else {
                 HStack {
                     ProgressView()
@@ -2549,20 +2642,21 @@ struct PrivacyAuditView: View {
                 }
             }
             Spacer()
-            Divider()
+            Divider().overlay(PulseDesign.warmGray(0.14))
             footer
         }
-        .padding(18)
-        .frame(minWidth: 520, minHeight: 480)
+        .padding(22)
+        .background(PulseDesign.surface)
+        .frame(minWidth: 560, minHeight: 520)
         .task {
             if model.snapshot == nil { await model.reload() }
         }
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text("What Pulse has recorded", bundle: .module)
-                .font(.title2.bold())
+                .font(.system(.title2, design: .rounded, weight: .semibold))
             Text(
                 "Every count and row below is read live from your local SQLite — this window is the ground truth, not a summary we maintain separately.",
                 bundle: .module
@@ -2597,7 +2691,7 @@ struct PrivacyAuditView: View {
                 countRow(
                     label: Text("Key codes stored", bundle: .module),
                     value: snap.keyCodesRecorded,
-                    highlight: snap.keyCodesRecorded == 0 ? .green : .orange
+                    highlight: snap.keyCodesRecorded == 0 ? PulseDesign.sage : PulseDesign.amber
                 )
             }
             HStack {
@@ -2629,10 +2723,10 @@ struct PrivacyAuditView: View {
     }
 
     private func systemEventsSection(_ snap: PrivacyAuditSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("System events (latest first)", bundle: .module)
-                    .font(.headline)
+                    .font(PulseDesign.cardTitleFont)
                 Spacer()
                 Text("\(snap.systemEvents.count)")
                     .font(.subheadline.monospacedDigit())
@@ -2644,27 +2738,32 @@ struct PrivacyAuditView: View {
                     .foregroundStyle(.secondary)
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 4) {
                         ForEach(Array(snap.systemEvents.enumerated()), id: \.offset) { _, row in
-                            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            HStack(alignment: .firstTextBaseline, spacing: 12) {
                                 Text(PrivacyAuditView.clockTime(row.timestamp))
                                     .font(.footnote.monospacedDigit())
                                     .foregroundStyle(.secondary)
-                                    .frame(width: 64, alignment: .leading)
+                                    .frame(width: 68, alignment: .leading)
                                 Text(row.category)
                                     .font(.footnote.monospacedDigit())
-                                    .frame(width: 140, alignment: .leading)
+                                    .frame(width: 144, alignment: .leading)
                                 Text(row.payload ?? "—")
                                     .font(.footnote.monospacedDigit())
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                                     .truncationMode(.middle)
                             }
+                            .padding(.vertical, 1)
                         }
                     }
+                    .padding(10)
                 }
-                .frame(minHeight: 180, maxHeight: 260)
-                .background(Color.black.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+                .frame(minHeight: 200, maxHeight: 280)
+                .background(
+                    RoundedRectangle(cornerRadius: PulseDesign.cardCornerRadius * 0.75)
+                        .fill(PulseDesign.warmGray(0.06))
+                )
             }
         }
     }

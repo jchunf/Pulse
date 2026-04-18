@@ -64,6 +64,15 @@ public final class LiveDisplayRegistry: DisplayRegistry, @unchecked Sendable {
         for id in ids {
             let widthPx = Int(CGDisplayPixelsWide(id))
             let heightPx = Int(CGDisplayPixelsHigh(id))
+            // `CGDisplayBounds` returns the display's rectangle in the
+            // global *point* coordinate space — the same space
+            // `CGEvent.location` arrives in. On @2x Retina this is half
+            // the native pixel count; A26 uses these values as the real
+            // normalisation denominator so the point-space math in
+            // `MileageConverter` actually lines up with physical motion.
+            let bounds = CGDisplayBounds(id)
+            let widthPoints = Int(bounds.size.width.rounded())
+            let heightPoints = Int(bounds.size.height.rounded())
             let mmSize = CGDisplayScreenSize(id)
             let dpi: Double
             if mmSize.width > 0 {
@@ -76,6 +85,8 @@ public final class LiveDisplayRegistry: DisplayRegistry, @unchecked Sendable {
                     id: UInt32(id),
                     widthPx: widthPx,
                     heightPx: heightPx,
+                    widthPoints: widthPoints > 0 ? widthPoints : widthPx,
+                    heightPoints: heightPoints > 0 ? heightPoints : heightPx,
                     dpi: dpi,
                     isPrimary: id == mainId
                 )
