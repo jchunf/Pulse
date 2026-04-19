@@ -8,10 +8,15 @@ import Foundation
 /// describe the new boundary; add a rule → append a case to
 /// `InsightPayload` + a String Catalog entry + a test.
 public enum DefaultInsightRules {
+    /// Registration order drives UI order. Hourly comes first because
+    /// "your 14:00 was 60% quieter" is more actionable than the
+    /// day-level activity-anomaly signal the summary cards'
+    /// delta-vs-yesterday already conveys.
     public static let all: [any InsightRule] = [
-        ActivityAnomalyRule(),
+        HourlyActivityAnomalyRule(),
         DeepFocusStandoutRule(),
-        SingleAppDominanceRule()
+        SingleAppDominanceRule(),
+        ActivityAnomalyRule()
     ]
 }
 
@@ -127,6 +132,116 @@ public struct DeepFocusStandoutRule: InsightRule {
                 medianLongestSeconds: median,
                 bundleId: today.bundleId,
                 percentAbove: percentAbove
+            )
+        )
+    }
+}
+
+// MARK: - Hourly activity anomaly
+
+/// Fires on the **single completed** hour of today with the largest
+/// magnitude deviation from the median of that same hour-of-day in
+/// the prior days of the heatmap window. Skipped entirely when:
+///
+/// - history for that hour has fewer than `minimumHistoryDays`
+///   non-zero observations,
+/// - the same-hour median is below `medianFloor` (a typo-size
+///   baseline doesn't justify "900% above" dramatics),
+/// - today's hour has no cell in the heatmap *and* the direction
+///   would be "below" — the `hourlyHeatmap` query omits zero-activity
+///   rows, so a missing today cell is indistinguishable from "Pulse
+///   wasn't running then"; the rule chooses to stay silent rather
+///   than risk a false positive. (A missing today cell in the
+///   "above" direction is impossible by definition — "above" needs
+///   today's count to exceed the median.)
+///
+/// Emits at most one insight per evaluation — picking the hour with
+/// the highest `|percentOff|` — so the card stays a glance rather
+/// than a list of every outlier hour.
+public struct HourlyActivityAnomalyRule: InsightRule {
+
+    public let id = "hourly_activity_anomaly"
+    public let thresholdPercent: Double
+    public let minimumHistoryDays: Int
+    public let medianFloor: Int
+
+    /// 50% is deliberately stricter than the day-level rule's 30% —
+    /// single hours are noisier than full-day aggregates, so we
+    /// want a louder signal before flagging "your 14:00 was weird".
+    public init(
+        thresholdPercent: Double = 50.0,
+        minimumHistoryDays: Int = 3,
+        medianFloor: Int = 30
+    ) {
+        self.thresholdPercent = thresholdPercent
+        self.minimumHistoryDays = minimumHistoryDays
+        self.medianFloor = medianFloor
+    }
+
+    public func evaluate(context: InsightContext) -> Insight? {
+        let currentHour = context.calendar.component(.hour, from: context.now)
+        guard currentHour > 0 else { return nil } // Midnight: no completed hours yet.
+
+        // Pre-index today / past cells by hour for O(24) scan.
+        var todayByHour: [Int: Int] = [:]
+        var pastByHour: [Int: [Int]] = [:]
+        for cell in context.heatmapCells {
+            if cell.dayOffset == 0 {
+                todayByHour[cell.hour] = cell.activityCount
+            } else if cell.dayOffset > 0 {
+                pastByHour[cell.hour, default: []].append(cell.activityCount)
+            }
+        }
+
+        var best: (
+            hour: Int,
+            direction: InsightPayload.Direction,
+            percentOff: Int,
+            today: Int,
+            median: Int,
+            magnitude: Double
+        )? = nil
+
+        for hour in 0..<currentHour {
+            let history = (pastByHour[hour] ?? []).filter { $0 > 0 }
+            guard history.count >= minimumHistoryDays,
+                  let median = InsightStatistics.median(history),
+                  median >= medianFloor
+            else {
+                continue
+            }
+
+            let today = todayByHour[hour] ?? 0
+            // Missing today cell in "below" direction is ambiguous —
+            // Pulse off vs. legitimately quiet. See docstring.
+            if today == 0 { continue }
+
+            let deltaPercent = (Double(today) - Double(median)) / Double(median) * 100.0
+            let magnitude = abs(deltaPercent)
+            guard magnitude >= thresholdPercent else { continue }
+
+            if best == nil || magnitude > (best?.magnitude ?? 0) {
+                best = (
+                    hour: hour,
+                    direction: deltaPercent > 0 ? .above : .below,
+                    percentOff: Int(magnitude.rounded()),
+                    today: today,
+                    median: median,
+                    magnitude: magnitude
+                )
+            }
+        }
+
+        guard let pick = best else { return nil }
+        return Insight(
+            id: id,
+            kind: .curious,
+            payload: .hourlyActivityAnomaly(
+                hour: pick.hour,
+                direction: pick.direction,
+                percentOff: pick.percentOff,
+                todayCount: pick.today,
+                medianCount: pick.median
             )
         )
     }

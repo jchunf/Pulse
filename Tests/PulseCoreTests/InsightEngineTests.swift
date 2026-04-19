@@ -7,6 +7,25 @@ struct InsightEngineTests {
 
     // MARK: - Helpers
 
+    /// A fixed reference "now" so hourly tests don't drift as wall-
+    /// clock time changes between runs. 14:30 local means hours 0–13
+    /// are considered "completed" and eligible for evaluation.
+    private var referenceNow: Date {
+        var components = DateComponents()
+        components.year = 2026; components.month = 4; components.day = 19
+        components.hour = 14; components.minute = 30
+        components.timeZone = TimeZone(identifier: "UTC")
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar.date(from: components)!
+    }
+
+    private var utcCalendar: Calendar {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "UTC")!
+        return c
+    }
+
     /// Build a context that is below every rule's threshold by
     /// default. Individual tests bump the specific field they are
     /// exercising, which keeps the intent of each test case small.
@@ -19,7 +38,9 @@ struct InsightEngineTests {
             AppUsageRow(bundleId: "com.example.other", secondsUsed: 1_500)
         ],
         todayFocus: FocusSegment? = nil,
-        pastFocusSeconds: [Int] = []
+        pastFocusSeconds: [Int] = [],
+        heatmapCells: [HeatmapCell] = [],
+        now: Date? = nil
     ) -> InsightContext {
         let today = TodaySummary(
             totalKeyPresses: todayKeys,
@@ -31,14 +52,14 @@ struct InsightEngineTests {
             totalIdleSeconds: 300,
             topApps: topApps
         )
-        let now = Date()
+        let resolvedNow = now ?? Date()
         let calendar = Calendar(identifier: .gregorian)
         let pastTrend: [DailyTrendPoint] = pastKeys.enumerated().map { offset, keys in
             let day = calendar.date(
                 byAdding: .day,
                 value: -(pastKeys.count - offset),
-                to: now
-            ) ?? now
+                to: resolvedNow
+            ) ?? resolvedNow
             return DailyTrendPoint(
                 day: day,
                 keyPresses: keys,
@@ -50,7 +71,10 @@ struct InsightEngineTests {
             today: today,
             pastDailyTrend: pastTrend,
             todayLongestFocus: todayFocus,
-            pastLongestFocusSeconds: pastFocusSeconds
+            pastLongestFocusSeconds: pastFocusSeconds,
+            heatmapCells: heatmapCells,
+            now: resolvedNow,
+            calendar: utcCalendar
         )
     }
 
@@ -282,6 +306,180 @@ struct InsightEngineTests {
     func singleAppEmpty() {
         let rule = SingleAppDominanceRule()
         let ctx = baselineContext(topApps: [])
+        #expect(rule.evaluate(context: ctx) == nil)
+    }
+
+    // MARK: - HourlyActivityAnomalyRule
+
+    /// Helper that builds the heatmap cells for a history of prior
+    /// days + a single today cell at the given hour. Only hour 10
+    /// is populated unless callers provide additional cells.
+    private func heatmap(
+        todayHour: Int = 10,
+        todayCount: Int,
+        pastDayCountsAtSameHour: [Int]
+    ) -> [HeatmapCell] {
+        var cells: [HeatmapCell] = [
+            HeatmapCell(dayOffset: 0, hour: todayHour, activityCount: todayCount)
+        ]
+        for (index, count) in pastDayCountsAtSameHour.enumerated() where count > 0 {
+            cells.append(
+                HeatmapCell(
+                    dayOffset: index + 1,
+                    hour: todayHour,
+                    activityCount: count
+                )
+            )
+        }
+        return cells
+    }
+
+    @Test("hourly — fires on the hour with largest magnitude deviation")
+    func hourlyFires() throws {
+        let rule = HourlyActivityAnomalyRule()
+        let ctx = baselineContext(
+            heatmapCells: heatmap(
+                todayHour: 10,
+                todayCount: 200,
+                pastDayCountsAtSameHour: [80, 90, 75, 85, 80]
+            ),
+            now: referenceNow
+        )
+        let insight = try #require(rule.evaluate(context: ctx))
+        guard case let .hourlyActivityAnomaly(hour, direction, percentOff, todayCount, medianCount) = insight.payload else {
+            Issue.record("wrong payload case")
+            return
+        }
+        #expect(hour == 10)
+        #expect(direction == .above)
+        #expect(todayCount == 200)
+        #expect(medianCount == 80)   // median of [75, 80, 80, 85, 90]
+        #expect(percentOff == 150)   // (200-80)/80 * 100 = 150
+    }
+
+    @Test("hourly — fires on the quieter direction too")
+    func hourlyFiresBelow() throws {
+        let rule = HourlyActivityAnomalyRule()
+        let ctx = baselineContext(
+            heatmapCells: heatmap(
+                todayHour: 9,
+                todayCount: 30,
+                pastDayCountsAtSameHour: [120, 110, 130, 115, 125]
+            ),
+            now: referenceNow
+        )
+        let insight = try #require(rule.evaluate(context: ctx))
+        guard case let .hourlyActivityAnomaly(_, direction, percentOff, _, medianCount) = insight.payload else {
+            Issue.record("wrong payload case")
+            return
+        }
+        #expect(direction == .below)
+        #expect(medianCount == 120)  // median of [110, 115, 120, 125, 130]
+        #expect(percentOff == 75)    // (120-30)/120 * 100 = 75
+    }
+
+    @Test("hourly — picks the biggest magnitude when multiple hours qualify")
+    func hourlyPicksBiggest() throws {
+        let rule = HourlyActivityAnomalyRule()
+        var cells: [HeatmapCell] = []
+        // Hour 9: +60% — qualifying but weaker.
+        cells.append(HeatmapCell(dayOffset: 0, hour: 9, activityCount: 160))
+        for d in 1...5 {
+            cells.append(HeatmapCell(dayOffset: d, hour: 9, activityCount: 100))
+        }
+        // Hour 13: +200% — the clear winner.
+        cells.append(HeatmapCell(dayOffset: 0, hour: 13, activityCount: 300))
+        for d in 1...5 {
+            cells.append(HeatmapCell(dayOffset: d, hour: 13, activityCount: 100))
+        }
+        let ctx = baselineContext(heatmapCells: cells, now: referenceNow)
+        let insight = try #require(rule.evaluate(context: ctx))
+        guard case let .hourlyActivityAnomaly(hour, _, percentOff, _, _) = insight.payload else {
+            Issue.record("wrong payload case")
+            return
+        }
+        #expect(hour == 13)
+        #expect(percentOff == 200)
+    }
+
+    @Test("hourly — silent on hour not yet completed")
+    func hourlyIgnoresIncompleteHour() {
+        // currentHour = 14; hour 14 is in progress → rule must skip it.
+        let rule = HourlyActivityAnomalyRule()
+        let cells: [HeatmapCell] = [
+            HeatmapCell(dayOffset: 0, hour: 14, activityCount: 500)
+        ] + (1...5).map {
+            HeatmapCell(dayOffset: $0, hour: 14, activityCount: 100)
+        }
+        let ctx = baselineContext(heatmapCells: cells, now: referenceNow)
+        #expect(rule.evaluate(context: ctx) == nil)
+    }
+
+    @Test("hourly — silent when history too sparse")
+    func hourlyInsufficientHistory() {
+        let rule = HourlyActivityAnomalyRule() // minimumHistoryDays default 3
+        let cells: [HeatmapCell] = [
+            HeatmapCell(dayOffset: 0, hour: 10, activityCount: 200),
+            HeatmapCell(dayOffset: 1, hour: 10, activityCount: 100),
+            HeatmapCell(dayOffset: 2, hour: 10, activityCount: 100)
+            // only 2 prior days — below floor
+        ]
+        let ctx = baselineContext(heatmapCells: cells, now: referenceNow)
+        #expect(rule.evaluate(context: ctx) == nil)
+    }
+
+    @Test("hourly — silent when same-hour median is below medianFloor")
+    func hourlyMedianFloor() {
+        let rule = HourlyActivityAnomalyRule() // medianFloor default 30
+        let cells: [HeatmapCell] = [
+            HeatmapCell(dayOffset: 0, hour: 10, activityCount: 300)
+        ] + (1...5).map {
+            HeatmapCell(dayOffset: $0, hour: 10, activityCount: 10) // median 10 < 30
+        }
+        let ctx = baselineContext(heatmapCells: cells, now: referenceNow)
+        #expect(rule.evaluate(context: ctx) == nil)
+    }
+
+    @Test("hourly — silent when today has no cell (Pulse may be off)")
+    func hourlyTodayMissing() {
+        let rule = HourlyActivityAnomalyRule()
+        let cells: [HeatmapCell] = (1...5).map {
+            HeatmapCell(dayOffset: $0, hour: 10, activityCount: 100)
+        }
+        // Today has no hour-10 cell at all.
+        let ctx = baselineContext(heatmapCells: cells, now: referenceNow)
+        #expect(rule.evaluate(context: ctx) == nil)
+    }
+
+    @Test("hourly — silent at midnight when no hours have completed")
+    func hourlyEarlyMorning() {
+        let rule = HourlyActivityAnomalyRule()
+        // 00:30 — currentHour = 0; no completed hours yet.
+        var components = DateComponents()
+        components.year = 2026; components.month = 4; components.day = 19
+        components.hour = 0; components.minute = 30
+        components.timeZone = TimeZone(identifier: "UTC")
+        let midnight30 = utcCalendar.date(from: components)!
+        let ctx = baselineContext(
+            heatmapCells: heatmap(
+                todayHour: 10, // irrelevant — no hour < 0
+                todayCount: 200,
+                pastDayCountsAtSameHour: [80, 90, 75, 85, 80]
+            ),
+            now: midnight30
+        )
+        #expect(rule.evaluate(context: ctx) == nil)
+    }
+
+    @Test("hourly — within band produces no insight")
+    func hourlyWithinBand() {
+        let rule = HourlyActivityAnomalyRule() // thresholdPercent 50
+        let cells: [HeatmapCell] = [
+            HeatmapCell(dayOffset: 0, hour: 10, activityCount: 90) // 12.5% above median 80
+        ] + (1...5).map {
+            HeatmapCell(dayOffset: $0, hour: 10, activityCount: 80)
+        }
+        let ctx = baselineContext(heatmapCells: cells, now: referenceNow)
         #expect(rule.evaluate(context: ctx) == nil)
     }
 
