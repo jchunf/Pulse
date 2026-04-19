@@ -597,12 +597,14 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var longestFocus: FocusSegment?
     @Published private(set) var sessionPosture: SessionPosture = .empty
     @Published private(set) var goalProgress: [GoalProgress] = []
+    @Published private(set) var insights: [Insight] = []
     @Published private(set) var lastRefreshAt: Date?
     @Published private(set) var errorMessage: String?
     @Published private(set) var recentAchievement: LandmarkAchievement?
 
     private let store: EventStore?
     private let goalsStore: GoalsStore
+    private let insightEngine = InsightEngine()
     private var refreshTask: Task<Void, Never>?
 
     /// Default heatmap window (in days). The user can override via the
@@ -678,6 +680,26 @@ final class DashboardModel: ObservableObject {
                 longestFocus: focus,
                 appSwitchesToday: switches
             )
+            // A27 — run the cross-metric rule engine. The past-days
+            // longest-focus query is one extra DB hit per prior day;
+            // `try?` so a single-day failure just reduces the history
+            // the deep-focus rule sees rather than blanking the whole
+            // insights row.
+            let calendar = Calendar.current
+            let pastLongestFocus: [Int] = (1...(Self.trendDays - 1)).compactMap { offset in
+                guard let day = calendar.date(byAdding: .day, value: -offset, to: dayStart),
+                      let segment = try? store.longestFocusSegment(on: day, now: now)
+                else {
+                    return nil
+                }
+                return segment.durationSeconds
+            }
+            let insightContext = InsightContext(
+                today: summary,
+                pastDailyTrend: Array(trend.dropLast()),
+                todayLongestFocus: focus,
+                pastLongestFocusSeconds: pastLongestFocus
+            )
             self.summary = summary
             self.heatmapCells = heatmap
             self.heatmapDays = days
@@ -685,6 +707,7 @@ final class DashboardModel: ObservableObject {
             self.longestFocus = focus
             self.sessionPosture = posture
             self.goalProgress = progress
+            self.insights = insightEngine.evaluate(context: insightContext)
             self.lastRefreshAt = now
             self.errorMessage = nil
             updateAchievementIfNeeded(
@@ -986,6 +1009,14 @@ struct DashboardView: View {
                         GoalsCard(progress: model.goalProgress)
                     }
                     todayPulseSection(summary: summary)
+
+                    // ── Section 1b — Insights (A27) ──
+                    // Rendered inline only when a rule actually fired;
+                    // an "everything is normal" tile would add noise
+                    // for no payoff.
+                    if !model.insights.isEmpty {
+                        InsightsCard(insights: model.insights)
+                    }
 
                     // ── Section 2 — Rhythm (trends across the week) ──
                     DashboardSectionHeader(titleKey: "Rhythm")
@@ -1944,6 +1975,170 @@ struct DiagnosticsCard: View {
             snapshot.rollupStamps.idleEventsToMin,
             snapshot.rollupStamps.purgeExpired
         ].compactMap { $0 }.max()
+    }
+}
+
+/// Dashboard card for A27 cross-metric insights. Renders up to three
+/// rule-fired observations, each as an icon + headline + body row.
+/// Only shown when `insights` is non-empty; the empty state is the
+/// absence of the card itself (avoids "nothing interesting today"
+/// filler that would compete with real signal elsewhere on the
+/// Dashboard).
+///
+/// Localization follows the same pattern as `DashboardModel`'s
+/// formatted strings: `NSLocalizedString` + `String.localizedStringWithFormat`
+/// with positional arguments, so the String Catalog can flip
+/// interpolation order per language.
+struct InsightsCard: View {
+
+    let insights: [Insight]
+
+    /// Copy the Dashboard-wide cache so a fresh InsightsCard on a
+    /// re-render doesn't re-load every bundle's display name from
+    /// `NSWorkspace`.
+    private static let displayNameCache = BundleDisplayNameCache()
+
+    /// At most three rows — past that the card becomes a wall of
+    /// text and the first-glance value of the Dashboard suffers.
+    private static let visibleLimit = 3
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(PulseDesign.coral)
+                Text("Today's insights", bundle: .module)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(Array(insights.prefix(Self.visibleLimit))) { insight in
+                    row(for: insight)
+                }
+            }
+        }
+        .pulseFeaturedCard()
+    }
+
+    @ViewBuilder
+    private func row(for insight: Insight) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon(for: insight))
+                .foregroundStyle(accent(for: insight.kind))
+                .font(.system(size: 15, weight: .medium))
+                .frame(width: 22, alignment: .center)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(verbatim: headline(for: insight.payload))
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.primary)
+                Text(verbatim: body(for: insight.payload))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    // MARK: - Presentation helpers
+
+    private func icon(for insight: Insight) -> String {
+        switch insight.payload {
+        case .activityAnomaly(.above, _, _, _): "arrow.up.forward.circle"
+        case .activityAnomaly(.below, _, _, _): "arrow.down.forward.circle"
+        case .deepFocusStandout: "waveform.path.ecg"
+        case .singleAppDominance: "circle.grid.cross"
+        }
+    }
+
+    private func accent(for kind: Insight.Kind) -> Color {
+        switch kind {
+        case .celebratory: PulseDesign.coral
+        case .curious: PulseDesign.coral.opacity(0.8)
+        case .neutral: .secondary
+        }
+    }
+
+    private func headline(for payload: InsightPayload) -> String {
+        switch payload {
+        case let .activityAnomaly(direction, percentOff, _, _):
+            switch direction {
+            case .above:
+                return String.localizedStringWithFormat(
+                    NSLocalizedString(
+                        "Today is %lld%% busier than usual",
+                        bundle: .module,
+                        comment: "Insight headline — activity anomaly, above baseline"
+                    ),
+                    Int64(percentOff)
+                )
+            case .below:
+                return String.localizedStringWithFormat(
+                    NSLocalizedString(
+                        "Today is %lld%% quieter than usual",
+                        bundle: .module,
+                        comment: "Insight headline — activity anomaly, below baseline"
+                    ),
+                    Int64(percentOff)
+                )
+            }
+        case .deepFocusStandout:
+            return String(
+                localized: "Biggest focus stretch this week",
+                bundle: .module,
+                comment: "Insight headline — today's longest focus beats the weekly median"
+            )
+        case let .singleAppDominance(bundleId, _, _):
+            let app = Self.displayNameCache.name(for: bundleId)
+            return String.localizedStringWithFormat(
+                NSLocalizedString(
+                    "Focused day in %@",
+                    bundle: .module,
+                    comment: "Insight headline — one app dominated today; %@ is display name"
+                ),
+                app
+            )
+        }
+    }
+
+    private func body(for payload: InsightPayload) -> String {
+        switch payload {
+        case let .activityAnomaly(_, _, todayKeys, medianKeys):
+            return String.localizedStringWithFormat(
+                NSLocalizedString(
+                    "Typical day: about %lld key presses. Today: %lld.",
+                    bundle: .module,
+                    comment: "Insight body — activity anomaly comparison numbers"
+                ),
+                Int64(medianKeys),
+                Int64(todayKeys)
+            )
+        case let .deepFocusStandout(todaySec, _, bundleId, percentAbove):
+            let app = Self.displayNameCache.name(for: bundleId)
+            let duration = PulseFormat.duration(seconds: todaySec)
+            return String.localizedStringWithFormat(
+                NSLocalizedString(
+                    "%@ in %@ — %lld%% longer than your weekly median.",
+                    bundle: .module,
+                    comment: "Insight body — deep focus standout; duration, app, percent"
+                ),
+                duration,
+                app,
+                Int64(percentAbove)
+            )
+        case let .singleAppDominance(bundleId, fraction, seconds):
+            let app = Self.displayNameCache.name(for: bundleId)
+            let duration = PulseFormat.duration(seconds: seconds)
+            let percent = Int((fraction * 100).rounded())
+            return String.localizedStringWithFormat(
+                NSLocalizedString(
+                    "%@ accounted for %lld%% of your active time (%@).",
+                    bundle: .module,
+                    comment: "Insight body — single app dominance; app, percent, duration"
+                ),
+                app,
+                Int64(percent),
+                duration
+            )
+        }
     }
 }
 

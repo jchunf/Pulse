@@ -3281,6 +3281,142 @@
           }
         }
       }
+    },
+    "Biggest focus stretch this week": {
+      "comment": "A27 InsightsCard — headline for the deep-focus-standout rule.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Biggest focus stretch this week"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本周最长专注片段"
+          }
+        }
+      }
+    },
+    "Focused day in %@": {
+      "comment": "A27 InsightsCard — headline for single-app-dominance rule. %@ is the app display name.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Focused day in %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日主要在 %1$@"
+          }
+        }
+      }
+    },
+    "Today is %lld%% busier than usual": {
+      "comment": "A27 InsightsCard — activity anomaly, above baseline. %lld is the percent delta.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today is %1$lld%% busier than usual"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天比往常忙 %1$lld%%"
+          }
+        }
+      }
+    },
+    "Today is %lld%% quieter than usual": {
+      "comment": "A27 InsightsCard — activity anomaly, below baseline. %lld is the percent delta.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today is %1$lld%% quieter than usual"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天比往常安静 %1$lld%%"
+          }
+        }
+      }
+    },
+    "Today's insights": {
+      "comment": "A27 InsightsCard — card title.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today's insights"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日洞察"
+          }
+        }
+      }
+    },
+    "Typical day: about %lld key presses. Today: %lld.": {
+      "comment": "A27 InsightsCard — activity anomaly body. Args: median keys, today keys.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Typical day: about %1$lld key presses. Today: %2$lld."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "平常约 %1$lld 次按键，今天 %2$lld 次。"
+          }
+        }
+      }
+    },
+    "%@ accounted for %lld%% of your active time (%@).": {
+      "comment": "A27 InsightsCard — single-app dominance body. Args: app name, percent, duration string.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ accounted for %2$lld%% of your active time (%3$@)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 占了活跃时间的 %2$lld%%（%3$@）。"
+          }
+        }
+      }
+    },
+    "%@ in %@ — %lld%% longer than your weekly median.": {
+      "comment": "A27 InsightsCard — deep-focus standout body. Args: duration string, app name, percent above median.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ in %2$@ — %3$lld%% longer than your weekly median."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 %2$@ 里 %1$@，比过去一周中位数长 %3$lld%%。"
+          }
+        }
+      }
     }
   }
 }
