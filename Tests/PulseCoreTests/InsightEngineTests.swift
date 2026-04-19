@@ -80,9 +80,9 @@ struct InsightEngineTests {
         }
         #expect(direction == .above)
         #expect(todayKeys == 8_000)
-        #expect(medianKeys == 5_050) // even-count median of 6 sorted integers
-        // (8000-5050)/5050 ≈ 58.4%
-        #expect(percentOff == 58)
+        #expect(medianKeys == 5_025) // even-count median: (5000+5050)/2
+        // (8000-5025)/5025 ≈ 59.2%
+        #expect(percentOff == 59)
     }
 
     @Test("activity-anomaly — fires below threshold, direction=below")
