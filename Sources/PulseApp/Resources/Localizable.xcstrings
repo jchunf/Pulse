@@ -3655,6 +3655,57 @@
           }
         }
       }
+    },
+    "Rests today": {
+      "comment": "F-26 RestCard — card title.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rests today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日休息"
+          }
+        }
+      }
+    },
+    "Count": {
+      "comment": "F-26 RestCard — label above the count stat.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Count"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次数"
+          }
+        }
+      }
+    },
+    "Total": {
+      "comment": "F-26 RestCard — label above the total-duration stat.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "总时长"
+          }
+        }
+      }
     }
   }
 }
