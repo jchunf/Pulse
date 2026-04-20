@@ -3944,6 +3944,40 @@
           }
         }
       }
+    },
+    "Check for updates…": {
+      "comment": "Updater menu item / Settings button — manual Sparkle check.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check for updates…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查更新…"
+          }
+        }
+      }
+    },
+    "Update checks are always manual. Pulse never pings GitHub on its own — see docs/05-privacy.md.": {
+      "comment": "Settings About section footer — reinforces the user-initiated-only update promise.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update checks are always manual. Pulse never pings GitHub on its own — see docs/05-privacy.md."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查更新永远是你手动点的。Pulse 不会自动联网 — 参见 docs/05-privacy.md。"
+          }
+        }
+      }
     }
   }
 }

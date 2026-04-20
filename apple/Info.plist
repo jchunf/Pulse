@@ -37,5 +37,22 @@
     <true/>
     <key>NSHumanReadableCopyright</key>
     <string>Pulse is a local-first macOS self-tracking app. Data stays on your Mac.</string>
+    <!-- Sparkle update configuration. All three "automatic" flags are
+         explicitly false to match the docs/05-privacy.md §七 promise
+         that update checks are user-initiated only. The feed URL is
+         populated once the CI pipeline in PR β starts publishing
+         appcast.xml alongside the release .zip. SUPublicEDKey is a
+         placeholder in PR α and gets swapped for the real key when
+         PR β lands. -->
+    <key>SUFeedURL</key>
+    <string>https://github.com/jchunf/Pulse/releases/latest/download/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>__SPARKLE_PUBLIC_ED_KEY__</string>
+    <key>SUEnableAutomaticChecks</key>
+    <false/>
+    <key>SUAllowsAutomaticUpdates</key>
+    <false/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>0</integer>
 </dict>
 </plist>

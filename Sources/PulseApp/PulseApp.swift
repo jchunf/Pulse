@@ -22,7 +22,8 @@ struct PulseApp: App {
                 onShowBriefing: { appDelegate.requestShowBriefing() },
                 onGenerateReport: { appDelegate.generateWeeklyReport() },
                 onGenerateReportPDF: { appDelegate.generateWeeklyReportPDF() },
-                onExportData: { appDelegate.exportData() }
+                onExportData: { appDelegate.exportData() },
+                onCheckForUpdates: { appDelegate.updateController.checkForUpdates() }
             )
         } label: {
             // Use a different SF Symbol when collection is paused or
@@ -75,7 +76,8 @@ struct PulseApp: App {
                 onOpenPrivacyAudit: { appDelegate.requestShowPrivacyAudit() },
                 onPurgeRange: { start, end in
                     try appDelegate.purgeRange(start: start, end: end)
-                }
+                },
+                onCheckForUpdates: { appDelegate.updateController.checkForUpdates() }
             )
         }
     }
@@ -144,6 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let onboardingModel: OnboardingModel
     let anomalyMonitor: AnomalyMonitor
     let goalsStore: GoalsStore
+    let updateController: UpdateController
 
     /// Passthrough channel the MenuBarLabel listens on to open the
     /// briefing window. AppDelegate fires this on first-wake-of-day and
@@ -206,6 +209,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             errorMessage: dbResult.errorMessage
         )
         self.goalsStore = GoalsStore()
+        self.updateController = UpdateController()
         self.dashboardModel = DashboardModel(
             store: dbResult.database.map { EventStore(database: $0) },
             goalsStore: self.goalsStore
@@ -915,6 +919,7 @@ struct HealthMenuView: View {
     let onGenerateReport: () -> Void
     let onGenerateReportPDF: () -> Void
     let onExportData: () -> Void
+    let onCheckForUpdates: () -> Void
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -992,6 +997,11 @@ struct HealthMenuView: View {
                     .buttonStyle(.link)
                     Button(action: onExportData) {
                         Text("Export data…", bundle: .module)
+                            .font(.footnote)
+                    }
+                    .buttonStyle(.link)
+                    Button(action: onCheckForUpdates) {
+                        Text("Check for updates…", bundle: .module)
                             .font(.footnote)
                     }
                     .buttonStyle(.link)
@@ -3150,6 +3160,7 @@ struct SettingsView: View {
     @ObservedObject var goalsStore: GoalsStore
     let onOpenPrivacyAudit: () -> Void
     let onPurgeRange: (Date, Date) throws -> RangePurgeResult
+    let onCheckForUpdates: () -> Void
 
     @State private var isPresentingPurgeSheet = false
 
@@ -3239,8 +3250,15 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
+                Button(action: onCheckForUpdates) {
+                    Text("Check for updates…", bundle: .module)
+                }
             } header: {
                 Text("About", bundle: .module)
+            } footer: {
+                Text("Update checks are always manual. Pulse never pings GitHub on its own — see docs/05-privacy.md.", bundle: .module)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
