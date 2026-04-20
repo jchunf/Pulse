@@ -698,7 +698,10 @@ final class DashboardModel: ObservableObject {
                 today: summary,
                 pastDailyTrend: Array(trend.dropLast()),
                 todayLongestFocus: focus,
-                pastLongestFocusSeconds: pastLongestFocus
+                pastLongestFocusSeconds: pastLongestFocus,
+                heatmapCells: heatmap,
+                now: now,
+                calendar: calendar
             )
             self.summary = summary
             self.heatmapCells = heatmap
@@ -2046,6 +2049,7 @@ struct InsightsCard: View {
         case .activityAnomaly(.below, _, _, _): "arrow.down.forward.circle"
         case .deepFocusStandout: "waveform.path.ecg"
         case .singleAppDominance: "circle.grid.cross"
+        case .hourlyActivityAnomaly: "clock.badge.exclamationmark"
         }
     }
 
@@ -2096,6 +2100,30 @@ struct InsightsCard: View {
                 ),
                 app
             )
+        case let .hourlyActivityAnomaly(hour, direction, percentOff, _, _):
+            let label = String(format: "%02d:00", hour)
+            switch direction {
+            case .above:
+                return String.localizedStringWithFormat(
+                    NSLocalizedString(
+                        "Your %@ hour was %lld%% busier than usual",
+                        bundle: .module,
+                        comment: "Insight headline — hourly anomaly above baseline. %@ is HH:00, %lld is percent."
+                    ),
+                    label,
+                    Int64(percentOff)
+                )
+            case .below:
+                return String.localizedStringWithFormat(
+                    NSLocalizedString(
+                        "Your %@ hour was %lld%% quieter than usual",
+                        bundle: .module,
+                        comment: "Insight headline — hourly anomaly below baseline."
+                    ),
+                    label,
+                    Int64(percentOff)
+                )
+            }
         }
     }
 
@@ -2137,6 +2165,18 @@ struct InsightsCard: View {
                 app,
                 Int64(percent),
                 duration
+            )
+        case let .hourlyActivityAnomaly(hour, _, _, todayCount, medianCount):
+            let label = String(format: "%02d:00", hour)
+            return String.localizedStringWithFormat(
+                NSLocalizedString(
+                    "Usually about %lld events at %@. Today: %lld.",
+                    bundle: .module,
+                    comment: "Insight body — hourly anomaly comparison. %lld median, %@ HH:00, %lld today."
+                ),
+                Int64(medianCount),
+                label,
+                Int64(todayCount)
             )
         }
     }

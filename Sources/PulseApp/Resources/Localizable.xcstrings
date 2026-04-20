@@ -3316,6 +3316,57 @@
         }
       }
     },
+    "Your %@ hour was %lld%% busier than usual": {
+      "comment": "A28 InsightsCard — hourly anomaly headline, above baseline. %@ is HH:00, %lld is percent.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your %1$@ hour was %2$lld%% busier than usual"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你 %1$@ 这个小时比平时忙 %2$lld%%"
+          }
+        }
+      }
+    },
+    "Your %@ hour was %lld%% quieter than usual": {
+      "comment": "A28 InsightsCard — hourly anomaly headline, below baseline.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your %1$@ hour was %2$lld%% quieter than usual"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你 %1$@ 这个小时比平时安静 %2$lld%%"
+          }
+        }
+      }
+    },
+    "Usually about %lld events at %@. Today: %lld.": {
+      "comment": "A28 InsightsCard — hourly anomaly body. %lld median events, %@ HH:00, %lld today events.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usually about %1$lld events at %2$@. Today: %3$lld."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$@ 时段平常约 %1$lld 次活动，今天 %3$lld 次。"
+          }
+        }
+      }
+    },
     "Today is %lld%% busier than usual": {
       "comment": "A27 InsightsCard — activity anomaly, above baseline. %lld is the percent delta.",
       "localizations": {

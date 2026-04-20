@@ -23,26 +23,37 @@ public protocol InsightRule: Sendable {
 /// Dashboard refresh by the caller that has database access.
 /// `pastDailyTrend` excludes today (the last slot in the queried
 /// window). `pastLongestFocusSeconds` is one integer per prior day
-/// in the window, same exclusion. Anything derivable from these
-/// fields should stay inside the rule; anything requiring a fresh
-/// DB query should land as a new field here so rules stay pure.
+/// in the window, same exclusion. `heatmapCells` is the raw output
+/// of `EventStore.hourlyHeatmap(endingAt:days:)` so hourly rules
+/// can carve it up per their own needs. Anything derivable from
+/// these fields should stay inside the rule; anything requiring a
+/// fresh DB query should land as a new field here so rules stay pure.
 public struct InsightContext: Sendable {
 
     public let today: TodaySummary
     public let pastDailyTrend: [DailyTrendPoint]
     public let todayLongestFocus: FocusSegment?
     public let pastLongestFocusSeconds: [Int]
+    public let heatmapCells: [HeatmapCell]
+    public let now: Date
+    public let calendar: Calendar
 
     public init(
         today: TodaySummary,
         pastDailyTrend: [DailyTrendPoint],
         todayLongestFocus: FocusSegment?,
-        pastLongestFocusSeconds: [Int]
+        pastLongestFocusSeconds: [Int],
+        heatmapCells: [HeatmapCell] = [],
+        now: Date = Date(),
+        calendar: Calendar = .current
     ) {
         self.today = today
         self.pastDailyTrend = pastDailyTrend
         self.todayLongestFocus = todayLongestFocus
         self.pastLongestFocusSeconds = pastLongestFocusSeconds
+        self.heatmapCells = heatmapCells
+        self.now = now
+        self.calendar = calendar
     }
 }
 

@@ -78,6 +78,20 @@ public enum InsightPayload: Sendable, Equatable {
         secondsInApp: Int
     )
 
+    /// A single **completed** hour of today diverges from the median
+    /// of that same hour-of-day over prior days by ≥ the rule's
+    /// threshold. `hour` is 0–23 local time; UI formats as `HH:00`.
+    /// The engine emits at most one of these per refresh — whichever
+    /// hour has the largest magnitude deviation — so the card stays
+    /// a glance, not a list.
+    case hourlyActivityAnomaly(
+        hour: Int,
+        direction: Direction,
+        percentOff: Int,
+        todayCount: Int,
+        medianCount: Int
+    )
+
     public enum Direction: Sendable, Equatable {
         case above
         case below
