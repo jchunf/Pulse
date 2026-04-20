@@ -602,6 +602,7 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var lidOpensToday: Int = 0
     @Published private(set) var lidOpensTrend: [Int] = []
     @Published private(set) var restToday: RestDay = RestDay(segments: [])
+    @Published private(set) var timelineToday: DayTimeline?
     @Published private(set) var lastRefreshAt: Date?
     @Published private(set) var errorMessage: String?
     @Published private(set) var recentAchievement: LandmarkAchievement?
@@ -686,6 +687,7 @@ final class DashboardModel: ObservableObject {
             let lidToday = try store.dailyLidOpens(on: dayStart, capUntil: now)
             let lidTrend = try store.lidOpensTrend(endingAt: now, days: Self.trendDays)
             let restDay = try store.restSegments(on: dayStart, capUntil: now)
+            let timeline = try store.dayTimeline(on: dayStart, capUntil: now)
             let progress = GoalEvaluator.evaluate(
                 goals: goalsStore.enabledGoals(),
                 summary: summary,
@@ -728,6 +730,7 @@ final class DashboardModel: ObservableObject {
             self.lidOpensToday = lidToday
             self.lidOpensTrend = lidTrend
             self.restToday = restDay
+            self.timelineToday = timeline
             self.lastRefreshAt = now
             self.errorMessage = nil
             updateAchievementIfNeeded(
@@ -1062,6 +1065,7 @@ struct DashboardView: View {
 
                     // ── Section 4 — Apps ──
                     DashboardSectionHeader(titleKey: "Apps")
+                    DayTimelineCard(timeline: model.timelineToday)
                     AppRankingChart(rows: summary.topApps)
 
                     // ── Section 5 — Health (diagnostics, kept last) ──
@@ -2385,6 +2389,133 @@ struct UsagePostureCard: View {
         } else {
             return "Checker mode — mostly quick dips today, not long-form focus."
         }
+    }
+}
+
+/// F-10 — a full-day horizontal band showing which app had focus at
+/// each moment. The bar spans 24h (not the partial-day slice) so the
+/// user can visually place "now" against the whole day. The trailing
+/// `dayEnd → midnight` portion stays visually empty — a stretched
+/// 15h bar on a 15h-of-today timeline would be misleading.
+///
+/// Bundle colors come from a deterministic palette lookup
+/// (`DayTimelineCard.color(for:)`) so the same app stays the same
+/// color across refresh ticks, locales, and process restarts.
+struct DayTimelineCard: View {
+
+    let timeline: DayTimeline?
+
+    private static let displayNameCache = BundleDisplayNameCache()
+    private static let barHeight: CGFloat = 32
+    private static let hourLabels = [0, 6, 12, 18]
+
+    private static let palette: [Color] = [
+        PulseDesign.sage,
+        PulseDesign.coral,
+        PulseDesign.amber,
+        .blue,
+        .purple,
+        .teal,
+        .indigo,
+        .pink
+    ]
+
+    var body: some View {
+        if let timeline, !timeline.isEmpty {
+            populated(timeline)
+        } else {
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func populated(_ timeline: DayTimeline) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "clock")
+                    .foregroundStyle(PulseDesign.sage)
+                    .opacity(0.85)
+                Text("Today's timeline", bundle: .module)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            bar(timeline)
+                .frame(height: Self.barHeight)
+            axis
+            legend(timeline)
+        }
+        .pulseFeaturedCard()
+    }
+
+    @ViewBuilder
+    private func bar(_ timeline: DayTimeline) -> some View {
+        GeometryReader { proxy in
+            let totalWidth = proxy.size.width
+            let daySpan: TimeInterval = 86_400
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.secondary.opacity(0.08))
+                ForEach(Array(timeline.segments.enumerated()), id: \.offset) { _, segment in
+                    let offset = segment.startedAt.timeIntervalSince(timeline.dayStart)
+                    let width = max(1, CGFloat(Double(segment.durationSeconds) / daySpan) * totalWidth)
+                    Self.color(for: segment.bundleId)
+                        .opacity(0.85)
+                        .frame(width: width)
+                        .offset(x: CGFloat(offset / daySpan) * totalWidth)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+    }
+
+    @ViewBuilder
+    private var axis: some View {
+        HStack(spacing: 0) {
+            ForEach(0..<24, id: \.self) { hour in
+                Text(Self.hourLabels.contains(hour) ? "\(hour)" : "")
+                    .font(.system(size: 9).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func legend(_ timeline: DayTimeline) -> some View {
+        let top = timeline.topBundles(limit: 3)
+        if !top.isEmpty {
+            HStack(spacing: 16) {
+                ForEach(Array(top.enumerated()), id: \.offset) { _, entry in
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(Self.color(for: entry.bundleId).opacity(0.85))
+                            .frame(width: 8, height: 8)
+                        Text(Self.displayNameCache.name(for: entry.bundleId))
+                            .font(.footnote)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        Text(PulseFormat.duration(seconds: entry.totalSeconds))
+                            .font(.footnote.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+            }
+            .padding(.top, 2)
+        }
+    }
+
+    // MARK: - Colour mapping
+
+    /// Deterministic palette pick — same bundle id always gets the
+    /// same color across refresh ticks, locale changes, and process
+    /// restarts. Avoids `String.hashValue` (per-process randomised
+    /// seed) and the ordering drift that would come with it.
+    static func color(for bundleId: String) -> Color {
+        var sum = 0
+        for scalar in bundleId.unicodeScalars {
+            sum &+= Int(scalar.value)
+        }
+        return palette[abs(sum) % palette.count]
     }
 }
 
