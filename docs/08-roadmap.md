@@ -97,15 +97,33 @@
 
 ### v1.1（MVP + 2 个月）
 
-重点：**更深的可视化 + 基础报告**
+重点：**更深的可视化 + 基础报告 + 跨指标 insight 引擎**
 
-- F-04 鼠标轨迹可视化（Metal 渲染）
-- F-06 周报/月报导出（PDF + PNG）
+已在 `main` 上落地、随 v1.1 tag 出（见 `CHANGELOG.md` 的
+`[Unreleased]`）：
+
+- A26 / A26f / A26g — Vital Pulse 视觉语言 + Dashboard 分区布局 +
+  真机三 bug 修复
+- A27 — 跨指标 insight 引擎（`ActivityAnomalyRule` /
+  `DeepFocusStandoutRule` / `SingleAppDominanceRule`），关闭评
+  审 §3.4
+
+v1.1 队列（按优先级，均在开发中或待开）：
+
+- A28+ 持续扩展 insight 规则（time-of-day、单 app 停留趋势等）
+- F-11 连续记录（GitHub 贡献图风格）—— 读侧查询，实现最便宜，优先起
 - F-10 每日时间带
-- F-11 连续记录（GitHub 贡献图风格）
 - F-26 空闲/休息统计
 - F-27 开合盖次数
 - F-47 时段数据清除
+- F-06 周报/月报导出（PDF + PNG）
+- F-04 鼠标轨迹可视化（Metal 渲染）—— 工程量最大，v1.1 末尾
+
+随时可从 `v1.0.x` 补丁流出的**独立线**：
+
+- Developer ID 签名 + `notarytool` + Sparkle appcast（`docs/07`）——
+  等 Apple Developer 账号注册完成；见 `CHANGELOG.md`
+  `[1.0.0-rc1]` 「正式推迟」说明。
 
 ### v1.2（+ 2 个月）
 

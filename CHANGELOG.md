@@ -10,6 +10,27 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ---
 
+## [Unreleased] — v1.1 in development
+
+v1.1 focuses on the cross-metric insight engine called out by review
+§3.4, Dashboard visual-language refresh, and the F-04 / F-06 /
+F-10 / F-11 / F-26 / F-27 / F-47 queue from
+`docs/08-roadmap.md` §四. Entries below have already merged onto
+`main` after the `1.0.0-rc1` cut and will ship with the v1.1 tag.
+
+### Dashboard & Narrative (A)
+
+- **A26** Vital Pulse visual language + Retina mileage fix. (#49)
+- **A26f** Dashboard layout refresh — above-the-fold hero row +
+  sectioned scroll. (#50)
+- **A26g** three real-Mac bug fixes: loginwindow focus, menu-bar red
+  dot, i18n leak. (#51)
+- **A27** cross-metric insight engine with three seed rules —
+  `ActivityAnomalyRule`, `DeepFocusStandoutRule`,
+  `SingleAppDominanceRule`. Closes review §3.4. (#52)
+
+---
+
 ## [1.0.0-rc1] — 2026-04-17
 
 First release-candidate tag. Feature scope closes the three v1.0 goals
@@ -24,7 +45,9 @@ narrative engine, goals layer); the §3.5 / §3.6 / §3.7 items
 - Review §5 "立刻" #2 — Developer ID signing, notarization, Sparkle
   appcast (`docs/07`). The `package` workflow currently produces an
   ad-hoc-signed `.app`, runnable on the maintainer's own Mac but not
-  distributable to a third party. Will land in a `1.0.0` retag after
+  distributable to a third party. **Formally deferred** — no longer
+  a blocker for the `v1.0.0` tag. Will land as a follow-up tag
+  (`v1.0.1` signed-distribution patch, or rolled into `v1.1`) once
   the maintainer's Apple Developer enrolment completes.
 
 ### Onboarding
