@@ -89,8 +89,16 @@
 - [ ] `TitleHasher` —— `min_app` 里的窗口标题默认应当是哈希后的；
       如果你在偏好里临时切换到明文模式（如果该开关已经暴露），明
       文应当**只出现在当前 session**。
-- [ ] 出站网络：在 Pulse 运行时跑 `lsof -i -nP | grep Pulse`。应
-      该是**零**连接（更新检查目前还没接，确认这个状态保持）。
+- [ ] 出站网络（闲置基线）：Pulse 运行着但**没点**菜单栏 /
+      Settings 里的 "Check for updates…"，`lsof -i -nP | grep Pulse`
+      应该是**零**连接。Sparkle 已经接入（PR #64 / PR β），但
+      `SUEnableAutomaticChecks=false` + 运行时防御层共同保证这条
+      不变（`docs/05-privacy.md` §七 承诺）。
+- [ ] 出站网络（检查更新）：手动点一次 "Check for updates…"，
+      `lsof` 应出现**仅一次**到 `github.com` 的 HTTPS 连接（取
+      appcast.xml + 新版本 zip）；检查对话框关闭后连接应即时断开。
+      Sparkle 系统画像关闭（`sendsSystemProfile=false`），请求头
+      里不应带 CPU / macOS 版本等 profile 参数。
 
 ## 5. 系统事件
 
