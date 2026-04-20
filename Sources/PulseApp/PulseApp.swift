@@ -21,6 +21,7 @@ struct PulseApp: App {
                 onResume: { appDelegate.resumeCollector() },
                 onShowBriefing: { appDelegate.requestShowBriefing() },
                 onGenerateReport: { appDelegate.generateWeeklyReport() },
+                onGenerateReportPDF: { appDelegate.generateWeeklyReportPDF() },
                 onExportData: { appDelegate.exportData() }
             )
         } label: {
@@ -400,6 +401,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } catch {
                 #if DEBUG
                 print("weekly report failed: \(error)")
+                #endif
+            }
+        }
+    }
+
+    /// F-06 — same weekly report as `generateWeeklyReport()` but
+    /// rendered through `WKWebView.pdf(...)` into a PDF file. The
+    /// HTML pipeline is reused as-is; PDF is strictly a presentation
+    /// layer on top. Reveals the resulting file in Finder on success.
+    ///
+    /// `WKWebView` is main-actor-bound and `makePDF` suspends while
+    /// WebKit completes its load, so the outer `Task` inherits
+    /// AppDelegate's `@MainActor` isolation rather than running on a
+    /// detached executor. The DB read (`weeklyReport`) is a small
+    /// handful of rows — cheap enough on main.
+    func generateWeeklyReportPDF() {
+        guard let database else { return }
+        let store = EventStore(database: database)
+        let endingAt = Date()
+        Task {
+            do {
+                let report = try store.weeklyReport(endingAt: endingAt)
+                let html = WeeklyReportRenderer.renderLocalized(report: report)
+                let pdfData = try await WeeklyReportPDFRenderer.makePDF(html: html)
+                let url = try WeeklyReportPDFRenderer.writeToDisk(
+                    pdfData: pdfData,
+                    endingAt: endingAt
+                )
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+            } catch {
+                #if DEBUG
+                print("weekly PDF report failed: \(error)")
                 #endif
             }
         }
@@ -880,6 +913,7 @@ struct HealthMenuView: View {
     let onResume: () -> Void
     let onShowBriefing: () -> Void
     let onGenerateReport: () -> Void
+    let onGenerateReportPDF: () -> Void
     let onExportData: () -> Void
     @Environment(\.openWindow) private var openWindow
 
@@ -948,6 +982,11 @@ struct HealthMenuView: View {
                     .buttonStyle(.link)
                     Button(action: onGenerateReport) {
                         Text("Generate weekly report", bundle: .module)
+                            .font(.footnote)
+                    }
+                    .buttonStyle(.link)
+                    Button(action: onGenerateReportPDF) {
+                        Text("Weekly PDF…", bundle: .module)
                             .font(.footnote)
                     }
                     .buttonStyle(.link)
