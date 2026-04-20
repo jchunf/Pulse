@@ -31,7 +31,12 @@ let package = Package(
         .executable(name: "PulseApp", targets: ["PulseApp"])
     ],
     dependencies: [
-        .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.0")
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.0"),
+        // Sparkle — in-app update checks with EdDSA verification.
+        // Pulled in for PulseApp only. Used strictly user-initiated
+        // (see `docs/05-privacy.md` §七), so the app does not make
+        // outbound calls unless the user clicks "Check for updates…".
+        .package(url: "https://github.com/sparkle-project/Sparkle.git", from: "2.6.0")
         // swift-snapshot-testing will return when the first UI
         // snapshot-based test actually lands (docs/10-testing-and-ci.md §二).
     ],
@@ -57,7 +62,8 @@ let package = Package(
             name: "PulseApp",
             dependencies: [
                 "PulseCore",
-                "PulsePlatform"
+                "PulsePlatform",
+                .product(name: "Sparkle", package: "Sparkle")
             ],
             resources: [
                 .process("Resources")
