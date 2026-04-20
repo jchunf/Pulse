@@ -3570,6 +3570,40 @@
           }
         }
       }
+    },
+    "Keep your %lld-day streak going": {
+      "comment": "A29c InsightsCard — streak-at-risk headline. %lld is the current streak in days.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep your %lld-day streak going"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保持你的 %lld 天连续记录"
+          }
+        }
+      }
+    },
+    "%lld active hours so far today — %lld more and today counts toward the streak.": {
+      "comment": "A29c InsightsCard — streak-at-risk body. First %lld is hours logged today, second is hours remaining to qualify.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld active hours so far today — %2$lld more and today counts toward the streak."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天已活跃 %1$lld 小时，再 %2$lld 小时就能计入连续记录。"
+          }
+        }
+      }
     }
   }
 }

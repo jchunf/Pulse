@@ -8,11 +8,15 @@ import Foundation
 /// describe the new boundary; add a rule → append a case to
 /// `InsightPayload` + a String Catalog entry + a test.
 public enum DefaultInsightRules {
-    /// Registration order drives UI order. Hourly comes first because
-    /// "your 14:00 was 60% quieter" is more actionable than the
-    /// day-level activity-anomaly signal the summary cards'
-    /// delta-vs-yesterday already conveys.
+    /// Registration order drives UI order. Streak-at-risk comes
+    /// first — when the user has a long streak hanging in the
+    /// balance, that is the single most actionable signal the card
+    /// can surface. Hourly anomaly follows because "your 14:00 was
+    /// 60% quieter" is specific and auditable. Deep-focus standout,
+    /// single-app dominance, and the day-level activity anomaly
+    /// round out the set, from most to least actionable.
     public static let all: [any InsightRule] = [
+        StreakAtRiskRule(),
         HourlyActivityAnomalyRule(),
         DeepFocusStandoutRule(),
         SingleAppDominanceRule(),
@@ -286,6 +290,79 @@ public struct SingleAppDominanceRule: InsightRule {
                 bundleId: top.bundleId,
                 fractionOfActive: fraction,
                 secondsInApp: top.secondsUsed
+            )
+        )
+    }
+}
+
+// MARK: - Streak at risk
+
+/// Fires when the user has a long continuity streak going into today
+/// **and** today hasn't yet crossed the qualifying threshold.
+/// Composes F-11 (`ContinuityStreak`) with the A27 insight engine —
+/// the card goes from passive grid to active nudge exactly on the
+/// days that matter, and stays quiet the rest of the time.
+///
+/// Silent cases (all intentional):
+/// - `InsightContext.continuity` is nil (caller didn't compute it).
+/// - `continuity.days` is empty (pre-rollup install).
+/// - Today already qualified — streak is safe, a nudge would be
+///   noise.
+/// - Today has 0 active hours — the user isn't at the Mac today, and
+///   the streak is effectively already broken; a "save your streak"
+///   nudge would arrive too late and tip over into guilt-trip
+///   territory (review §2.3 / §4 caution against).
+/// - Local hour is below `hourOfDayToFire` — it's still early, plenty
+///   of time to clear the bar naturally; surfacing the rule before
+///   mid-afternoon would be premature.
+/// - Streak through **yesterday** is shorter than `minimumStreakDays`
+///   — short streaks aren't worth a dedicated card slot.
+///
+/// Emits a single insight when all six guards clear. `currentStreak`
+/// carries the through-yesterday length so the UI can say "your
+/// N-day streak" without off-by-one confusion with
+/// `ContinuityStreak.currentStreak` (which zeros when today is unqualified).
+public struct StreakAtRiskRule: InsightRule {
+
+    public let id = "streak_at_risk"
+    public let minimumStreakDays: Int
+    public let activeHoursThreshold: Int
+    public let hourOfDayToFire: Int
+
+    public init(
+        minimumStreakDays: Int = 7,
+        activeHoursThreshold: Int = 4,
+        hourOfDayToFire: Int = 15
+    ) {
+        self.minimumStreakDays = minimumStreakDays
+        self.activeHoursThreshold = activeHoursThreshold
+        self.hourOfDayToFire = hourOfDayToFire
+    }
+
+    public func evaluate(context: InsightContext) -> Insight? {
+        guard let continuity = context.continuity,
+              let today = continuity.days.last,
+              !today.qualified,
+              today.activeHours > 0
+        else {
+            return nil
+        }
+
+        let currentHour = context.calendar.component(.hour, from: context.now)
+        guard currentHour >= hourOfDayToFire else { return nil }
+
+        let priorQualified = continuity.days.dropLast().map(\.qualified)
+        let (streakEndingYesterday, _) = EventStore.streakStatistics(Array(priorQualified))
+        guard streakEndingYesterday >= minimumStreakDays else { return nil }
+
+        let hoursToQualify = max(0, activeHoursThreshold - today.activeHours)
+        return Insight(
+            id: id,
+            kind: .celebratory,
+            payload: .streakAtRisk(
+                currentStreak: streakEndingYesterday,
+                activeHoursToday: today.activeHours,
+                hoursToQualify: hoursToQualify
             )
         )
     }
