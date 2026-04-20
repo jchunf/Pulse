@@ -111,26 +111,99 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+      # Sparkle appcast publishing is gated on "is this tag a stable
+      # final?" — `v1.0.0` yes, `v1.0.0-rc2` no. rc / beta builds still
+      # get a GitHub Release (tagged as pre-release) but no appcast.xml,
+      # so the Sparkle clients listed in `releases/latest/download/`
+      # only auto-update between stable finals. See PR #64 for the
+      # client-side wiring and the plan in /reviews for the two-PR
+      # rationale.
+      - name: Detect stable-final tag
+        id: channel
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "is_stable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_stable=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Sign update zip (EdDSA)
+        id: sign
+        if: steps.channel.outputs.is_stable == 'true'
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        # `sign_update` from Sparkle's release tarball prints the
+        # enclosure attribute string on stdout, e.g.
+        #   sparkle:edSignature="…" length="…"
+        # which we capture verbatim and hand to generate_appcast.sh.
+        # The private-key file is written to $RUNNER_TEMP (cleaned up
+        # at the end of the job) and `shred`-wiped on EXIT as defence
+        # in depth against a leaked transient filesystem.
+        run: |
+          if [[ -z "$SPARKLE_ED_PRIVATE_KEY" ]]; then
+            echo "::error::SPARKLE_ED_PRIVATE_KEY secret is not set. Generate an EdDSA keypair with Sparkle's generate_keys tool, store the private half as a repo secret, and paste the public half into apple/Info.plist's SUPublicEDKey." >&2
+            exit 1
+          fi
+          SPARKLE_VERSION="2.6.0"
+          tmp="$RUNNER_TEMP/sparkle"
+          mkdir -p "$tmp"
+          curl -sSL "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz" \
+            | tar -xJ -C "$tmp"
+          sign_tool="$tmp/bin/sign_update"
+          chmod +x "$sign_tool"
+          key_file="$RUNNER_TEMP/sparkle_ed_private_key"
+          umask 077
+          printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > "$key_file"
+          trap 'shred -u "$key_file" 2>/dev/null || rm -f "$key_file"' EXIT
+          attributes=$("$sign_tool" -f "$key_file" "${{ steps.zip.outputs.zip_path }}")
+          echo "signed: $attributes"
+          # Emit as output for the next step. The attributes string
+          # is a single line; safe to pass through $GITHUB_OUTPUT.
+          echo "attributes=$attributes" >> "$GITHUB_OUTPUT"
+
+      - name: Generate appcast.xml
+        if: steps.channel.outputs.is_stable == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD: ${{ steps.version.outputs.build }}
+          ZIP_NAME: ${{ steps.zip.outputs.zip_name }}
+          SIGN_ATTRIBUTES: ${{ steps.sign.outputs.attributes }}
+          REPO: ${{ github.repository }}
+        run: bash scripts/generate_appcast.sh > dist/appcast.xml
+
       - name: Create GitHub Release (tag only)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          prerelease: true
+          # Stable finals (v1.0.0 etc.) land as a non-prerelease so
+          # that `releases/latest/download/appcast.xml` resolves to
+          # them. rc / beta tags stay flagged as pre-release; since
+          # they skip the appcast generation step, their Release has
+          # no appcast.xml asset and so never wins the "latest" race.
+          prerelease: ${{ steps.channel.outputs.is_stable != 'true' }}
           generate_release_notes: true
+          fail_on_unmatched_files: false
           body: |
-            **Pre-release — unsigned (ad-hoc codesign only).**
+            **Distribution: ad-hoc codesigned (Developer ID pending).**
 
-            This bundle is not signed with a Developer ID and not
-            notarized by Apple. macOS will warn on first launch:
-            right-click the `.app` in Finder and choose Open → Open,
-            or run `xattr -dr com.apple.quarantine Pulse.app` first.
+            First install still needs the Gatekeeper dance: right-click
+            the `.app` in Finder → Open → Open, or run
+            `xattr -dr com.apple.quarantine Pulse.app` once. After that,
+            Pulse auto-updates through **Sparkle** on a manual
+            *Check for updates…* click — the bundle is EdDSA-signed so
+            the updater verifies every download before it replaces the
+            running app, and the replacement does not re-trigger
+            Gatekeeper or re-prompt for Input Monitoring / Accessibility.
 
-            Developer ID signing + notarization + Sparkle auto-update
-            are tracked as v1.0 blockers in `CHANGELOG.md` and
-            `docs/07-distribution.md`.
+            Developer ID signing + notarization (so the first launch
+            skips Gatekeeper too) are still deferred; see
+            `CHANGELOG.md` and `docs/07-distribution.md`.
 
-            See the auto-generated changelog below for merged PRs
-            since the previous tag.
+            Auto-generated changelog below — merged PRs since the
+            previous tag.
           files: |
             ${{ steps.zip.outputs.zip_path }}
             ${{ steps.zip.outputs.zip_path }}.sha256
+            dist/appcast.xml
