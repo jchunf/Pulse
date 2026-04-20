@@ -509,11 +509,16 @@ struct InsightEngineTests {
         #expect(engine.evaluate(context: baselineContext()).isEmpty)
     }
 
-    @Test("engine — defaults cover all three rules")
+    @Test("engine — defaults cover every registered rule in declared order")
     func engineDefaults() {
         let engine = InsightEngine()
         let ruleIds = engine.rules.map(\.id)
-        #expect(ruleIds == ["activity_anomaly", "deep_focus_standout", "single_app_dominance"])
+        #expect(ruleIds == [
+            "hourly_activity_anomaly",
+            "deep_focus_standout",
+            "single_app_dominance",
+            "activity_anomaly"
+        ])
     }
 
     // MARK: - Statistics helper
