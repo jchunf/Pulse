@@ -10,6 +10,46 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ---
 
+## [1.0.0-rc2] — 2026-04-20
+
+Second release candidate. Layers on top of `1.0.0-rc1` with the
+cross-metric insight engine called out by review §3.4 (the last
+review-flagged §3 row — review §3.4 was originally slotted for v1.2,
+pulled forward), the first time-of-day insight rule, the Vital Pulse
+visual-language pass, the above-the-fold Dashboard layout, and three
+bug fixes surfaced by post-rc1 real-Mac dogfooding.
+
+**Still knowingly out of scope** (carries over from rc1 §7):
+Developer ID signing + `notarytool` + Sparkle appcast
+(`docs/07-distribution.md`). **Formally deferred** — no longer a
+`v1.0.0` blocker. Ships as a `v1.0.1` signed-distribution patch, or
+folds into `v1.1`, once the maintainer's Apple Developer enrolment
+completes.
+
+### Dashboard & Narrative (A)
+
+- **A26** Vital Pulse visual language + Retina mileage fix. (#49)
+- **A26f** Dashboard layout — above-the-fold hero row + sectioned
+  scroll. (#50)
+- **A26g** three real-Mac bug fixes: loginwindow focus, menu-bar red
+  dot, i18n leak. (#51)
+
+### Insights engine — review §3.4
+
+- **A27** cross-metric insight engine with three seed rules —
+  `ActivityAnomalyRule` (today vs 7-day median, ±30%),
+  `DeepFocusStandoutRule` (today's longest focus ≥ 1.3× median),
+  `SingleAppDominanceRule` (one app > 50% of active time). Rule
+  thresholds exposed as `public let` constants per review §3.4's
+  "transparent, auditable, rule-based" bar. (#52)
+- **A28** `HourlyActivityAnomalyRule` — first **time-of-day** rule,
+  reuses `hourlyHeatmap` output so no new DB queries. Fires on the
+  completed hour with the largest magnitude deviation (≥ 50%) from
+  the same-hour median baseline over prior days; emits at most one
+  insight per refresh to keep the card a glance, not a list. (#53)
+
+---
+
 ## [1.0.0-rc1] — 2026-04-17
 
 First release-candidate tag. Feature scope closes the three v1.0 goals
@@ -24,7 +64,9 @@ narrative engine, goals layer); the §3.5 / §3.6 / §3.7 items
 - Review §5 "立刻" #2 — Developer ID signing, notarization, Sparkle
   appcast (`docs/07`). The `package` workflow currently produces an
   ad-hoc-signed `.app`, runnable on the maintainer's own Mac but not
-  distributable to a third party. Will land in a `1.0.0` retag after
+  distributable to a third party. **Formally deferred** — no longer
+  a blocker for the `v1.0.0` tag. Will land as a follow-up tag
+  (`v1.0.1` signed-distribution patch, or rolled into `v1.1`) once
   the maintainer's Apple Developer enrolment completes.
 
 ### Onboarding

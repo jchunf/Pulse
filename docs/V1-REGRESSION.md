@@ -110,28 +110,32 @@
 - [ ] 周报 HTML 使用的是它**渲染时**的 locale（不是当前 UI 的
       locale —— 这是有意为之的）。
 
-## 7. 已知未实现的 v1.0.0 tag 阻塞项
+## 7. 已正式推迟出 v1.0.0 的项
 
-这些**不是**回归，是从来没做过的事。列在这里是为了在它们 land 之
-前（或者 scope 被明确推到 v1.0.1）不要打 tag。
+这些**不是**回归，是从来没做过的事。原本曾被视作 v1.0.0 的阻塞
+项 —— 现在已**正式推迟**，**不再阻塞** `v1.0.0` tag。
 
-- [ ] ~~评审 §5 立刻 #1 —— `docs/06-onboarding-permissions.md` 的
+- [x] ~~评审 §5 立刻 #1 —— `docs/06-onboarding-permissions.md` 的
       欢迎屏 → 隐私承诺 checkbox → 引导 Input Monitoring 授权 →
       引导 Accessibility 授权。~~ ✅ A25 已 land（PR #45）。
-- [ ] 评审 §5 立刻 #2 —— Developer ID 签名、`notarytool` 上传、
-      Sparkle appcast。`Makefile` 当前没有 `sign` / `release`
-      target。`docs/07-distribution.md` 描述了预期流程。**这是
-      v1.0.0 正式 tag 唯一剩下的 blocker**；rc1 用 ad-hoc 签名先
-      让你拿到包做回归。
-- [ ] 更新检查的出站调用（必须在 Sparkle ship 之前存在，并且
-      §4 隐私审计文案要更新成「除更新检查外零出站」）。
+- [ ] **推迟** — 评审 §5 立刻 #2：Developer ID 签名、`notarytool`
+      上传、Sparkle appcast。`Makefile` 当前没有 `sign` / `release`
+      target。`docs/07-distribution.md` 描述了预期流程。**不再阻
+      塞 v1.0.0**；等 Apple Developer 注册完成后以 `v1.0.1`
+      签名分发补丁或并入 `v1.1` 出。rc1 / 1.0.0 用 ad-hoc 签名
+      让维护者自己的 Mac 做回归。
+- [ ] **推迟** — 更新检查的出站调用；随 Sparkle 一起落（跟上面
+      §5 立刻 #2 同一个补丁）。落地时 §4 隐私审计文案也要更
+      新成「除更新检查外零出站」。
 
 ## 8. Sign-off
 
 - [ ] §§0–6 所有框都打勾。
-- [ ] §7 的剩余项要么 land 了，要么在 `CHANGELOG.md` 里**显式推
-      迟**到下一个版本，并附 issue 链接。
-- [ ] `CHANGELOG.md` 把 `[1.0.0-rc1]` 升级成 `[1.0.0] — <date>`。
+- [ ] §7 的两个推迟项在 `CHANGELOG.md` 的 `[1.0.0-rc1]` 与
+      `[1.0.0-rc2]` 块里都被**显式推迟**到 `v1.0.1` / `v1.1`，
+      并附 issue 链接（如尚未开则现开）。
+- [ ] `CHANGELOG.md` 把**最新 rc**（当前是 `[1.0.0-rc2]`）升级
+      成 `[1.0.0] — <date>`。
 - [ ] 通过 `tag-release` workflow 创建 tag `v1.0.0` 并推送（或者
       `git tag -s v1.0.0 && git push origin v1.0.0` 如果你本地有签
       名密钥）。
