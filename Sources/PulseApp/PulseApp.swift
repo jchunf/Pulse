@@ -601,6 +601,7 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var continuity: ContinuityStreak?
     @Published private(set) var lidOpensToday: Int = 0
     @Published private(set) var lidOpensTrend: [Int] = []
+    @Published private(set) var restToday: RestDay = RestDay(segments: [])
     @Published private(set) var lastRefreshAt: Date?
     @Published private(set) var errorMessage: String?
     @Published private(set) var recentAchievement: LandmarkAchievement?
@@ -684,6 +685,7 @@ final class DashboardModel: ObservableObject {
             let continuity = try store.continuityStreak(endingAt: now, days: Self.continuityDays)
             let lidToday = try store.dailyLidOpens(on: dayStart, capUntil: now)
             let lidTrend = try store.lidOpensTrend(endingAt: now, days: Self.trendDays)
+            let restDay = try store.restSegments(on: dayStart, capUntil: now)
             let progress = GoalEvaluator.evaluate(
                 goals: goalsStore.enabledGoals(),
                 summary: summary,
@@ -725,6 +727,7 @@ final class DashboardModel: ObservableObject {
             self.continuity = continuity
             self.lidOpensToday = lidToday
             self.lidOpensTrend = lidTrend
+            self.restToday = restDay
             self.lastRefreshAt = now
             self.errorMessage = nil
             updateAchievementIfNeeded(
@@ -1055,6 +1058,7 @@ struct DashboardView: View {
                         UsagePostureCard(posture: model.sessionPosture)
                             .frame(maxWidth: .infinity)
                     }
+                    RestCard(rest: model.restToday)
 
                     // ── Section 4 — Apps ──
                     DashboardSectionHeader(titleKey: "Apps")
@@ -2380,6 +2384,69 @@ struct UsagePostureCard: View {
             return "Short-form work — lots of 5-to-15-minute sessions today."
         } else {
             return "Checker mode — mostly quick dips today, not long-form focus."
+        }
+    }
+}
+
+/// F-26 — today's rest recap. Walks completed `idle_entered` /
+/// `idle_exited` pairs (and any still-open idle segment) and
+/// surfaces count + longest + total. Complements the A15 "Idle time"
+/// summary tile — the tile is a single aggregate number, this card
+/// explains its shape (one 90-minute rest or ten 9-minute micro-pauses
+/// are very different usage patterns).
+///
+/// Renders nothing when no rest has been recorded today — the A15
+/// tile already carries the "0 minutes idle" case, a dedicated empty
+/// card would be noise.
+struct RestCard: View {
+
+    let rest: RestDay
+
+    var body: some View {
+        if rest.count == 0 {
+            EmptyView()
+        } else {
+            populated
+        }
+    }
+
+    private var populated: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "cup.and.saucer")
+                    .foregroundStyle(PulseDesign.sage)
+                    .opacity(0.85)
+                Text("Rests today", bundle: .module)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            HStack(spacing: 28) {
+                stat(
+                    label: Text("Count", bundle: .module),
+                    value: "\(rest.count)"
+                )
+                stat(
+                    label: Text("Longest", bundle: .module),
+                    value: PulseFormat.duration(seconds: rest.longestSeconds)
+                )
+                stat(
+                    label: Text("Total", bundle: .module),
+                    value: PulseFormat.duration(seconds: rest.totalSeconds)
+                )
+                Spacer()
+            }
+        }
+        .pulseFeaturedCard()
+    }
+
+    @ViewBuilder
+    private func stat(label: Text, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            label
+                .font(PulseDesign.labelFont)
+                .tracking(0.3)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(PulseDesign.metricFont)
         }
     }
 }
