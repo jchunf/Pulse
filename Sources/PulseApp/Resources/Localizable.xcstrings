@@ -3927,6 +3927,23 @@
           }
         }
       }
+    },
+    "Weekly PDF…": {
+      "comment": "F-06 menu button — renders the weekly report as a PDF.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weekly PDF…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "周报 PDF…"
+          }
+        }
+      }
     }
   }
 }
