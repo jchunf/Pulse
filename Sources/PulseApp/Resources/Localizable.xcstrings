@@ -3468,6 +3468,108 @@
           }
         }
       }
+    },
+    "Continuity": {
+      "comment": "F-11 ContinuityCard — card title.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continuity"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连续记录"
+          }
+        }
+      }
+    },
+    "current streak": {
+      "comment": "F-11 ContinuityCard — label under the current-streak number.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "current streak"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前连续天数"
+          }
+        }
+      }
+    },
+    "Longest: %lld": {
+      "comment": "F-11 ContinuityCard — longest streak in the window. %lld is days.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Longest: %lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最长纪录：%lld 天"
+          }
+        }
+      }
+    },
+    "%lld of %lld days qualified": {
+      "comment": "F-11 ContinuityCard — qualifying days in the window. First %lld is qualifying, second is total.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld of %2$lld days qualified"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "过去 %2$lld 天里有 %1$lld 天达标"
+          }
+        }
+      }
+    },
+    "Today: %lld active hours so far — a few more to qualify.": {
+      "comment": "F-11 ContinuityCard — footer shown when today has activity but has not yet crossed the threshold.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today: %lld active hours so far — a few more to qualify."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天已活跃 %lld 小时，再几小时就能计入连续记录。"
+          }
+        }
+      }
+    },
+    "Every day you use your Mac for more than four hours lights up a square. Keep coming back — this card fills in over time.": {
+      "comment": "F-11 ContinuityCard — empty-state copy shown before any activity has been recorded.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every day you use your Mac for more than four hours lights up a square. Keep coming back — this card fills in over time."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每天在 Mac 上活跃超过四小时，就会点亮一个方块。保持回来，这张图会随时间慢慢填满。"
+          }
+        }
+      }
     }
   }
 }
