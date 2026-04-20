@@ -706,6 +706,7 @@ final class DashboardModel: ObservableObject {
                 todayLongestFocus: focus,
                 pastLongestFocusSeconds: pastLongestFocus,
                 heatmapCells: heatmap,
+                continuity: continuity,
                 now: now,
                 calendar: calendar
             )
@@ -2058,6 +2059,7 @@ struct InsightsCard: View {
         case .deepFocusStandout: "waveform.path.ecg"
         case .singleAppDominance: "circle.grid.cross"
         case .hourlyActivityAnomaly: "clock.badge.exclamationmark"
+        case .streakAtRisk: "flame.circle"
         }
     }
 
@@ -2132,6 +2134,15 @@ struct InsightsCard: View {
                     Int64(percentOff)
                 )
             }
+        case let .streakAtRisk(currentStreak, _, _):
+            return String.localizedStringWithFormat(
+                NSLocalizedString(
+                    "Keep your %lld-day streak going",
+                    bundle: .module,
+                    comment: "Insight headline — streak at risk. %lld is the current streak in days."
+                ),
+                Int64(currentStreak)
+            )
         }
     }
 
@@ -2185,6 +2196,16 @@ struct InsightsCard: View {
                 Int64(medianCount),
                 label,
                 Int64(todayCount)
+            )
+        case let .streakAtRisk(_, activeHoursToday, hoursToQualify):
+            return String.localizedStringWithFormat(
+                NSLocalizedString(
+                    "%lld active hours so far today — %lld more and today counts toward the streak.",
+                    bundle: .module,
+                    comment: "Insight body — streak at risk. First %lld is hours logged today, second is hours remaining to qualify."
+                ),
+                Int64(activeHoursToday),
+                Int64(hoursToQualify)
             )
         }
     }

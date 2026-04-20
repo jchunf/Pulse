@@ -25,9 +25,12 @@ public protocol InsightRule: Sendable {
 /// window). `pastLongestFocusSeconds` is one integer per prior day
 /// in the window, same exclusion. `heatmapCells` is the raw output
 /// of `EventStore.hourlyHeatmap(endingAt:days:)` so hourly rules
-/// can carve it up per their own needs. Anything derivable from
-/// these fields should stay inside the rule; anything requiring a
-/// fresh DB query should land as a new field here so rules stay pure.
+/// can carve it up per their own needs. `continuity` is the F-11
+/// grid `ContinuityStreak` the Dashboard already fetches; the
+/// streak-at-risk rule reads today's qualifying state from it.
+/// Anything derivable from these fields should stay inside the
+/// rule; anything requiring a fresh DB query should land as a new
+/// field here so rules stay pure.
 public struct InsightContext: Sendable {
 
     public let today: TodaySummary
@@ -35,6 +38,7 @@ public struct InsightContext: Sendable {
     public let todayLongestFocus: FocusSegment?
     public let pastLongestFocusSeconds: [Int]
     public let heatmapCells: [HeatmapCell]
+    public let continuity: ContinuityStreak?
     public let now: Date
     public let calendar: Calendar
 
@@ -44,6 +48,7 @@ public struct InsightContext: Sendable {
         todayLongestFocus: FocusSegment?,
         pastLongestFocusSeconds: [Int],
         heatmapCells: [HeatmapCell] = [],
+        continuity: ContinuityStreak? = nil,
         now: Date = Date(),
         calendar: Calendar = .current
     ) {
@@ -52,6 +57,7 @@ public struct InsightContext: Sendable {
         self.todayLongestFocus = todayLongestFocus
         self.pastLongestFocusSeconds = pastLongestFocusSeconds
         self.heatmapCells = heatmapCells
+        self.continuity = continuity
         self.now = now
         self.calendar = calendar
     }

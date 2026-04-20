@@ -483,6 +483,177 @@ struct InsightEngineTests {
         #expect(rule.evaluate(context: ctx) == nil)
     }
 
+    // MARK: - StreakAtRiskRule
+
+    /// Build a minimal `InsightContext` exercising only streak fields.
+    /// Past-days run old → new; today is appended last. `activeHoursPastDay`
+    /// controls whether each past day qualifies (≥ 4 by default).
+    private func streakContext(
+        pastQualifiedDays: Int,
+        todayActiveHours: Int,
+        hourOfDay: Int = 16
+    ) -> InsightContext {
+        let today = TodaySummary(
+            totalKeyPresses: 1,
+            totalMouseClicks: 0,
+            totalMouseMovesRaw: 0,
+            totalMouseDistanceMillimeters: 0,
+            totalScrollTicks: 0,
+            totalActiveSeconds: 0,
+            totalIdleSeconds: 0,
+            topApps: []
+        )
+        var components = DateComponents()
+        components.year = 2026; components.month = 4; components.day = 19
+        components.hour = hourOfDay; components.minute = 0
+        components.timeZone = TimeZone(identifier: "UTC")
+        let now = utcCalendar.date(from: components)!
+        let todayStart = utcCalendar.startOfDay(for: now)
+        // Past days + today as ContinuityDay cells.
+        var days: [ContinuityDay] = []
+        for offset in stride(from: pastQualifiedDays, to: 0, by: -1) {
+            let day = utcCalendar.date(byAdding: .day, value: -offset, to: todayStart)!
+            days.append(ContinuityDay(day: day, activeHours: 8, qualified: true))
+        }
+        days.append(ContinuityDay(
+            day: todayStart,
+            activeHours: todayActiveHours,
+            qualified: todayActiveHours >= 4
+        ))
+        let streak = ContinuityStreak(
+            days: days,
+            currentStreak: days.last?.qualified == true ? pastQualifiedDays + 1 : 0,
+            longestStreak: pastQualifiedDays + (days.last?.qualified == true ? 1 : 0),
+            qualifyingDays: pastQualifiedDays + (days.last?.qualified == true ? 1 : 0),
+            windowDays: days.count
+        )
+        return InsightContext(
+            today: today,
+            pastDailyTrend: [],
+            todayLongestFocus: nil,
+            pastLongestFocusSeconds: [],
+            heatmapCells: [],
+            continuity: streak,
+            now: now,
+            calendar: utcCalendar
+        )
+    }
+
+    @Test("streak-at-risk — fires when 7-day streak hanging + today unqualified + post-15:00")
+    func streakAtRiskFires() throws {
+        let rule = StreakAtRiskRule()
+        let ctx = streakContext(pastQualifiedDays: 7, todayActiveHours: 2)
+        let insight = try #require(rule.evaluate(context: ctx))
+        #expect(insight.id == "streak_at_risk")
+        #expect(insight.kind == .celebratory)
+        guard case let .streakAtRisk(currentStreak, activeHoursToday, hoursToQualify) = insight.payload else {
+            Issue.record("wrong payload case: \(insight.payload)")
+            return
+        }
+        #expect(currentStreak == 7)
+        #expect(activeHoursToday == 2)
+        #expect(hoursToQualify == 2) // 4 - 2
+    }
+
+    @Test("streak-at-risk — silent when continuity is nil")
+    func streakAtRiskNilContinuity() {
+        let rule = StreakAtRiskRule()
+        let ctx = baselineContext(now: referenceNow)
+        #expect(rule.evaluate(context: ctx) == nil)
+    }
+
+    @Test("streak-at-risk — silent when today already qualified")
+    func streakAtRiskTodayQualified() {
+        let rule = StreakAtRiskRule()
+        let ctx = streakContext(pastQualifiedDays: 10, todayActiveHours: 6)
+        #expect(rule.evaluate(context: ctx) == nil)
+    }
+
+    @Test("streak-at-risk — silent when today has zero activity (streak already gone)")
+    func streakAtRiskTodayZero() {
+        let rule = StreakAtRiskRule()
+        let ctx = streakContext(pastQualifiedDays: 10, todayActiveHours: 0)
+        #expect(rule.evaluate(context: ctx) == nil)
+    }
+
+    @Test("streak-at-risk — silent before the mid-afternoon cutoff")
+    func streakAtRiskEarly() {
+        let rule = StreakAtRiskRule() // hourOfDayToFire default 15
+        let ctx = streakContext(pastQualifiedDays: 10, todayActiveHours: 2, hourOfDay: 11)
+        #expect(rule.evaluate(context: ctx) == nil)
+    }
+
+    @Test("streak-at-risk — silent when prior streak is below the minimum")
+    func streakAtRiskShortStreak() {
+        let rule = StreakAtRiskRule() // minimumStreakDays default 7
+        let ctx = streakContext(pastQualifiedDays: 5, todayActiveHours: 2)
+        #expect(rule.evaluate(context: ctx) == nil)
+    }
+
+    @Test("streak-at-risk — 7 exactly qualifies (boundary)")
+    func streakAtRiskBoundary() throws {
+        let rule = StreakAtRiskRule(minimumStreakDays: 7)
+        let ctx = streakContext(pastQualifiedDays: 7, todayActiveHours: 1)
+        let insight = try #require(rule.evaluate(context: ctx))
+        guard case let .streakAtRisk(currentStreak, _, hoursToQualify) = insight.payload else {
+            Issue.record("wrong payload case")
+            return
+        }
+        #expect(currentStreak == 7)
+        #expect(hoursToQualify == 3)
+    }
+
+    @Test("streak-at-risk — ignores gaps in prior window; current streak measured through yesterday")
+    func streakAtRiskGapStops() {
+        let rule = StreakAtRiskRule()
+        let today = TodaySummary(
+            totalKeyPresses: 1,
+            totalMouseClicks: 0,
+            totalMouseMovesRaw: 0,
+            totalMouseDistanceMillimeters: 0,
+            totalScrollTicks: 0,
+            totalActiveSeconds: 0,
+            totalIdleSeconds: 0,
+            topApps: []
+        )
+        var components = DateComponents()
+        components.year = 2026; components.month = 4; components.day = 19
+        components.hour = 16; components.minute = 0
+        components.timeZone = TimeZone(identifier: "UTC")
+        let now = utcCalendar.date(from: components)!
+        let todayStart = utcCalendar.startOfDay(for: now)
+        // A 10-day block, but with a break right before yesterday so
+        // the through-yesterday streak is only 3 — below the default
+        // minimum of 7 even though the overall longest is bigger.
+        var days: [ContinuityDay] = []
+        for offset in stride(from: 15, to: 0, by: -1) {
+            let day = utcCalendar.date(byAdding: .day, value: -offset, to: todayStart)!
+            let qualified = offset <= 3 || (offset >= 5 && offset <= 12)
+            days.append(ContinuityDay(day: day, activeHours: qualified ? 8 : 1, qualified: qualified))
+        }
+        days.append(ContinuityDay(day: todayStart, activeHours: 2, qualified: false))
+        let streak = ContinuityStreak(
+            days: days,
+            currentStreak: 0,
+            longestStreak: 8,
+            qualifyingDays: 11,
+            windowDays: days.count
+        )
+        let ctx = InsightContext(
+            today: today,
+            pastDailyTrend: [],
+            todayLongestFocus: nil,
+            pastLongestFocusSeconds: [],
+            heatmapCells: [],
+            continuity: streak,
+            now: now,
+            calendar: utcCalendar
+        )
+        // Through-yesterday streak is 3 (offsets 3, 2, 1 qualified) —
+        // below the default 7, so the rule stays silent.
+        #expect(rule.evaluate(context: ctx) == nil)
+    }
+
     // MARK: - InsightEngine integration
 
     @Test("engine — preserves rule registration order and drops nils")
@@ -514,6 +685,7 @@ struct InsightEngineTests {
         let engine = InsightEngine()
         let ruleIds = engine.rules.map(\.id)
         #expect(ruleIds == [
+            "streak_at_risk",
             "hourly_activity_anomaly",
             "deep_focus_standout",
             "single_app_dominance",

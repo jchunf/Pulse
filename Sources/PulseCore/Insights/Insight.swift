@@ -92,6 +92,18 @@ public enum InsightPayload: Sendable, Equatable {
         medianCount: Int
     )
 
+    /// The user has a ≥ `minimumStreakDays` continuity streak going
+    /// into today, but today has not yet cleared the qualifying
+    /// threshold. Fires only after a mid-afternoon cutoff so early
+    /// risers are not pressured to front-load activity. UI copy
+    /// should frame the nudge as **"here's what saves the streak"**,
+    /// never as a guilt-trip (review §2.3 / §4 caution).
+    case streakAtRisk(
+        currentStreak: Int,
+        activeHoursToday: Int,
+        hoursToQualify: Int
+    )
+
     public enum Direction: Sendable, Equatable {
         case above
         case below
