@@ -3723,6 +3723,210 @@
           }
         }
       }
+    },
+    "Clear data in a time range…": {
+      "comment": "F-47 Settings button that opens the range-purge sheet.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear data in a time range…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除某时段数据…"
+          }
+        }
+      }
+    },
+    "Clear a time range": {
+      "comment": "F-47 range-purge sheet title.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear a time range"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除时段数据"
+          }
+        }
+      }
+    },
+    "From": {
+      "comment": "F-47 range-purge sheet — from-date picker label.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从"
+          }
+        }
+      }
+    },
+    "To": {
+      "comment": "F-47 range-purge sheet — to-date picker label.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "到"
+          }
+        }
+      }
+    },
+    "Every row whose timestamp falls between these moments will be permanently deleted from every data table. An audit note (\"data_purged\") is added to system_events so the Privacy window still shows that a purge occurred. This cannot be undone.": {
+      "comment": "F-47 range-purge sheet — explanatory body.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every row whose timestamp falls between these moments will be permanently deleted from every data table. An audit note (\"data_purged\") is added to system_events so the Privacy window still shows that a purge occurred. This cannot be undone."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该区间内的所有数据行将从所有数据表中永久删除。一条审计记录（「data_purged」）会写入 system_events，以便隐私窗口仍然显示曾发生过清除。此操作不可撤销。"
+          }
+        }
+      }
+    },
+    "Close": {
+      "comment": "F-47 range-purge sheet — close button.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭"
+          }
+        }
+      }
+    },
+    "Clear…": {
+      "comment": "F-47 range-purge sheet — destructive button (opens confirmation).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除…"
+          }
+        }
+      }
+    },
+    "Delete every event between those moments?": {
+      "comment": "F-47 confirmation-dialog title.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete every event between those moments?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "永久删除该区间内的所有事件？"
+          }
+        }
+      }
+    },
+    "Delete permanently": {
+      "comment": "F-47 confirmation-dialog destructive action.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete permanently"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "永久删除"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "comment": "F-47 confirmation-dialog cancel action.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消"
+          }
+        }
+      }
+    },
+    "Deleted %lld rows across all tables.": {
+      "comment": "F-47 range-purge success message. %lld is the total rows deleted.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleted %lld rows across all tables."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已从所有数据表删除 %lld 行。"
+          }
+        }
+      }
+    },
+    "Database is not available — permission or storage issue.": {
+      "comment": "F-47 error — no database accessible for purge.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database is not available — permission or storage issue."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法访问数据库 — 可能是权限或存储问题。"
+          }
+        }
+      }
     }
   }
 }
