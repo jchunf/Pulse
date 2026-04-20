@@ -3604,6 +3604,57 @@
           }
         }
       }
+    },
+    "MacBook lid": {
+      "comment": "F-27 LidCard — card title.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MacBook lid"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "笔记本盖"
+          }
+        }
+      }
+    },
+    "opens today": {
+      "comment": "F-27 LidCard — label under the today-count number.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "opens today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日开盖次数"
+          }
+        }
+      }
+    },
+    "Avg past 7 days: %@": {
+      "comment": "F-27 LidCard — 7-day average lid-open count. %@ is a pre-formatted integer or one-decimal string.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avg past 7 days: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "过去 7 天平均 %@ 次"
+          }
+        }
+      }
     }
   }
 }

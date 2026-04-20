@@ -599,6 +599,8 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var goalProgress: [GoalProgress] = []
     @Published private(set) var insights: [Insight] = []
     @Published private(set) var continuity: ContinuityStreak?
+    @Published private(set) var lidOpensToday: Int = 0
+    @Published private(set) var lidOpensTrend: [Int] = []
     @Published private(set) var lastRefreshAt: Date?
     @Published private(set) var errorMessage: String?
     @Published private(set) var recentAchievement: LandmarkAchievement?
@@ -680,6 +682,8 @@ final class DashboardModel: ObservableObject {
             let posture = try store.sessionPosture(on: dayStart, now: now)
             let switches = try store.appSwitchCount(on: dayStart, capUntil: now)
             let continuity = try store.continuityStreak(endingAt: now, days: Self.continuityDays)
+            let lidToday = try store.dailyLidOpens(on: dayStart, capUntil: now)
+            let lidTrend = try store.lidOpensTrend(endingAt: now, days: Self.trendDays)
             let progress = GoalEvaluator.evaluate(
                 goals: goalsStore.enabledGoals(),
                 summary: summary,
@@ -719,6 +723,8 @@ final class DashboardModel: ObservableObject {
             self.goalProgress = progress
             self.insights = insightEngine.evaluate(context: insightContext)
             self.continuity = continuity
+            self.lidOpensToday = lidToday
+            self.lidOpensTrend = lidTrend
             self.lastRefreshAt = now
             self.errorMessage = nil
             updateAchievementIfNeeded(
@@ -1034,6 +1040,12 @@ struct DashboardView: View {
                     WeekTrendChart(points: model.trendPoints)
                     WeekHourlyHeatmap(cells: model.heatmapCells, days: model.heatmapDays)
                     ContinuityCard(streak: model.continuity)
+                    if model.lidOpensTrend.contains(where: { $0 > 0 }) {
+                        LidCard(
+                            todayOpens: model.lidOpensToday,
+                            trend: model.lidOpensTrend
+                        )
+                    }
 
                     // ── Section 3 — Focus (depth + sessions) ──
                     DashboardSectionHeader(titleKey: "Focus")
@@ -2369,6 +2381,85 @@ struct UsagePostureCard: View {
         } else {
             return "Checker mode — mostly quick dips today, not long-form focus."
         }
+    }
+}
+
+/// F-27 — how many times the MacBook lid has been opened today,
+/// with a seven-day sparkline for context. Desktop users get no
+/// `lid_*` system events; when the 7-day history is empty the card
+/// hides itself (no "0 opens" filler on a Mac Studio).
+///
+/// Semantically one lid-open = one "returned to the Mac" moment —
+/// a concrete session count, not a noisy toggle tally.
+struct LidCard: View {
+
+    let todayOpens: Int
+    let trend: [Int]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "laptopcomputer")
+                    .foregroundStyle(PulseDesign.sage)
+                    .opacity(todayOpens > 0 ? 0.85 : 0.45)
+                Text("MacBook lid", bundle: .module)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(todayOpens)")
+                        .font(PulseDesign.heroSecondaryFont)
+                        .monospacedDigit()
+                        .foregroundStyle(todayOpens > 0 ? PulseDesign.sage : .secondary)
+                    Text("opens today", bundle: .module)
+                        .font(PulseDesign.labelFont)
+                        .tracking(0.3)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if trend.count >= 2 {
+                    VStack(alignment: .trailing, spacing: 6) {
+                        let pastAvg = Self.pastAverage(trend)
+                        Text(
+                            String.localizedStringWithFormat(
+                                NSLocalizedString(
+                                    "Avg past 7 days: %@",
+                                    bundle: .module,
+                                    comment: "F-27 LidCard — 7-day average lid-open count, already formatted."
+                                ),
+                                pastAvg
+                            )
+                        )
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        let series = trend.map(Double.init)
+                        ZStack(alignment: .bottom) {
+                            Sparkline(points: series, closed: true)
+                                .fill(PulseDesign.sage.opacity(0.10))
+                            Sparkline(points: series, closed: false)
+                                .stroke(PulseDesign.sage, style: StrokeStyle(lineWidth: 1.2, lineJoin: .round))
+                        }
+                        .frame(width: 80, height: 22)
+                    }
+                }
+            }
+        }
+        .pulseFeaturedCard()
+    }
+
+    /// Average over the **prior** days in the trend (excludes today,
+    /// which is the last slot). Formatted with one decimal when the
+    /// result has a fractional part, integer otherwise — matches the
+    /// SummaryCard conventions without reaching for `NumberFormatter`
+    /// overhead on a tiny two-digit value.
+    static func pastAverage(_ trend: [Int]) -> String {
+        let past = trend.dropLast()
+        guard !past.isEmpty else { return "0" }
+        let avg = Double(past.reduce(0, +)) / Double(past.count)
+        if avg.rounded() == avg {
+            return String(Int(avg))
+        }
+        return String(format: "%.1f", avg)
     }
 }
 
