@@ -10,24 +10,43 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ---
 
-## [Unreleased] — v1.1 in development
+## [1.0.0-rc2] — 2026-04-20
 
-v1.1 focuses on the cross-metric insight engine called out by review
-§3.4, Dashboard visual-language refresh, and the F-04 / F-06 /
-F-10 / F-11 / F-26 / F-27 / F-47 queue from
-`docs/08-roadmap.md` §四. Entries below have already merged onto
-`main` after the `1.0.0-rc1` cut and will ship with the v1.1 tag.
+Second release candidate. Layers on top of `1.0.0-rc1` with the
+cross-metric insight engine called out by review §3.4 (the last
+review-flagged §3 row — review §3.4 was originally slotted for v1.2,
+pulled forward), the first time-of-day insight rule, the Vital Pulse
+visual-language pass, the above-the-fold Dashboard layout, and three
+bug fixes surfaced by post-rc1 real-Mac dogfooding.
+
+**Still knowingly out of scope** (carries over from rc1 §7):
+Developer ID signing + `notarytool` + Sparkle appcast
+(`docs/07-distribution.md`). **Formally deferred** — no longer a
+`v1.0.0` blocker. Ships as a `v1.0.1` signed-distribution patch, or
+folds into `v1.1`, once the maintainer's Apple Developer enrolment
+completes.
 
 ### Dashboard & Narrative (A)
 
 - **A26** Vital Pulse visual language + Retina mileage fix. (#49)
-- **A26f** Dashboard layout refresh — above-the-fold hero row +
-  sectioned scroll. (#50)
+- **A26f** Dashboard layout — above-the-fold hero row + sectioned
+  scroll. (#50)
 - **A26g** three real-Mac bug fixes: loginwindow focus, menu-bar red
   dot, i18n leak. (#51)
+
+### Insights engine — review §3.4
+
 - **A27** cross-metric insight engine with three seed rules —
-  `ActivityAnomalyRule`, `DeepFocusStandoutRule`,
-  `SingleAppDominanceRule`. Closes review §3.4. (#52)
+  `ActivityAnomalyRule` (today vs 7-day median, ±30%),
+  `DeepFocusStandoutRule` (today's longest focus ≥ 1.3× median),
+  `SingleAppDominanceRule` (one app > 50% of active time). Rule
+  thresholds exposed as `public let` constants per review §3.4's
+  "transparent, auditable, rule-based" bar. (#52)
+- **A28** `HourlyActivityAnomalyRule` — first **time-of-day** rule,
+  reuses `hourlyHeatmap` output so no new DB queries. Fires on the
+  completed hour with the largest magnitude deviation (≥ 50%) from
+  the same-hour median baseline over prior days; emits at most one
+  insight per refresh to keep the card a glance, not a list. (#53)
 
 ---
 

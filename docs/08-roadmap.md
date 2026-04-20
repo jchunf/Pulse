@@ -95,23 +95,21 @@
 
 ## 四、后续版本队列
 
+### v1.0.0 tag 前的增量（已在 `main`，随 `1.0.0-rc2` 打包出）
+
+A26 / A26f / A26g / A27 / A28 都在 rc1 之后 land，`CHANGELOG.md`
+的 `[1.0.0-rc2]` 块收录完整清单：视觉语言 + Dashboard 分区布
+局 + 真机三 bug 修复 + 跨指标 insight 引擎（关闭评审 §3.4）+
+首条时段 insight 规则。rc2 通过真机回归后直接升 `v1.0.0`。
+
 ### v1.1（MVP + 2 个月）
 
-重点：**更深的可视化 + 基础报告 + 跨指标 insight 引擎**
+重点：**更深的可视化 + 基础报告 + 持续扩展 insight 规则**
 
-已在 `main` 上落地、随 v1.1 tag 出（见 `CHANGELOG.md` 的
-`[Unreleased]`）：
-
-- A26 / A26f / A26g — Vital Pulse 视觉语言 + Dashboard 分区布局 +
-  真机三 bug 修复
-- A27 — 跨指标 insight 引擎（`ActivityAnomalyRule` /
-  `DeepFocusStandoutRule` / `SingleAppDominanceRule`），关闭评
-  审 §3.4
-
-v1.1 队列（按优先级，均在开发中或待开）：
-
-- A28+ 持续扩展 insight 规则（time-of-day、单 app 停留趋势等）
-- F-11 连续记录（GitHub 贡献图风格）—— 读侧查询，实现最便宜，优先起
+- F-11 连续记录（GitHub 贡献图风格）—— 读侧查询，实现最便宜，v1.1 起
+  步件
+- 下一批 insight 规则：单 app 停留趋势、首次跨过某一 landmark、周
+  末 vs 工作日等
 - F-10 每日时间带
 - F-26 空闲/休息统计
 - F-27 开合盖次数
@@ -123,7 +121,7 @@ v1.1 队列（按优先级，均在开发中或待开）：
 
 - Developer ID 签名 + `notarytool` + Sparkle appcast（`docs/07`）——
   等 Apple Developer 账号注册完成；见 `CHANGELOG.md`
-  `[1.0.0-rc1]` 「正式推迟」说明。
+  `[1.0.0-rc1]` / `[1.0.0-rc2]` 「正式推迟」说明。
 
 ### v1.2（+ 2 个月）
 
