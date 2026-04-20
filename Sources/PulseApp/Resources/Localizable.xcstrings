@@ -3706,6 +3706,23 @@
           }
         }
       }
+    },
+    "Today's timeline": {
+      "comment": "F-10 DayTimelineCard — card title.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today's timeline"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日时间带"
+          }
+        }
+      }
     }
   }
 }
