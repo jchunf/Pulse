@@ -71,7 +71,10 @@ struct PulseApp: App {
         Settings {
             SettingsView(
                 goalsStore: appDelegate.goalsStore,
-                onOpenPrivacyAudit: { appDelegate.requestShowPrivacyAudit() }
+                onOpenPrivacyAudit: { appDelegate.requestShowPrivacyAudit() },
+                onPurgeRange: { start, end in
+                    try appDelegate.purgeRange(start: start, end: end)
+                }
             )
         }
     }
@@ -303,6 +306,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { [weak self] in
             await self?.privacyAuditModel.reload()
             await MainActor.run { self?.privacyAuditTrigger.send(()) }
+        }
+    }
+
+    /// F-47 — user-initiated purge of every data row whose timestamp
+    /// falls in `[start, end)`. Runs on a background queue; throws
+    /// back to the caller if the database is unavailable or the
+    /// write transaction fails so the Settings sheet can surface
+    /// the error instead of silently lying about "done".
+    func purgeRange(start: Date, end: Date) throws -> RangePurgeResult {
+        guard let database else {
+            throw PurgeError.databaseUnavailable
+        }
+        let store = EventStore(database: database)
+        return try store.purgeRange(start: start, end: end)
+    }
+
+    enum PurgeError: LocalizedError {
+        case databaseUnavailable
+
+        var errorDescription: String? {
+            switch self {
+            case .databaseUnavailable:
+                return String(
+                    localized: "Database is not available — permission or storage issue.",
+                    bundle: .module,
+                    comment: "F-47 error — no database to purge against."
+                )
+            }
         }
     }
 
@@ -3079,6 +3110,9 @@ struct SettingsView: View {
     private var heatmapDays: Int = DashboardModel.defaultHeatmapDays
     @ObservedObject var goalsStore: GoalsStore
     let onOpenPrivacyAudit: () -> Void
+    let onPurgeRange: (Date, Date) throws -> RangePurgeResult
+
+    @State private var isPresentingPurgeSheet = false
 
     var body: some View {
         Form {
@@ -3138,12 +3172,23 @@ struct SettingsView: View {
                 Button(action: onOpenPrivacyAudit) {
                     Text("Show what Pulse has recorded…", bundle: .module)
                 }
+                Button(role: .destructive) {
+                    isPresentingPurgeSheet = true
+                } label: {
+                    Text("Clear data in a time range…", bundle: .module)
+                }
             } header: {
                 Text("Privacy", bundle: .module)
             } footer: {
                 Text("Opens a window that lists the raw row counts and the full system-events ledger from the last hour — read live from your local SQLite.", bundle: .module)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            }
+            .sheet(isPresented: $isPresentingPurgeSheet) {
+                RangePurgeSheet(
+                    onPurgeRange: onPurgeRange,
+                    onDismiss: { isPresentingPurgeSheet = false }
+                )
             }
 
             Section {
@@ -3161,6 +3206,117 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 520, height: 360)
+    }
+}
+
+// MARK: - Range-purge sheet (F-47)
+
+/// Modal presented from Settings → Privacy. Two date pickers plus
+/// a destructive confirmation flow — no keyboard-shortcut "Clear"
+/// default action, no silent commit. The sheet stays presented on
+/// success so the user sees the "X rows deleted" result and can
+/// close on their own terms.
+struct RangePurgeSheet: View {
+
+    let onPurgeRange: (Date, Date) throws -> RangePurgeResult
+    let onDismiss: () -> Void
+
+    @State private var startDate: Date = Calendar.current.startOfDay(for: Date())
+    @State private var endDate: Date = Date()
+    @State private var isConfirming: Bool = false
+    @State private var resultMessage: String? = nil
+    @State private var errorMessage: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Clear a time range", bundle: .module)
+                .font(PulseDesign.cardTitleFont)
+
+            VStack(alignment: .leading, spacing: 10) {
+                DatePicker(
+                    selection: $startDate,
+                    displayedComponents: [.date, .hourAndMinute]
+                ) {
+                    Text("From", bundle: .module)
+                        .frame(width: 56, alignment: .leading)
+                }
+                DatePicker(
+                    selection: $endDate,
+                    in: startDate...,
+                    displayedComponents: [.date, .hourAndMinute]
+                ) {
+                    Text("To", bundle: .module)
+                        .frame(width: 56, alignment: .leading)
+                }
+            }
+
+            Text("Every row whose timestamp falls between these moments will be permanently deleted from every data table. An audit note (\"data_purged\") is added to system_events so the Privacy window still shows that a purge occurred. This cannot be undone.", bundle: .module)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let resultMessage {
+                Text(verbatim: resultMessage)
+                    .font(.footnote)
+                    .foregroundStyle(PulseDesign.sage)
+            }
+            if let errorMessage {
+                Text(verbatim: errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(PulseDesign.coral)
+            }
+
+            HStack {
+                Button {
+                    onDismiss()
+                } label: {
+                    Text("Close", bundle: .module)
+                }
+                .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button(role: .destructive) {
+                    isConfirming = true
+                } label: {
+                    Text("Clear…", bundle: .module)
+                }
+                .disabled(endDate <= startDate)
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 380)
+        .confirmationDialog(
+            Text("Delete every event between those moments?", bundle: .module),
+            isPresented: $isConfirming
+        ) {
+            Button(role: .destructive) {
+                performPurge()
+            } label: {
+                Text("Delete permanently", bundle: .module)
+            }
+            Button(role: .cancel) {
+                isConfirming = false
+            } label: {
+                Text("Cancel", bundle: .module)
+            }
+        }
+    }
+
+    private func performPurge() {
+        do {
+            let result = try onPurgeRange(startDate, endDate)
+            errorMessage = nil
+            resultMessage = String.localizedStringWithFormat(
+                NSLocalizedString(
+                    "Deleted %lld rows across all tables.",
+                    bundle: .module,
+                    comment: "F-47 range-purge success message. %lld is the total rows deleted."
+                ),
+                Int64(result.deletedRowCount)
+            )
+        } catch {
+            resultMessage = nil
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
