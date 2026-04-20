@@ -598,6 +598,7 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var sessionPosture: SessionPosture = .empty
     @Published private(set) var goalProgress: [GoalProgress] = []
     @Published private(set) var insights: [Insight] = []
+    @Published private(set) var continuity: ContinuityStreak?
     @Published private(set) var lastRefreshAt: Date?
     @Published private(set) var errorMessage: String?
     @Published private(set) var recentAchievement: LandmarkAchievement?
@@ -617,6 +618,10 @@ final class DashboardModel: ObservableObject {
     nonisolated static let defaultHeatmapDays = 7
     /// Weekly trend chart span — fixed at 7 days for MVP; not user-tunable.
     nonisolated static let trendDays = 7
+    /// F-11 continuity grid window. 52 × 7 = 364 days, plus one cell so
+    /// the newest column is always "this week" regardless of which
+    /// weekday today is.
+    nonisolated static let continuityDays = 365
 
     init(store: EventStore?, goalsStore: GoalsStore) {
         self.store = store
@@ -674,6 +679,7 @@ final class DashboardModel: ObservableObject {
             let focus = try store.longestFocusSegment(on: dayStart, now: now)
             let posture = try store.sessionPosture(on: dayStart, now: now)
             let switches = try store.appSwitchCount(on: dayStart, capUntil: now)
+            let continuity = try store.continuityStreak(endingAt: now, days: Self.continuityDays)
             let progress = GoalEvaluator.evaluate(
                 goals: goalsStore.enabledGoals(),
                 summary: summary,
@@ -711,6 +717,7 @@ final class DashboardModel: ObservableObject {
             self.sessionPosture = posture
             self.goalProgress = progress
             self.insights = insightEngine.evaluate(context: insightContext)
+            self.continuity = continuity
             self.lastRefreshAt = now
             self.errorMessage = nil
             updateAchievementIfNeeded(
@@ -1025,6 +1032,7 @@ struct DashboardView: View {
                     DashboardSectionHeader(titleKey: "Rhythm")
                     WeekTrendChart(points: model.trendPoints)
                     WeekHourlyHeatmap(cells: model.heatmapCells, days: model.heatmapDays)
+                    ContinuityCard(streak: model.continuity)
 
                     // ── Section 3 — Focus (depth + sessions) ──
                     DashboardSectionHeader(titleKey: "Focus")
@@ -2339,6 +2347,189 @@ struct UsagePostureCard: View {
             return "Short-form work — lots of 5-to-15-minute sessions today."
         } else {
             return "Checker mode — mostly quick dips today, not long-form focus."
+        }
+    }
+}
+
+/// F-11 — 52-week continuity grid. One square per day, Sun-to-Sat
+/// columns (locale-aware via `Calendar.firstWeekday`), colored by the
+/// day's active-hour count. Headline = current streak; a secondary
+/// "Longest: N" pairs the "don't break the chain" framing with proof
+/// that the user has achieved long runs before.
+struct ContinuityCard: View {
+
+    let streak: ContinuityStreak?
+
+    private static let cellSize: CGFloat = 10
+    private static let cellSpacing: CGFloat = 3
+    private static let cellCornerRadius: CGFloat = 2
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "square.grid.3x3.topleft.filled")
+                    .foregroundStyle(PulseDesign.sage)
+                    .opacity(hasAnyActivity ? 0.85 : 0.35)
+                Text("Continuity", bundle: .module)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            if let streak, hasAnyActivity {
+                filled(streak)
+            } else {
+                empty
+            }
+        }
+        .pulseFeaturedCard()
+    }
+
+    private var hasAnyActivity: Bool {
+        (streak?.days.contains { $0.activeHours > 0 }) ?? false
+    }
+
+    @ViewBuilder
+    private func filled(_ streak: ContinuityStreak) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(streak.currentStreak)")
+                        .font(PulseDesign.heroSecondaryFont)
+                        .monospacedDigit()
+                        .foregroundStyle(streak.currentStreak > 0 ? PulseDesign.sage : .secondary)
+                    Text("current streak", bundle: .module)
+                        .font(PulseDesign.labelFont)
+                        .tracking(0.3)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(
+                        String.localizedStringWithFormat(
+                            NSLocalizedString(
+                                "Longest: %lld",
+                                bundle: .module,
+                                comment: "Continuity card — longest streak in the window. %lld is days."
+                            ),
+                            Int64(streak.longestStreak)
+                        )
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    Text(
+                        String.localizedStringWithFormat(
+                            NSLocalizedString(
+                                "%lld of %lld days qualified",
+                                bundle: .module,
+                                comment: "Continuity card — qualifying days in the window. First %lld is qualifying, second is total."
+                            ),
+                            Int64(streak.qualifyingDays),
+                            Int64(streak.windowDays)
+                        )
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.tertiary)
+                }
+            }
+            grid(streak)
+            if streak.currentStreak == 0, let today = streak.days.last, today.activeHours > 0 {
+                Text(
+                    String.localizedStringWithFormat(
+                        NSLocalizedString(
+                            "Today: %lld active hours so far — a few more to qualify.",
+                            bundle: .module,
+                            comment: "Continuity card — footer shown when today has activity but has not yet crossed the threshold."
+                        ),
+                        Int64(today.activeHours)
+                    )
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var empty: some View {
+        Text("Every day you use your Mac for more than four hours lights up a square. Keep coming back — this card fills in over time.", bundle: .module)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func grid(_ streak: ContinuityStreak) -> some View {
+        let columns = Self.layout(days: streak.days, calendar: .current)
+        // Tight column spacing; fixed cell size. The whole grid
+        // naturally becomes ~53 columns × (cellSize + cellSpacing) wide.
+        HStack(alignment: .top, spacing: Self.cellSpacing) {
+            ForEach(Array(columns.enumerated()), id: \.offset) { _, column in
+                VStack(spacing: Self.cellSpacing) {
+                    ForEach(0..<7, id: \.self) { row in
+                        RoundedRectangle(cornerRadius: Self.cellCornerRadius)
+                            .fill(Self.color(for: column[row], threshold: 4))
+                            .frame(width: Self.cellSize, height: Self.cellSize)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Layout + coloring
+
+    /// Assigns every `ContinuityDay` to a `(column, row)` slot so the
+    /// rightmost column holds the current week, columns run left →
+    /// right from oldest to newest, and rows are weekdays starting at
+    /// `Calendar.firstWeekday`. Missing slots end up as `nil`.
+    static func layout(days: [ContinuityDay], calendar: Calendar) -> [[ContinuityDay?]] {
+        guard let newest = days.last else { return [] }
+        let firstWeekday = calendar.firstWeekday
+        func weekdayRow(_ date: Date) -> Int {
+            let raw = calendar.component(.weekday, from: date) // 1..7
+            return (raw - firstWeekday + 7) % 7
+        }
+        let newestRow = weekdayRow(newest.day)
+        let newestDayStart = calendar.startOfDay(for: newest.day)
+
+        var cellsByColFromRight: [Int: [Int: ContinuityDay]] = [:]
+        var maxColFromRight = 0
+        for day in days {
+            let row = weekdayRow(day.day)
+            let dayStart = calendar.startOfDay(for: day.day)
+            let daysFromNewest = calendar.dateComponents([.day], from: dayStart, to: newestDayStart).day ?? 0
+            // Days between the two week-start anchors; see design note
+            // in the card documentation.
+            let daysBetweenWeekStarts = daysFromNewest + row - newestRow
+            let colFromRight = max(0, daysBetweenWeekStarts / 7)
+            maxColFromRight = max(maxColFromRight, colFromRight)
+            cellsByColFromRight[colFromRight, default: [:]][row] = day
+        }
+        let totalCols = maxColFromRight + 1
+        var grid: [[ContinuityDay?]] = Array(repeating: Array(repeating: nil, count: 7), count: totalCols)
+        for (colFromRight, rows) in cellsByColFromRight {
+            let col = totalCols - 1 - colFromRight
+            for (row, day) in rows {
+                grid[col][row] = day
+            }
+        }
+        return grid
+    }
+
+    /// 5-step gradient keyed to active-hour count, anchored to
+    /// `PulseDesign.sage`. 0 hours renders as a faint surface tint so
+    /// the grid's weekday structure stays visible on a blank slate.
+    static func color(for day: ContinuityDay?, threshold: Int) -> Color {
+        guard let day else { return Color.secondary.opacity(0.08) }
+        let hours = day.activeHours
+        if hours == 0 {
+            return Color.secondary.opacity(0.08)
+        } else if hours < threshold {
+            // Some activity, didn't clear the bar.
+            return PulseDesign.sage.opacity(0.25)
+        } else if hours < threshold * 2 {
+            return PulseDesign.sage.opacity(0.5)
+        } else if hours < threshold * 3 {
+            return PulseDesign.sage.opacity(0.75)
+        } else {
+            return PulseDesign.sage
         }
     }
 }
