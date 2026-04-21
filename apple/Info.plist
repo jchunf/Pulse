@@ -47,7 +47,7 @@
     <key>SUFeedURL</key>
     <string>https://github.com/jchunf/Pulse/releases/latest/download/appcast.xml</string>
     <key>SUPublicEDKey</key>
-    <string>__SPARKLE_PUBLIC_ED_KEY__</string>
+    <string>RTOW4MYZsX5c1vJ297lY1giGyQQoPxR3hbM4e0S4DHU=</string>
     <key>SUEnableAutomaticChecks</key>
     <false/>
     <key>SUAllowsAutomaticUpdates</key>
