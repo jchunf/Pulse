@@ -16,15 +16,24 @@ Second release candidate. Layers on top of `1.0.0-rc1` with the
 cross-metric insight engine called out by review §3.4 (the last
 review-flagged §3 row — review §3.4 was originally slotted for v1.2,
 pulled forward), the first time-of-day insight rule, the Vital Pulse
-visual-language pass, the above-the-fold Dashboard layout, and three
-bug fixes surfaced by post-rc1 real-Mac dogfooding.
+visual-language pass, the above-the-fold Dashboard layout, three
+bug fixes surfaced by post-rc1 real-Mac dogfooding, the full F-11
+streak storyline (grid + StreakAtRisk insight), five more v1.1
+Dashboard cards (F-27 MacBook lid / F-26 rest segments / F-10
+day timeline / F-06 weekly PDF), the F-47 time-range purge, and
+Sparkle-powered in-app updates.
 
-**Still knowingly out of scope** (carries over from rc1 §7):
-Developer ID signing + `notarytool` + Sparkle appcast
-(`docs/07-distribution.md`). **Formally deferred** — no longer a
-`v1.0.0` blocker. Ships as a `v1.0.1` signed-distribution patch, or
-folds into `v1.1`, once the maintainer's Apple Developer enrolment
-completes.
+**Partially addressed — remaining deferrals**:
+
+- ~~Sparkle appcast / in-app update flow~~ — **closed**. EdDSA-signed
+  update pipeline lands in D2 (app) + D3 (CI). From this release on,
+  the "Check for updates…" menu entry downloads a signed bundle,
+  verifies the signature, replaces the `.app` in-place, and does
+  **not** re-trigger Gatekeeper quarantine or TCC permission prompts.
+- Developer ID signing + `notarytool` — **still deferred**. First
+  install still needs the right-click-Open dance on a fresh Mac.
+  Apple Developer enrolment lands → add `codesign` + `notarytool`
+  steps to `package.yml` → subsequent tags pick up automatically.
 
 ### Dashboard & Narrative (A)
 
@@ -33,6 +42,24 @@ completes.
   scroll. (#50)
 - **A26g** three real-Mac bug fixes: loginwindow focus, menu-bar red
   dot, i18n leak. (#51)
+- **A29b** F-11 ContinuityCard — 52-week contribution grid with
+  5-step sage gradient keyed to activeHours, current / longest
+  streak + qualifying-day ratio in the header, locale-aware weekday
+  rows (`Calendar.firstWeekday`). (#56)
+- **A30** F-27 MacBook LidCard — today's lid-open count +
+  7-day sparkline; auto-hides on desktops where no lid events
+  ever land. (#58)
+- **A31** F-26 RestCard — walks `idle_entered` / `idle_exited`
+  pairs for today; surfaces count / longest / total. Complements
+  the A15 idle-time tile. (#59)
+- **A32** F-10 DayTimelineCard — 24h horizontal focus band driven
+  by `system_events.foreground_app`, deterministic per-bundle
+  coloring from an 8-entry palette, top-3 bundle legend. Placed
+  above AppRankingChart in the Apps section. (#60)
+- **A34** F-06 Weekly report PDF — reuses the A19 HTML pipeline,
+  renders it through `WKWebView.pdf(configuration:)` at Letter
+  portrait, drops a `weekly-YYYY-MM-DD.pdf` next to the HTML
+  sibling. New menu-bar link "Weekly PDF…". (#62)
 
 ### Insights engine — review §3.4
 
@@ -47,6 +74,60 @@ completes.
   completed hour with the largest magnitude deviation (≥ 50%) from
   the same-hour median baseline over prior days; emits at most one
   insight per refresh to keep the card a glance, not a list. (#53)
+- **A29c** `StreakAtRiskRule` — composes F-11's `ContinuityStreak`
+  with the insight engine. Fires only when the user has a ≥ 7-day
+  streak going into today **and** today hasn't yet cleared 4
+  active hours **and** it's past 15:00 local **and** today has
+  some activity (never nags a zero-hour day). Copy framed as
+  "here's what saves the streak", not a guilt-trip. (#57)
+
+### Data layer additions
+
+- **A29** F-11 continuity data layer — `continuityStreak(endingAt:
+  days:activeHoursThreshold:calendar:)` scans `hour_summary`,
+  buckets by local day, emits `ContinuityDay[]` + current /
+  longest / qualifying-days stats. `EventStore.streakStatistics(
+  [Bool])` helper factored out so the card UI and the
+  `StreakAtRiskRule` share the same math. (#55)
+
+### Privacy
+
+- **A33** F-47 time-range data purge — Settings → Privacy gains a
+  destructive "Clear data in a time range…" sheet with two date
+  pickers + two-click confirmation. `EventStore.purgeRange(start:
+  end:auditedAt:)` deletes rows in every data table in the window
+  (raw L0 through L3 aggregates + `system_events` +
+  `display_snapshots`); `rollup_watermarks` stay untouched. Writes
+  a single `data_purged` audit event at `auditedAt` so the Privacy
+  window still shows evidence a purge happened without preserving
+  any of the purged rows. (#61)
+
+### Infrastructure
+
+- **D2** in-app updater, app side — Sparkle 2.x pulled in as an
+  SPM dependency on `PulseApp`. `UpdateController` wraps
+  `SPUStandardUpdaterController` with runtime belt-and-braces
+  (`automaticallyChecksForUpdates = false`,
+  `sendsSystemProfile = false`). "Check for updates…" added to
+  both the menu bar and Settings → About. Info.plist's
+  `SUEnableAutomaticChecks` / `SUAllowsAutomaticUpdates` /
+  `SUScheduledCheckInterval` all pinned to match the
+  `docs/05-privacy.md` §七 "检查更新也是你手动触发的" promise. (#64)
+- **D3** in-app updater, CI side — `package.yml` detects
+  stable-final tags (`^v[0-9]+\.[0-9]+\.[0-9]+$`), fetches
+  Sparkle's `sign_update` tool at job time, signs the release
+  `.zip` with EdDSA (private key stored as
+  `SPARKLE_ED_PRIVATE_KEY` secret), generates `appcast.xml` via
+  the new `scripts/generate_appcast.sh`, and attaches it to the
+  stable Release (which also flips `prerelease: false` so
+  `releases/latest/download/appcast.xml` resolves). rc / beta
+  tags still ship zip + sha256 as pre-release; no appcast is
+  generated, so Sparkle's "latest" URL never sees them. (#65)
+- **V1-REGRESSION §4 privacy row split** — baseline lsof row now
+  expects zero outbound when the updater is idle, and exactly one
+  `github.com` HTTPS connection when the user manually clicks
+  Check for updates; `sendsSystemProfile = false` is enforced so
+  no Sparkle profile params leak in the query string. (#65)
 
 ---
 
