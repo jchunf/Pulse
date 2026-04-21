@@ -126,27 +126,31 @@
 - [x] ~~评审 §5 立刻 #1 —— `docs/06-onboarding-permissions.md` 的
       欢迎屏 → 隐私承诺 checkbox → 引导 Input Monitoring 授权 →
       引导 Accessibility 授权。~~ ✅ A25 已 land（PR #45）。
-- [ ] **推迟** — 评审 §5 立刻 #2：Developer ID 签名、`notarytool`
-      上传、Sparkle appcast。`Makefile` 当前没有 `sign` / `release`
-      target。`docs/07-distribution.md` 描述了预期流程。**不再阻
-      塞 v1.0.0**；等 Apple Developer 注册完成后以 `v1.0.1`
-      签名分发补丁或并入 `v1.1` 出。rc1 / 1.0.0 用 ad-hoc 签名
-      让维护者自己的 Mac 做回归。
-- [ ] **推迟** — 更新检查的出站调用；随 Sparkle 一起落（跟上面
-      §5 立刻 #2 同一个补丁）。落地时 §4 隐私审计文案也要更
-      新成「除更新检查外零出站」。
+- [ ] **仍推迟** — Developer ID 签名 + `notarytool` 上传。首次
+      安装在一台干净 Mac 上依然要右键 Open → Open 一次
+      （或 `xattr -dr com.apple.quarantine`）。Apple Developer 注
+      册完成后给 `package.yml` 补 `codesign` + `notarytool` step，
+      之后的 stable tag 自动签名通过，Sparkle 管线不变。
+- [x] ~~评审 §5 立刻 #2 的 Sparkle appcast 部分~~ —— ✅ 已 land
+      (#64 app / #65 CI / #67 公钥 / `SPARKLE_ED_PRIVATE_KEY`
+      secret)。`package.yml` 在 stable-final tag 上自动用 EdDSA
+      签名 zip 并生成 `appcast.xml`，`releases/latest/download/
+      appcast.xml` 解析到 `v1.0.0`，菜单栏 "Check for updates…"
+      全链路工作。
+- [x] ~~更新检查的出站调用~~ —— ✅ 同上。§4 隐私审计文案已更新：
+      空闲 0 连接、手动点"Check for updates…" 只一次
+      `github.com` HTTPS 连接。
 
 ## 8. Sign-off
 
-- [ ] §§0–6 所有框都打勾。
-- [ ] §7 的两个推迟项在 `CHANGELOG.md` 的 `[1.0.0-rc1]` 与
-      `[1.0.0-rc2]` 块里都被**显式推迟**到 `v1.0.1` / `v1.1`，
-      并附 issue 链接（如尚未开则现开）。
-- [ ] `CHANGELOG.md` 把**最新 rc**（当前是 `[1.0.0-rc2]`）升级
-      成 `[1.0.0] — <date>`。
-- [ ] 通过 `tag-release` workflow 创建 tag `v1.0.0` 并推送（或者
-      `git tag -s v1.0.0 && git push origin v1.0.0` 如果你本地有签
-      名密钥）。
-- [ ] `package` workflow 跑完后，去 GitHub Release 页面把生成的
-      pre-Release 升级成正式 Release，并把 §7 #2 完成后的签名
-      DMG 也附上去。
+- [ ] §§0–6 所有框都打勾（维护者真机回归）。
+- [x] §7 剩下的 Dev ID 签名项在 `CHANGELOG.md` 的 `[1.0.0]`
+      块里**显式推迟**到后续 `codesign` + `notarytool` 补丁。
+- [x] `CHANGELOG.md` 把 `[1.0.0-rc2]` 升级成 `[1.0.0] — 2026-04-21`。
+- [ ] 通过 `tag-release` workflow 创建 tag `v1.0.0` 并推送 —
+      CI 检测到 stable-final tag 格式后自动走 sign_update +
+      generate_appcast 流程。
+- [ ] `tag-release` 触发的 `package.yml` 跑完后，确认 Release
+      页面上除了 `Pulse-1.0.0.zip` + `.sha256` 之外还有
+      `appcast.xml`；`prerelease` 标记应当是 `false`
+      （stable-final gate 翻转）。

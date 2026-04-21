@@ -10,9 +10,9 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ---
 
-## [1.0.0-rc2] — 2026-04-20
+## [1.0.0] — 2026-04-21
 
-Second release candidate. Layers on top of `1.0.0-rc1` with the
+First stable tag. Layers on top of `1.0.0-rc1` with the
 cross-metric insight engine called out by review §3.4 (the last
 review-flagged §3 row — review §3.4 was originally slotted for v1.2,
 pulled forward), the first time-of-day insight rule, the Vital Pulse
@@ -23,17 +23,22 @@ Dashboard cards (F-27 MacBook lid / F-26 rest segments / F-10
 day timeline / F-06 weekly PDF), the F-47 time-range purge, and
 Sparkle-powered in-app updates.
 
-**Partially addressed — remaining deferrals**:
+**Remaining deferral** (single item):
 
-- ~~Sparkle appcast / in-app update flow~~ — **closed**. EdDSA-signed
-  update pipeline lands in D2 (app) + D3 (CI). From this release on,
-  the "Check for updates…" menu entry downloads a signed bundle,
-  verifies the signature, replaces the `.app` in-place, and does
-  **not** re-trigger Gatekeeper quarantine or TCC permission prompts.
-- Developer ID signing + `notarytool` — **still deferred**. First
-  install still needs the right-click-Open dance on a fresh Mac.
-  Apple Developer enrolment lands → add `codesign` + `notarytool`
-  steps to `package.yml` → subsequent tags pick up automatically.
+- Developer ID signing + `notarytool`. First install on a fresh
+  Mac still needs the right-click → Open → Open Gatekeeper dance
+  (or `xattr -dr com.apple.quarantine`). Once Apple Developer
+  enrolment completes, add `codesign` + `notarytool` steps to
+  `package.yml` — subsequent stable tags pick up automatically
+  and the Sparkle / appcast path stays unchanged.
+
+  All other signing-adjacent work is **closed** in this release:
+  the EdDSA-signed in-app update pipeline lands in D2 (app) + D3
+  (CI). "Check for updates…" downloads a signed bundle, verifies
+  the signature, replaces the `.app` in-place, and does **not**
+  re-trigger Gatekeeper quarantine or TCC permission prompts —
+  so after the one-time first-install friction, every
+  subsequent version swaps cleanly.
 
 ### Dashboard & Narrative (A)
 

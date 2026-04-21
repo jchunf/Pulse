@@ -58,7 +58,9 @@ make run          # 上一步 + 直接 open
 2. 菜单栏出现 Pulse 图标。打开 Dashboard 后，权限横幅 (A8) 会深链到系统设置；依次给 **Input Monitoring** 和 **Accessibility** 勾选。
 3. 授权 Input Monitoring 后 macOS 会重启 Pulse，正常现象。
 
-> **注意**：ad-hoc 签名没有稳定的 Team ID；如果你重新 `make app` 且 Gatekeeper 认为 codesign identity 变了，可能需要再授权一次权限。正式 Developer ID 签名后就会稳定下来（见 `docs/07-distribution.md`，仍是 v1.0 blocker）。
+**之后的更新自动化处理**（v1.0 起）：菜单栏 **Check for updates…** 或 Settings → About 里的同名按钮 —— Sparkle 走自己的 EdDSA 验签通道下载新 `.app` 并原地替换，**不会**重新触发 Gatekeeper，也**不会**再让你重授权 Input Monitoring / Accessibility（bundle identifier 不变）。检查动作严格手动，不会后台发请求（`docs/05-privacy.md` §七）。
+
+> **注意**：ad-hoc 签名没有稳定的 Team ID；如果你重新 `make app` 且 Gatekeeper 认为 codesign identity 变了，可能需要再授权一次权限。正式 Developer ID 签名后首次安装就也不用右键 Open 了（见 `docs/07-distribution.md`，v1.0 后续 patch 补位）。
 
 完整的 v1.0 回归清单见 [`docs/V1-REGRESSION.md`](docs/V1-REGRESSION.md)。
 
