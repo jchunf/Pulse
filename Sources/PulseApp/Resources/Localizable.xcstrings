@@ -3978,6 +3978,74 @@
           }
         }
       }
+    },
+    "Pulse exited unexpectedly last time": {
+      "comment": "F-49b CrashBeaconBanner — headline shown when last session did not shut down cleanly.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse exited unexpectedly last time"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse 上次异常退出"
+          }
+        }
+      }
+    },
+    "A diagnostic report was saved by macOS. Open it to see the stack trace, or dismiss this banner — it won't reappear unless another crash happens.": {
+      "comment": "F-49b CrashBeaconBanner — body text explaining the crash report and dismiss behavior.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A diagnostic report was saved by macOS. Open it to see the stack trace, or dismiss this banner — it won't reappear unless another crash happens."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS 已保存一份诊断报告。打开它可以查看崩溃堆栈；或者忽略 — 此横幅只在再次异常退出时才会重新出现。"
+          }
+        }
+      }
+    },
+    "Show crash report": {
+      "comment": "F-49b CrashBeaconBanner — opens the latest Pulse diagnostic report in Finder.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show crash report"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看崩溃报告"
+          }
+        }
+      }
+    },
+    "Dismiss": {
+      "comment": "Generic dismiss action label; used by F-49b CrashBeaconBanner and any future banner.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dismiss"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "忽略"
+          }
+        }
+      }
     }
   }
 }
