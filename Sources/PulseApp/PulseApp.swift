@@ -45,7 +45,8 @@ struct PulseApp: App {
         Window("Pulse Dashboard", id: "dashboard") {
             DashboardView(
                 model: appDelegate.dashboardModel,
-                healthModel: appDelegate.healthModel
+                healthModel: appDelegate.healthModel,
+                crashBeacon: appDelegate.crashBeacon
             )
         }
         .defaultSize(width: 720, height: 480)
@@ -147,6 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let anomalyMonitor: AnomalyMonitor
     let goalsStore: GoalsStore
     let updateController: UpdateController
+    let crashBeacon: CrashBeacon
 
     /// Passthrough channel the MenuBarLabel listens on to open the
     /// briefing window. AppDelegate fires this on first-wake-of-day and
@@ -210,6 +212,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         self.goalsStore = GoalsStore()
         self.updateController = UpdateController()
+        // Must be constructed once, **early**, during AppDelegate init:
+        // its init records the launch timestamp and clears the
+        // graceful-shutdown flag. Any later crash before
+        // `applicationWillTerminate` runs will leave the flag at
+        // false, which the next launch reads as "crashed".
+        self.crashBeacon = CrashBeacon()
         self.dashboardModel = DashboardModel(
             store: dbResult.database.map { EventStore(database: $0) },
             goalsStore: self.goalsStore
@@ -275,6 +283,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let wakeObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
         }
+        // F-49b: stamp the graceful-shutdown flag. Reaching this
+        // method means NSApplication got a clean terminate signal —
+        // Cmd+Q, NSApplicationDelegate.applicationShouldTerminate
+        // confirmation, Sparkle-initiated restart, or a user logout.
+        // Kill -9 / SIGSEGV / force-quit bypasses this entirely, so
+        // the next launch's CrashBeacon init detects the mismatch.
+        crashBeacon.recordGracefulShutdown()
         Task { [runtime] in await runtime?.stop() }
     }
 
@@ -1091,12 +1106,16 @@ struct DashboardView: View {
 
     @ObservedObject var model: DashboardModel
     @ObservedObject var healthModel: HealthModel
+    @ObservedObject var crashBeacon: CrashBeacon
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: PulseDesign.cardSpacing) {
                 header
                 DashboardPermissionBanner(permissions: healthModel.snapshot.permissions)
+                if crashBeacon.crashedLastSession {
+                    CrashBeaconBanner(beacon: crashBeacon)
+                }
                 if let achievement = model.recentAchievement {
                     MilestoneAchievementBanner(
                         achievement: achievement,
@@ -1299,6 +1318,60 @@ struct DashboardPermissionBanner: View {
                     .strokeBorder(PulseDesign.amber.opacity(0.25), lineWidth: 0.5)
             )
         }
+    }
+}
+
+/// F-49b — shown at the top of the Dashboard the next time the app
+/// opens after it was killed abnormally (crash, SIGKILL, forced
+/// shutdown). Deliberately quiet visual — amber accent, not coral,
+/// because the user has already lost data-collection continuity
+/// for the missed window and the last thing we want is to make
+/// them feel panicked about it. Two actions: reveal the most recent
+/// diagnostic report in Finder, or acknowledge and dismiss.
+struct CrashBeaconBanner: View {
+
+    @ObservedObject var beacon: CrashBeacon
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(PulseDesign.amber)
+                .font(.system(size: 18, weight: .medium))
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Pulse exited unexpectedly last time", bundle: .module)
+                    .font(.body.weight(.medium))
+                Text("A diagnostic report was saved by macOS. Open it to see the stack trace, or dismiss this banner — it won't reappear unless another crash happens.", bundle: .module)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 10) {
+                    Button {
+                        beacon.revealLatestCrashReport()
+                    } label: {
+                        Text("Show crash report", bundle: .module)
+                            .font(.footnote)
+                    }
+                    .buttonStyle(.link)
+                    Button {
+                        beacon.acknowledge()
+                    } label: {
+                        Text("Dismiss", bundle: .module)
+                            .font(.footnote)
+                    }
+                    .buttonStyle(.link)
+                }
+                .padding(.top, 2)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(PulseDesign.amber.opacity(0.08))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(PulseDesign.amber.opacity(0.25), lineWidth: 0.5)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
