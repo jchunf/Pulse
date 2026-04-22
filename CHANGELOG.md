@@ -10,6 +10,51 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ---
 
+## [Unreleased]
+
+Final v1.1 slice — closes F-04 mouse trajectory visualisation, the
+last remaining row in the v1.1 queue from `docs/08-roadmap.md` §四.
+
+### Dashboard & Narrative (A)
+
+- **A35** F-04 mouse-trails card — per-display 128×128 density
+  heatmap in the Dashboard's Apps section. 7-day rolling window,
+  `log1p`-normalised sage → coral ramp tied to the Vital Pulse
+  palette, optional `CIGaussianBlur` for smoothness.
+  `MouseTrajectoryCard` hides itself when no display has any
+  activity yet; per-display tiles honor physical aspect ratio via
+  the latest `display_snapshots` row.
+
+### Data layer additions
+
+- **A35** `EventStore.mouseDensity(endingAt:days:calendar:)` +
+  `latestDisplaySnapshot(displayId:)` in
+  `Sources/PulseCore/Storage/MouseTrajectoryQueries.swift`. Returns
+  `[MouseDisplayHistogram]` sorted by total count, cells sorted
+  `(bin_y, bin_x)` for diff-friendly tests.
+- **A35** `MouseDensityRenderer` (pure `CGImage` producer, stateless,
+  `Sendable`) in `Sources/PulseCore/Rendering/`. Core Graphics +
+  Core Image rather than Metal — data is pre-binned in SQL, per
+  refresh render is 10-40 ms per tile without the GPU.
+
+### 采集 / Collection (B)
+
+- **B9** `day_mouse_density` pre-aggregation table + `V4` migration.
+  `rollRawToSecond` now folds rolled coordinates into a 128×128
+  bin-per-(local-day, display) histogram before deleting the raw
+  rows. Solves the gap where `raw_mouse_moves` was emptied every
+  60 seconds and `sec_mouse` / `min_mouse` carried no coordinates —
+  F-04 now has multi-day data to render. Bounded by design
+  (~30 MB / display / year).
+
+### i18n
+
+- **A35** 5 new keys in en + zh-Hans: `Mouse trails`,
+  `No mouse movement recorded yet.`, `Display %lld`,
+  `Primary display`, `%@ moves · last 7 days`.
+
+---
+
 ## [1.0.0] — 2026-04-21
 
 First stable tag. Layers on top of `1.0.0-rc1` with the

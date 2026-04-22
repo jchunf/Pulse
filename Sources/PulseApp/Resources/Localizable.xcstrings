@@ -4046,6 +4046,91 @@
           }
         }
       }
+    },
+    "Mouse trails": {
+      "comment": "F-04 MouseTrajectoryCard — title of the density-heatmap card in the Apps section.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mouse trails"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "鼠标轨迹"
+          }
+        }
+      }
+    },
+    "No mouse movement recorded yet.": {
+      "comment": "F-04 MouseTrajectoryCard — empty state when the density table has no cells in the window.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No mouse movement recorded yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有记录到鼠标移动。"
+          }
+        }
+      }
+    },
+    "Display %lld": {
+      "comment": "F-04 MouseTrajectoryCard — fallback label for a display tile when the display is unnamed. %lld is the internal CGDirectDisplayID.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Display %lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示器 %lld"
+          }
+        }
+      }
+    },
+    "Primary display": {
+      "comment": "F-04 MouseTrajectoryCard — label for the primary (built-in / main) display tile.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Primary display"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主显示器"
+          }
+        }
+      }
+    },
+    "%@ moves · last 7 days": {
+      "comment": "F-04 MouseTrajectoryCard — subtitle showing total mouse-move count recorded across all displays in the window. %@ is an already-formatted integer with locale-appropriate grouping separators.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ moves · last 7 days"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 次移动 · 最近 7 天"
+          }
+        }
+      }
     }
   }
 }

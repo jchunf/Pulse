@@ -686,6 +686,11 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var lidOpensTrend: [Int] = []
     @Published private(set) var restToday: RestDay = RestDay(segments: [])
     @Published private(set) var timelineToday: DayTimeline?
+    /// F-04 — per-display 128×128 density histograms over
+    /// `trajectoryDays`. The Card asks a renderer for a `CGImage` off
+    /// the main thread via `.task(id:)`, so this struct stays cheap to
+    /// publish even when it carries several thousand non-zero cells.
+    @Published private(set) var trajectoryTiles: [MouseTrajectoryTileData] = []
     @Published private(set) var lastRefreshAt: Date?
     @Published private(set) var errorMessage: String?
     @Published private(set) var recentAchievement: LandmarkAchievement?
@@ -709,6 +714,10 @@ final class DashboardModel: ObservableObject {
     /// the newest column is always "this week" regardless of which
     /// weekday today is.
     nonisolated static let continuityDays = 365
+    /// F-04 trajectory-density window. 7 days covers "my last week" —
+    /// the obvious zoom for a density map — and keeps the query under
+    /// ~20k rows even on a two-display setup.
+    nonisolated static let trajectoryDays = 7
 
     init(store: EventStore?, goalsStore: GoalsStore) {
         self.store = store
@@ -771,6 +780,26 @@ final class DashboardModel: ObservableObject {
             let lidTrend = try store.lidOpensTrend(endingAt: now, days: Self.trendDays)
             let restDay = try store.restSegments(on: dayStart, capUntil: now)
             let timeline = try store.dayTimeline(on: dayStart, capUntil: now)
+            // F-04 — `mouseDensity` reads from the pre-binned
+            // `day_mouse_density` table (B9) so this is a lightweight
+            // grouped scan even over 7 days. `latestDisplaySnapshot`
+            // is one extra PK-lookup per display — fine inside the
+            // refresh loop.
+            let trajectoryHistograms = try store.mouseDensity(
+                endingAt: now,
+                days: Self.trajectoryDays
+            )
+            var trajectoryTiles: [MouseTrajectoryTileData] = []
+            trajectoryTiles.reserveCapacity(trajectoryHistograms.count)
+            for histogram in trajectoryHistograms {
+                let snapshot = try? store.latestDisplaySnapshot(displayId: histogram.displayId)
+                trajectoryTiles.append(
+                    MouseTrajectoryTileData(
+                        histogram: histogram,
+                        snapshot: snapshot
+                    )
+                )
+            }
             let progress = GoalEvaluator.evaluate(
                 goals: goalsStore.enabledGoals(),
                 summary: summary,
@@ -814,6 +843,7 @@ final class DashboardModel: ObservableObject {
             self.lidOpensTrend = lidTrend
             self.restToday = restDay
             self.timelineToday = timeline
+            self.trajectoryTiles = trajectoryTiles
             self.lastRefreshAt = now
             self.errorMessage = nil
             updateAchievementIfNeeded(
@@ -1166,6 +1196,9 @@ struct DashboardView: View {
                     DashboardSectionHeader(titleKey: "Apps")
                     DayTimelineCard(timeline: model.timelineToday)
                     AppRankingChart(rows: summary.topApps)
+                    if !model.trajectoryTiles.isEmpty {
+                        MouseTrajectoryCard(tiles: model.trajectoryTiles)
+                    }
 
                     // ── Section 5 — Health (diagnostics, kept last) ──
                     DashboardSectionHeader(titleKey: "Health")
@@ -2994,6 +3027,154 @@ struct ContinuityCard: View {
         } else {
             return PulseDesign.sage
         }
+    }
+}
+
+/// Bundle passed to `MouseTrajectoryCard` — the raw histogram plus the
+/// latest display snapshot so the rendered tile honors the display's
+/// physical aspect ratio. `snapshot` may be `nil` on a first launch
+/// where no `display_snapshots` row has been written yet; the card
+/// falls back to a square tile in that case.
+struct MouseTrajectoryTileData: Equatable {
+    let histogram: MouseDisplayHistogram
+    let snapshot: DisplayInfo?
+}
+
+/// F-04 — mouse-trail density heatmap per display. One tile per
+/// display with any activity in `DashboardModel.trajectoryDays`. Each
+/// tile renders its `MouseDensityRenderer` output on a background
+/// `.task(id:)` so the main actor keeps moving while the CGImage is
+/// produced. The card is omitted entirely when no display has cells
+/// (see the `trajectoryTiles.isEmpty` guard in `DashboardView`).
+struct MouseTrajectoryCard: View {
+
+    let tiles: [MouseTrajectoryTileData]
+
+    private var totalMoves: Int64 {
+        tiles.reduce(into: Int64(0)) { $0 += $1.histogram.totalCount }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "scribble.variable")
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(0.85)
+                Text("Mouse trails", bundle: .module)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            subtitle
+            VStack(spacing: 16) {
+                ForEach(tiles, id: \.histogram.displayId) { tile in
+                    MouseTrajectoryTile(tile: tile)
+                }
+            }
+        }
+        .pulseFeaturedCard()
+    }
+
+    @ViewBuilder
+    private var subtitle: some View {
+        if totalMoves > 0 {
+            let formatted = totalMoves.formatted(.number)
+            Text(
+                String.localizedStringWithFormat(
+                    NSLocalizedString(
+                        "%@ moves · last 7 days",
+                        bundle: .module,
+                        comment: "F-04 MouseTrajectoryCard — subtitle showing total mouse-move count recorded across all displays in the window."
+                    ),
+                    formatted
+                )
+            )
+            .font(PulseDesign.labelFont)
+            .tracking(0.3)
+            .foregroundStyle(.secondary)
+        } else {
+            Text("No mouse movement recorded yet.", bundle: .module)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// One tile inside `MouseTrajectoryCard`. Renders the display's
+/// density heatmap as a `CGImage` computed via `.task(id:)` so the
+/// work happens off the main actor on first appearance and whenever
+/// the histogram changes. Aspect ratio comes from the latest
+/// `display_snapshots` row for this display; tiles fall back to a
+/// square when no snapshot is available yet.
+private struct MouseTrajectoryTile: View {
+
+    let tile: MouseTrajectoryTileData
+
+    @State private var renderedImage: CGImage?
+
+    private static let renderer = MouseDensityRenderer()
+
+    private var aspectRatio: CGFloat {
+        if let snapshot = tile.snapshot, snapshot.heightPoints > 0 {
+            return CGFloat(snapshot.widthPoints) / CGFloat(snapshot.heightPoints)
+        }
+        return 1.0
+    }
+
+    private var displayLabel: String {
+        if let snapshot = tile.snapshot, snapshot.isPrimary {
+            return NSLocalizedString(
+                "Primary display",
+                bundle: .module,
+                comment: "F-04 MouseTrajectoryCard — tile label for the primary display."
+            )
+        }
+        return String.localizedStringWithFormat(
+            NSLocalizedString(
+                "Display %lld",
+                bundle: .module,
+                comment: "F-04 MouseTrajectoryCard — fallback tile label for a non-primary display."
+            ),
+            Int64(tile.histogram.displayId)
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(displayLabel)
+                .font(PulseDesign.labelFont)
+                .tracking(0.3)
+                .foregroundStyle(.secondary)
+            GeometryReader { geometry in
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(PulseDesign.warmGray(0.08))
+                    if let image = renderedImage {
+                        Image(decorative: image, scale: 1, orientation: .up)
+                            .resizable()
+                            .interpolation(.high)
+                            .aspectRatio(contentMode: .fit)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+                .frame(width: geometry.size.width, height: geometry.size.width / aspectRatio)
+            }
+            .frame(height: tileHeight)
+        }
+        .task(id: tile.histogram) {
+            // `.task(id:)` runs a child Task off the view-update
+            // critical path; the ~10–40 ms render therefore doesn't
+            // stall the DashboardModel refresh. Re-runs automatically
+            // whenever the histogram changes.
+            let image = Self.renderer.render(tile.histogram)
+            self.renderedImage = image
+        }
+    }
+
+    /// Fixed tile height, scaled by aspect so two displays stack at a
+    /// consistent vertical rhythm. 180pt on a 16:10 display gives a
+    /// ~288pt width — comfortable inside the card without dominating
+    /// the Apps section.
+    private var tileHeight: CGFloat {
+        180
     }
 }
 

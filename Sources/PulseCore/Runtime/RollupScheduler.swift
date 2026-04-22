@@ -170,6 +170,12 @@ public final class RollupScheduler: @unchecked Sendable {
 
     private func rollRawToSecond(now: Date) throws {
         let cutoffMillis = Int64(AggregationRules.secondBucket(for: now).timeIntervalSince1970 * 1_000)
+        // Local-midnight-in-UTC bucketing (see `day_mouse_density` comments
+        // in V4__mouse_density.sql). `secondsFromGMT(for:)` picks up DST
+        // correctly at `now` — rows rolled from wall-clock "yesterday"
+        // during a DST transition land in the wall-clock day they were
+        // produced, which is what users expect.
+        let localOffsetSeconds = Int64(TimeZone.current.secondsFromGMT(for: now))
         try database.queue.write { db in
             try db.execute(sql: """
                 INSERT INTO sec_mouse (ts_second, move_events, click_events, scroll_ticks, distance_mm)
@@ -200,6 +206,27 @@ public final class RollupScheduler: @unchecked Sendable {
                 ON CONFLICT(ts_second) DO UPDATE SET
                     press_count = sec_key.press_count + excluded.press_count
                 """, arguments: [cutoffMillis])
+
+            // F-04 / B9: fold rolled coordinates into a 128×128 density bin
+            // keyed by (local day, display). Runs **before** the DELETE below
+            // because the raw rows are this step's only data source. The
+            // 128-cell grid is the MouseTrajectoryGrid.size constant; the
+            // clamps guard the x_norm = 1.0 edge so `CAST(1.0 * 128 AS INTEGER)
+            // = 128` maps to bin 127, not out-of-bounds.
+            try db.execute(sql: """
+                INSERT INTO day_mouse_density (day, display_id, bin_x, bin_y, count)
+                SELECT
+                    (((ts / 1000 + ?) / 86400) * 86400) - ? AS day,
+                    display_id,
+                    MIN(127, MAX(0, CAST(x_norm * 128 AS INTEGER))) AS bin_x,
+                    MIN(127, MAX(0, CAST(y_norm * 128 AS INTEGER))) AS bin_y,
+                    COUNT(*) AS count
+                FROM raw_mouse_moves
+                WHERE ts < ?
+                GROUP BY day, display_id, bin_x, bin_y
+                ON CONFLICT(day, display_id, bin_x, bin_y) DO UPDATE SET
+                    count = day_mouse_density.count + excluded.count
+                """, arguments: [localOffsetSeconds, localOffsetSeconds, cutoffMillis])
 
             // After rolling, mark the rolled rows by deleting them from raw
             // tables that have already been aggregated. Retention purge will
