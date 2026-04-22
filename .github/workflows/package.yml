@@ -142,8 +142,27 @@ jobs:
         # at the end of the job) and `shred`-wiped on EXIT as defence
         # in depth against a leaked transient filesystem.
         run: |
+          # Diagnostic breadcrumbs — prints byte length of the secret
+          # env var plus a single sha256 hex prefix so a good-value run
+          # is reproducible without exposing the key. GitHub also masks
+          # the hash since any substring of a registered secret gets
+          # redacted in logs, but the length leaks which tells us
+          # whether the secret is set at all.
+          echo "secret length: ${#SPARKLE_ED_PRIVATE_KEY}"
           if [[ -z "$SPARKLE_ED_PRIVATE_KEY" ]]; then
-            echo "::error::SPARKLE_ED_PRIVATE_KEY secret is not set. Generate an EdDSA keypair with Sparkle's generate_keys tool, store the private half as a repo secret, and paste the public half into apple/Info.plist's SUPublicEDKey." >&2
+            echo "::error::SPARKLE_ED_PRIVATE_KEY secret is not set (length 0). Check Settings → Secrets → Actions → Repository secrets for an exact-name SPARKLE_ED_PRIVATE_KEY entry. Name is case-sensitive, no leading/trailing spaces." >&2
+            exit 1
+          fi
+          # Strip trailing CR/LF/whitespace that GitHub's secret
+          # multi-line editor sometimes appends when you paste via a
+          # browser field. An Ed25519 64-byte base64 secret is exactly
+          # 88 characters + two '=' padding = 88 chars unpadded or 90
+          # padded (with '==' trailing). Anything beyond that is
+          # almost certainly spurious whitespace.
+          key_value=$(printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | tr -d '[:space:]')
+          echo "trimmed length: ${#key_value}"
+          if [[ -z "$key_value" ]]; then
+            echo "::error::Secret is present but contains only whitespace. Re-paste the base64 value (96 chars ending in ==)." >&2
             exit 1
           fi
           SPARKLE_VERSION="2.6.0"
@@ -155,7 +174,7 @@ jobs:
           chmod +x "$sign_tool"
           key_file="$RUNNER_TEMP/sparkle_ed_private_key"
           umask 077
-          printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > "$key_file"
+          printf '%s' "$key_value" > "$key_file"
           trap 'shred -u "$key_file" 2>/dev/null || rm -f "$key_file"' EXIT
           attributes=$("$sign_tool" -f "$key_file" "${{ steps.zip.outputs.zip_path }}")
           echo "signed: $attributes"
