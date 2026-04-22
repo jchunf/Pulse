@@ -99,6 +99,24 @@ jobs:
           echo "zip_name=$zip_name" >> "$GITHUB_OUTPUT"
           shasum -a 256 "$zip_name" | tee "$zip_name.sha256"
 
+      # DMG is the human-facing install artifact. The mounted image
+      # holds Pulse.app + a symlink to /Applications so testers get
+      # the canonical drag-to-install affordance — and importantly
+      # fixes Sparkle's "must be in Applications folder" refusal
+      # once the user completes the drag.
+      #
+      # Sparkle still pulls the .zip for auto-update (see the sign +
+      # appcast steps below); DMG is strictly for first install.
+      - name: Build DMG
+        id: dmg
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          bash scripts/build_dmg.sh
+          dmg_name="Pulse-${{ steps.version.outputs.version }}.dmg"
+          echo "dmg_path=dist/$dmg_name" >> "$GITHUB_OUTPUT"
+          echo "dmg_name=$dmg_name" >> "$GITHUB_OUTPUT"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -106,6 +124,8 @@ jobs:
           path: |
             ${{ steps.zip.outputs.zip_path }}
             ${{ steps.zip.outputs.zip_path }}.sha256
+            ${{ steps.dmg.outputs.dmg_path }}
+            ${{ steps.dmg.outputs.dmg_path }}.sha256
           # Pre-release artifacts are cheap; a week is enough for the
           # maintainer to grab or for anyone reviewing a PR to try it.
           retention-days: 14
@@ -240,17 +260,34 @@ jobs:
           body: |
             **Distribution: ad-hoc codesigned (Developer ID pending).**
 
-            First install still needs the Gatekeeper dance: right-click
-            the `.app` in Finder → Open → Open, or run
-            `xattr -dr com.apple.quarantine Pulse.app` once. After that,
-            Pulse auto-updates through **Sparkle** on a manual
-            *Check for updates…* click — the bundle is EdDSA-signed so
-            the updater verifies every download before it replaces the
-            running app, and the replacement does not re-trigger
-            Gatekeeper or re-prompt for Input Monitoring / Accessibility.
+            ### Install
 
-            Developer ID signing + notarization (so the first launch
-            skips Gatekeeper too) are still deferred; see
+            Grab `Pulse-<version>.dmg`, double-click to mount, drag
+            `Pulse.app` onto the Applications symlink, eject the
+            volume. The `.dmg` also makes Sparkle's "must be in
+            Applications folder" check happy on the next update.
+
+            First launch still needs the Gatekeeper dance once:
+            right-click `/Applications/Pulse.app` → Open → Open
+            (ad-hoc codesign, no Developer ID yet), or run
+            `xattr -dr com.apple.quarantine /Applications/Pulse.app`.
+
+            ### Updates
+
+            From this version on, Pulse auto-updates through **Sparkle**
+            on a manual *Check for updates…* click — bundles are
+            EdDSA-signed so the updater verifies every download before
+            it replaces the running app, and the in-place replace does
+            NOT re-trigger Gatekeeper or re-prompt for Input Monitoring /
+            Accessibility permissions.
+
+            The `.zip` is what Sparkle downloads during auto-update.
+            Manual reinstallers can grab either `.zip` or `.dmg`;
+            `.sha256` sidecars let you verify the download against the
+            values published on GitHub.
+
+            Developer ID signing + notarization (so the first-launch
+            right-click is not needed either) are still deferred; see
             `CHANGELOG.md` and `docs/07-distribution.md`.
 
             Auto-generated changelog below — merged PRs since the
@@ -258,4 +295,6 @@ jobs:
           files: |
             ${{ steps.zip.outputs.zip_path }}
             ${{ steps.zip.outputs.zip_path }}.sha256
+            ${{ steps.dmg.outputs.dmg_path }}
+            ${{ steps.dmg.outputs.dmg_path }}.sha256
             dist/appcast.xml
