@@ -76,6 +76,48 @@ for b in "$BUILD_DIR"/*.bundle; do
 done
 shopt -u nullglob
 
+echo "==> embed Sparkle.framework"
+# Sparkle ships as a binary `.xcframework` via SPM. `swift build` writes
+# the framework into its artifacts cache and links the executable with
+# an `@rpath/Sparkle.framework/…` load command, but it does **not**
+# copy the framework next to the executable — so a bare `swift run`
+# works (SPM patches DYLD_FRAMEWORK_PATH at launch), but a standalone
+# `.app` bundle crashes immediately because dyld can't resolve the
+# framework. Fix: copy the right slice into `Contents/Frameworks/`
+# and ensure the executable has `@executable_path/../Frameworks` in
+# its rpath list before the ad-hoc codesign at the bottom of this
+# script seals everything in.
+FRAMEWORKS="$CONTENTS/Frameworks"
+mkdir -p "$FRAMEWORKS"
+# The xcframework layout puts each arch slice in its own subdir. For
+# Sparkle 2.5+ the combined fat slice lives at
+# `macos-arm64_x86_64/Sparkle.framework`. Fall back to any macos-*
+# slice so this survives Sparkle reshipping a split-slice layout.
+sparkle_fw=""
+if [[ -d "$ROOT/.build/artifacts" ]]; then
+    sparkle_fw=$(find "$ROOT/.build/artifacts" -type d -name 'Sparkle.framework' -path '*macos-arm64_x86_64*' 2>/dev/null | head -1)
+    if [[ -z "$sparkle_fw" ]]; then
+        sparkle_fw=$(find "$ROOT/.build/artifacts" -type d -name 'Sparkle.framework' -path '*macos*' 2>/dev/null | head -1)
+    fi
+fi
+if [[ -z "$sparkle_fw" || ! -d "$sparkle_fw" ]]; then
+    echo "error: Sparkle.framework not found under .build/artifacts/; did SPM resolve Sparkle? Try 'swift package resolve'." >&2
+    exit 1
+fi
+echo "    source: $sparkle_fw"
+# Preserve the Versions/A + Current symlink structure — ditto is the
+# Apple-recommended copy tool for .framework because it keeps the
+# extended attributes, ad-hoc codesign state, and symlinks intact.
+ditto "$sparkle_fw" "$FRAMEWORKS/Sparkle.framework"
+
+# SPM-linked executables get a @loader_path rpath into SPM's own
+# artifact cache but not the Frameworks dir of a .app. Add one.
+# Idempotent — install_name_tool errors harmlessly on duplicate add,
+# so the grep guard keeps repeat runs clean.
+if ! otool -l "$MACOS/$EXEC_NAME" | grep -q '@executable_path/../Frameworks'; then
+    install_name_tool -add_rpath @executable_path/../Frameworks "$MACOS/$EXEC_NAME" 2>/dev/null || true
+fi
+
 echo "==> generate + embed app icon"
 # Every build regenerates the .icns so a palette tweak in
 # scripts/generate-icon.swift propagates on the very next run without
