@@ -99,7 +99,7 @@ public struct MouseDensityRenderer: Sendable {
 
         for cell in histogram.cells where cell.count > 0 {
             let intensity = log1p(Double(cell.count)) / peakLog
-            let color = sample(ramp: configuration.rampStops, at: intensity)
+            let color = Self.sample(ramp: configuration.rampStops, at: intensity)
             let r = UInt8(clamping: Int((color.red * 255).rounded()))
             let g = UInt8(clamping: Int((color.green * 255).rounded()))
             let b = UInt8(clamping: Int((color.blue * 255).rounded()))
