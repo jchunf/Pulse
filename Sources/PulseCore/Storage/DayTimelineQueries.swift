@@ -53,14 +53,22 @@ public extension EventStore {
         var currentStartMs = startMs
         var currentBundle = priorBundle
         for (ts, bundle) in events {
-            if let current = currentBundle, ts > currentStartMs {
+            if let current = currentBundle,
+               !SystemAppFilter.excludedBundles.contains(current),
+               ts > currentStartMs {
                 segments.append(Self.segment(startMs: currentStartMs, endMs: ts, bundleId: current))
             }
             currentStartMs = ts
             currentBundle = bundle
         }
-        // Tail segment ending at capUntil.
-        if let current = currentBundle, endMs > currentStartMs {
+        // Tail segment ending at capUntil. Same `excludedBundles` filter
+        // as the loop above — without it, a locked-screen session right
+        // up to `capUntil` would credit the whole trailing interval to
+        // `com.apple.loginwindow` (the opposite of "what the user is
+        // actually doing").
+        if let current = currentBundle,
+           !SystemAppFilter.excludedBundles.contains(current),
+           endMs > currentStartMs {
             segments.append(Self.segment(startMs: currentStartMs, endMs: endMs, bundleId: current))
         }
 

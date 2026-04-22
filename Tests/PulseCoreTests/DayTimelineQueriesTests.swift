@@ -207,4 +207,43 @@ struct DayTimelineQueriesTests {
         )
         #expect(timeline.topBundles(limit: 2).count == 2)
     }
+
+    // MARK: - SystemAppFilter exclusion (matches A26g / focus-path parity)
+
+    @Test("loginwindow intervals do not produce timeline segments")
+    func loginWindowSegmentsSkipped() throws {
+        let (store, db) = try makeStore()
+        // Terminal 09-10, loginwindow 10-15 (user locked screen for a
+        // meeting), Chrome 15-17. The loginwindow span must NOT appear
+        // in the timeline — otherwise "I spent 5 h in loginwindow"
+        // ends up in the band, which is the exact bug A26g closed on
+        // the focus / ranking paths.
+        try insertSwitch(db, bundle: "com.apple.Terminal",    at: at(9, 0))
+        try insertSwitch(db, bundle: "com.apple.loginwindow", at: at(10, 0))
+        try insertSwitch(db, bundle: "com.google.Chrome",     at: at(15, 0))
+        let timeline = try store.dayTimeline(
+            on: referenceNow,
+            capUntil: referenceNow,
+            calendar: utcCalendar
+        )
+        let bundles = timeline.segments.map(\.bundleId)
+        #expect(!bundles.contains("com.apple.loginwindow"))
+        #expect(bundles == ["com.apple.Terminal", "com.google.Chrome"])
+        #expect(timeline.segments[0].durationSeconds == 1 * 3_600)  // 09→10
+        #expect(timeline.segments[1].durationSeconds == 2 * 3_600)  // 15→17
+    }
+
+    @Test("loginwindow as the tail bundle produces no tail segment")
+    func loginWindowTailSkipped() throws {
+        let (store, db) = try makeStore()
+        try insertSwitch(db, bundle: "com.apple.Terminal",    at: at(9, 0))
+        try insertSwitch(db, bundle: "com.apple.loginwindow", at: at(12, 0))
+        let timeline = try store.dayTimeline(
+            on: referenceNow,
+            capUntil: referenceNow,
+            calendar: utcCalendar
+        )
+        let bundles = timeline.segments.map(\.bundleId)
+        #expect(bundles == ["com.apple.Terminal"])
+    }
 }

@@ -1021,7 +1021,14 @@ struct HealthMenuView: View {
                     Spacer()
                     Button { NSApp.terminate(nil) } label: {
                         Text("Quit Pulse", bundle: .module)
+                            .padding(.horizontal, 4)
                     }
+                    // `.bordered` gives the button a visible chip
+                    // background in both light and dark mode. Without
+                    // it the default plain style renders as bare text
+                    // that disappears against the dark menu-bar
+                    // popover background.
+                    .buttonStyle(.bordered)
                     .keyboardShortcut("q")
                 }
                 HStack(spacing: 14) {
@@ -3143,21 +3150,29 @@ private struct MouseTrajectoryTile: View {
                 .font(PulseDesign.labelFont)
                 .tracking(0.3)
                 .foregroundStyle(.secondary)
-            GeometryReader { geometry in
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(PulseDesign.warmGray(0.08))
-                    if let image = renderedImage {
-                        Image(decorative: image, scale: 1, orientation: .up)
-                            .resizable()
-                            .interpolation(.high)
-                            .aspectRatio(contentMode: .fit)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(PulseDesign.warmGray(0.08))
+                if let image = renderedImage {
+                    // `.resizable()` without a `.aspectRatio(.fit)` lets
+                    // the square 128×128-cell CGImage stretch into the
+                    // container's display-aspect rectangle, which is
+                    // what the user expects ("this is what my screen
+                    // looks like, density-wise"). The surrounding ZStack
+                    // supplies the aspect via the modifier below.
+                    Image(decorative: image, scale: 1, orientation: .up)
+                        .resizable()
+                        .interpolation(.high)
                 }
-                .frame(width: geometry.size.width, height: geometry.size.width / aspectRatio)
             }
-            .frame(height: tileHeight)
+            // Size the tile to the display's real aspect, capped at a
+            // fixed max height so the Dashboard card doesn't balloon
+            // vertically when the user has a wide display + a tall
+            // Dashboard window. `.fit` + `maxHeight` combine to pick
+            // whichever dimension hits the cap first.
+            .aspectRatio(aspectRatio, contentMode: .fit)
+            .frame(maxWidth: .infinity, maxHeight: Self.maxTileHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
         .task(id: tile.histogram) {
             // `.task(id:)` runs a child Task off the view-update
@@ -3169,13 +3184,11 @@ private struct MouseTrajectoryTile: View {
         }
     }
 
-    /// Fixed tile height, scaled by aspect so two displays stack at a
-    /// consistent vertical rhythm. 180pt on a 16:10 display gives a
-    /// ~288pt width — comfortable inside the card without dominating
-    /// the Apps section.
-    private var tileHeight: CGFloat {
-        180
-    }
+    /// Tile height cap. 220pt on a 16:10 display gives a ~352pt wide
+    /// tile — comfortable inside the Apps section without forcing the
+    /// whole card to scroll when the user has multiple displays
+    /// stacked.
+    private static let maxTileHeight: CGFloat = 220
 }
 
 struct AppRankingChart: View {
