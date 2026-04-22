@@ -195,13 +195,17 @@ jobs:
           echo "signing archive: $zip_path ($(wc -c <"$zip_path") bytes)"
           # Capture stdout + stderr + exit code separately so we can
           # surface sign_update's own error messages if it rejects
-          # the key or archive.
+          # the key or archive. Note that sign_update prints most
+          # validation errors (key length / format rejections) to
+          # stdout, not stderr — so we have to dump both on failure.
           set +e
           attributes=$("$sign_tool" -f "$key_file" "$zip_path" 2> "$tmp/sign.err")
           sign_rc=$?
           set -e
-          if [[ $sign_rc -ne 0 || -z "$attributes" ]]; then
-            echo "::error::sign_update exit $sign_rc" >&2
+          if [[ $sign_rc -ne 0 || -z "$attributes" || "$attributes" != sparkle:edSignature=* ]]; then
+            echo "::error::sign_update exit $sign_rc (or returned non-signature stdout)" >&2
+            echo "----- sign_update stdout -----" >&2
+            printf '%s\n' "$attributes" >&2
             echo "----- sign_update stderr -----" >&2
             cat "$tmp/sign.err" >&2 || true
             echo "------------------------------" >&2
