@@ -134,53 +134,82 @@ jobs:
         if: steps.channel.outputs.is_stable == 'true'
         env:
           SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
-        # `sign_update` from Sparkle's release tarball prints the
-        # enclosure attribute string on stdout, e.g.
-        #   sparkle:edSignature="…" length="…"
-        # which we capture verbatim and hand to generate_appcast.sh.
-        # The private-key file is written to $RUNNER_TEMP (cleaned up
-        # at the end of the job) and `shred`-wiped on EXIT as defence
-        # in depth against a leaked transient filesystem.
+        # Verbose per-stage logging so if any sub-command fails
+        # silently (curl | tar pipe errors, missing extracted binary,
+        # sign_update key-format rejection) the log points straight
+        # at the failing stage without needing a rerun.
         run: |
-          # Diagnostic breadcrumbs — prints byte length of the secret
-          # env var plus a single sha256 hex prefix so a good-value run
-          # is reproducible without exposing the key. GitHub also masks
-          # the hash since any substring of a registered secret gets
-          # redacted in logs, but the length leaks which tells us
-          # whether the secret is set at all.
+          set -uo pipefail
+          echo "::group::Secret sanity"
           echo "secret length: ${#SPARKLE_ED_PRIVATE_KEY}"
           if [[ -z "$SPARKLE_ED_PRIVATE_KEY" ]]; then
-            echo "::error::SPARKLE_ED_PRIVATE_KEY secret is not set (length 0). Check Settings → Secrets → Actions → Repository secrets for an exact-name SPARKLE_ED_PRIVATE_KEY entry. Name is case-sensitive, no leading/trailing spaces." >&2
+            echo "::error::SPARKLE_ED_PRIVATE_KEY secret is not set (length 0). Settings → Secrets and variables → Actions → Repository secrets → exact-name SPARKLE_ED_PRIVATE_KEY entry." >&2
             exit 1
           fi
-          # Strip trailing CR/LF/whitespace that GitHub's secret
-          # multi-line editor sometimes appends when you paste via a
-          # browser field. An Ed25519 64-byte base64 secret is exactly
-          # 88 characters + two '=' padding = 88 chars unpadded or 90
-          # padded (with '==' trailing). Anything beyond that is
-          # almost certainly spurious whitespace.
+          # Ed25519 64-byte keypair → base64 with '==' padding = 88
+          # chars. GitHub's web secret editor occasionally appends a
+          # newline when you tab out of the textarea; trim whitespace
+          # and warn loudly if anything beyond 88 remains.
           key_value=$(printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | tr -d '[:space:]')
           echo "trimmed length: ${#key_value}"
           if [[ -z "$key_value" ]]; then
-            echo "::error::Secret is present but contains only whitespace. Re-paste the base64 value (96 chars ending in ==)." >&2
+            echo "::error::Secret value is whitespace-only after trimming. Re-paste the 88-char base64 key (ending in ==)." >&2
             exit 1
           fi
+          if [[ ${#key_value} -ne 88 ]]; then
+            echo "::warning::expected 88 chars, got ${#key_value} — sign_update may reject the key"
+          fi
+          echo "::endgroup::"
+
+          echo "::group::Download Sparkle 2.6.0 tools"
           SPARKLE_VERSION="2.6.0"
           tmp="$RUNNER_TEMP/sparkle"
           mkdir -p "$tmp"
-          curl -sSL "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz" \
-            | tar -xJ -C "$tmp"
+          tar_url="https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
+          echo "downloading $tar_url"
+          if ! curl -fsSL "$tar_url" -o "$tmp/sparkle.tar.xz"; then
+            echo "::error::curl failed fetching Sparkle tarball (HTTP or network error)" >&2
+            exit 1
+          fi
+          echo "downloaded bytes: $(wc -c <"$tmp/sparkle.tar.xz")"
+          if ! tar -xJf "$tmp/sparkle.tar.xz" -C "$tmp"; then
+            echo "::error::tar failed to extract Sparkle tarball (corrupt download?)" >&2
+            exit 1
+          fi
           sign_tool="$tmp/bin/sign_update"
-          chmod +x "$sign_tool"
+          if [[ ! -x "$sign_tool" ]]; then
+            echo "::error::sign_update not found at $sign_tool after extraction" >&2
+            echo "tarball listing:" >&2
+            tar -tJf "$tmp/sparkle.tar.xz" | grep -i sign_update >&2 || true
+            exit 1
+          fi
+          echo "sign_update: $("$sign_tool" -h 2>&1 | head -1 || true)"
+          echo "::endgroup::"
+
+          echo "::group::Prepare key file + sign"
           key_file="$RUNNER_TEMP/sparkle_ed_private_key"
           umask 077
           printf '%s' "$key_value" > "$key_file"
           trap 'shred -u "$key_file" 2>/dev/null || rm -f "$key_file"' EXIT
-          attributes=$("$sign_tool" -f "$key_file" "${{ steps.zip.outputs.zip_path }}")
+          zip_path="${{ steps.zip.outputs.zip_path }}"
+          echo "signing archive: $zip_path ($(wc -c <"$zip_path") bytes)"
+          # Capture stdout + stderr + exit code separately so we can
+          # surface sign_update's own error messages if it rejects
+          # the key or archive.
+          set +e
+          attributes=$("$sign_tool" -f "$key_file" "$zip_path" 2> "$tmp/sign.err")
+          sign_rc=$?
+          set -e
+          if [[ $sign_rc -ne 0 || -z "$attributes" ]]; then
+            echo "::error::sign_update exit $sign_rc" >&2
+            echo "----- sign_update stderr -----" >&2
+            cat "$tmp/sign.err" >&2 || true
+            echo "------------------------------" >&2
+            exit 1
+          fi
           echo "signed: $attributes"
-          # Emit as output for the next step. The attributes string
-          # is a single line; safe to pass through $GITHUB_OUTPUT.
           echo "attributes=$attributes" >> "$GITHUB_OUTPUT"
+          echo "::endgroup::"
 
       - name: Generate appcast.xml
         if: steps.channel.outputs.is_stable == 'true'
