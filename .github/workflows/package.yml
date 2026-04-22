@@ -146,18 +146,22 @@ jobs:
             echo "::error::SPARKLE_ED_PRIVATE_KEY secret is not set (length 0). Settings → Secrets and variables → Actions → Repository secrets → exact-name SPARKLE_ED_PRIVATE_KEY entry." >&2
             exit 1
           fi
-          # Ed25519 64-byte keypair → base64 with '==' padding = 88
-          # chars. GitHub's web secret editor occasionally appends a
-          # newline when you tab out of the textarea; trim whitespace
-          # and warn loudly if anything beyond 88 remains.
+          # Sparkle 2.6's sign_update accepts ONLY two base64 formats
+          # (see Sparkle/common_cli/secret.swift#secretUsesRegularSeed):
+          #   - 32 bytes (new format, raw Ed25519 seed) → 44 chars
+          #     base64 with one '=' padding
+          #   - 96 bytes (legacy, 64-byte expanded priv + 32-byte pub)
+          #     → 128 chars base64 with no padding
+          # GitHub's secret editor occasionally appends a newline when
+          # the textarea loses focus; strip whitespace before checking.
           key_value=$(printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | tr -d '[:space:]')
           echo "trimmed length: ${#key_value}"
           if [[ -z "$key_value" ]]; then
-            echo "::error::Secret value is whitespace-only after trimming. Re-paste the 88-char base64 key (ending in ==)." >&2
+            echo "::error::Secret value is whitespace-only after trimming. Re-paste the base64 key (44 chars for a 32-byte seed, 128 chars for the legacy 96-byte format)." >&2
             exit 1
           fi
-          if [[ ${#key_value} -ne 88 ]]; then
-            echo "::warning::expected 88 chars, got ${#key_value} — sign_update may reject the key"
+          if [[ ${#key_value} -ne 44 && ${#key_value} -ne 128 ]]; then
+            echo "::warning::expected 44 chars (32B seed) or 128 chars (96B legacy), got ${#key_value} — sign_update will reject the key. See Sparkle/common_cli/secret.swift."
           fi
           echo "::endgroup::"
 
