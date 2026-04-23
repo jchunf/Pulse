@@ -3962,6 +3962,23 @@
         }
       }
     },
+    "Settings…": {
+      "comment": "HealthMenuView header gear icon tooltip + accessibility label — opens the Settings window. Only Settings entry on the menu-bar-only build because ⌘, needs a key window Pulse lacks by default.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置…"
+          }
+        }
+      }
+    },
     "Receive development builds": {
       "comment": "Settings About toggle — opt into the rolling dev channel.",
       "localizations": {

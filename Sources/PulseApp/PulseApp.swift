@@ -966,12 +966,32 @@ struct HealthMenuView: View {
     let onExportData: () -> Void
     let onCheckForUpdates: () -> Void
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Pulse", bundle: .module)
                     .font(.system(.headline, design: .rounded, weight: .semibold))
+                // Gearshape right next to the app name — the only
+                // Settings entry on a menu-bar-only (LSUIElement=1)
+                // build, because `⌘,` needs a key window Pulse never
+                // has by default and the system menu-bar is suppressed.
+                Button {
+                    openSettings()
+                    // `.accessory` activation policy keeps Pulse out of
+                    // the Dock; activate the process explicitly so the
+                    // Settings window comes to front instead of dropping
+                    // behind whatever was previously focused.
+                    NSApp.activate(ignoringOtherApps: true)
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help(Text("Settings…", bundle: .module))
+                .accessibilityLabel(Text("Settings…", bundle: .module))
                 Spacer()
                 Text(localizedStatusHeadline(for: model.snapshot), bundle: .module)
                     .font(.footnote)
