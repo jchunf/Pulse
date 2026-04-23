@@ -2013,7 +2013,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "生成本周报告"
+            "value": "本周报告"
           }
         }
       }
@@ -2333,7 +2333,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "导出数据…"
+            "value": "导出数据"
           }
         }
       }
@@ -3940,7 +3940,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "周报 PDF…"
+            "value": "周报 PDF"
           }
         }
       }
@@ -3957,7 +3957,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "检查更新…"
+            "value": "检查更新"
           }
         }
       }

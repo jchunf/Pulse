@@ -1021,13 +1021,16 @@ struct HealthMenuView: View {
                     Spacer()
                     Button { NSApp.terminate(nil) } label: {
                         Text("Quit Pulse", bundle: .module)
+                            .foregroundStyle(.primary)
                             .padding(.horizontal, 4)
                     }
                     // `.bordered` gives the button a visible chip
-                    // background in both light and dark mode. Without
-                    // it the default plain style renders as bare text
-                    // that disappears against the dark menu-bar
-                    // popover background.
+                    // background in both light and dark mode. The
+                    // inner .primary foregroundStyle is what keeps
+                    // the label readable in dark mode — otherwise
+                    // the label picks up the accent color which in
+                    // our coral theme sits very close to the popover
+                    // background and disappears.
                     .buttonStyle(.bordered)
                     .keyboardShortcut("q")
                 }
@@ -3343,7 +3346,13 @@ struct PermissionList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ForEach(Permission.allCases, id: \.self) { permission in
+            // Only the two permissions Pulse actually depends on are
+            // shown here. Calendars / Location / Notifications are
+            // declared for future features but exposing them as
+            // "未决定" today reads as if the user has outstanding
+            // setup when they don't — keep them hidden until they
+            // gate real functionality.
+            ForEach(PermissionList.visible, id: \.self) { permission in
                 HStack {
                     Text(localizedPermissionName(permission))
                     Spacer()
@@ -3354,6 +3363,8 @@ struct PermissionList: View {
             }
         }
     }
+
+    static let visible: [Permission] = [.inputMonitoring, .accessibility]
 }
 
 /// Shown only when one or more required permissions aren't granted.
