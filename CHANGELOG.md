@@ -55,6 +55,56 @@ last remaining row in the v1.1 queue from `docs/08-roadmap.md` §四.
 
 ---
 
+## [1.1.10] — 2026-04-23
+
+Dev channel + rolling pre-releases for frictionless round-trip
+testing: every `main` merge now lands in a stable-URL pre-release,
+and clients that opt in via Settings pick it up through Sparkle
+instead of re-downloading a DMG by hand.
+
+### Dashboard & Narrative (A)
+
+- **A36** Menu-bar popover CTA symmetry — shared `menuBarChip`
+  modifier so "Open dashboard" and "Quit Pulse" share shape / height
+  / corner radius / padding (fill colour is the only delta); the
+  secondary row's 5 buttons now span the full popover width via
+  `Spacer(minLength:)` instead of clustering left. Resolves the
+  dark-mode visibility thread that began in #78 (#81).
+
+### Infrastructure
+
+- **A37** Rolling `dev-latest` GitHub pre-release on every `main`
+  push. Stable download URLs at
+  `releases/download/dev-latest/{Pulse.dmg,Pulse.zip}` — testers
+  grab the freshest `main` without waiting on a hand-cut tag. Tag
+  is deleted + recreated on each merge so assets always match
+  `HEAD(main)`. CI version label for main pushes changes from
+  `-ci.N+sha` to `-dev.N+sha` to visibly mark testable builds vs
+  throwaway PR validation builds (#82, #83).
+
+- **A38** Sparkle dev channel (opt-in). Settings → About gains a
+  "Receive development builds" toggle; flipping it points the next
+  "Check for updates…" at the dev appcast served from the
+  `dev-latest` release, so every `main` merge auto-prompts a dev
+  subscriber within minutes. Implementation uses two separate
+  feed URLs (stable `SUFeedURL` + dev `SUDevFeedURL` in Info.plist,
+  selected by `PulseUpdaterDelegate.feedURLString(for:)`) rather
+  than a single appcast with `<sparkle:channel>` filter tags — the
+  channel-tag approach was tried and reverted pre-v1.1.6 because
+  clients without `SUAllowedChannels` silently skipped every tagged
+  item (the 1.1.4→1.1.5 "you're on the latest" bug was this).
+  `scripts/generate_appcast.sh` accepts `CHANNEL=stable|dev`;
+  `package.yml` runs EdDSA signing on main pushes too and uploads
+  `appcast.xml` into the `dev-latest` release. Default stays
+  `stable` so users who never flip the toggle are unaffected (#84).
+
+### i18n
+
+- **A38** zh-Hans for `Receive development builds` and the toggle
+  caption.
+
+---
+
 ## [1.0.0] — 2026-04-21
 
 First stable tag. Layers on top of `1.0.0-rc1` with the
