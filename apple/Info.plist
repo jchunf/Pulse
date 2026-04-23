@@ -46,6 +46,13 @@
          PR β lands. -->
     <key>SUFeedURL</key>
     <string>https://github.com/jchunf/Pulse/releases/latest/download/appcast.xml</string>
+    <!-- Dev-channel feed, resolved by PulseUpdaterDelegate when the user
+         has flipped Settings → About → "Receive development builds".
+         Attached to the rolling `dev-latest` GitHub pre-release, so the
+         URL stays constant across every main merge (see package.yml
+         "Generate + upload dev appcast" step). -->
+    <key>SUDevFeedURL</key>
+    <string>https://github.com/jchunf/Pulse/releases/download/dev-latest/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string>RTOW4MYZsX5c1vJ297lY1giGyQQoPxR3hbM4e0S4DHU=</string>
     <key>SUEnableAutomaticChecks</key>
