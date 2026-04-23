@@ -34,15 +34,16 @@
 # To avoid re-stepping into that trap the dev channel now lives on its
 # own feed URL (`releases/download/dev-latest/appcast.xml`), selected
 # client-side by `SPUUpdaterDelegate.feedURLString(for:)` when the user
-# opts into dev builds. That means:
-#   - CHANNEL=stable → enclosure points at the tagged release zip; no
-#     `<sparkle:channel>` tag emitted. Visible to every client, exactly
-#     like the pre-channel flow.
-#   - CHANNEL=dev    → enclosure points at the rolling `dev-latest`
-#     release zip. A `<sparkle:channel>dev</sparkle:channel>` tag is
-#     emitted as defensive signposting even though this appcast lives
-#     on a separate URL — it prevents a client that accidentally points
-#     at the dev feed from mistaking a dev build for a stable one.
+# opts into dev builds. No `<sparkle:channel>` tags are emitted on
+# either feed — channel isolation comes entirely from the feed URL.
+#
+# A previous revision of this script emitted `<sparkle:channel>dev</sparkle:channel>`
+# on dev items as "defensive signposting". It re-triggered the original
+# bug: Sparkle filters items whose `channel` is not in the client's
+# `allowedChannelsForUpdater:` set, and the delegate didn't implement
+# that method, so every tagged item was silently dropped. v1.1.10 users
+# who flipped the toggle saw "You're up to date" forever. The tag is
+# now removed; the feed URL is the only channel selector.
 #
 # The appcast intentionally only carries one <item>: the release that
 # just built. Sparkle clients pick the newest `sparkle:version` they
@@ -73,11 +74,14 @@ case "$CHANNEL" in
     dev)
         # Dev items live on the rolling `dev-latest` release. ZIP_NAME
         # is "Pulse.zip" (stable filename, see PR #83) so the URL is
-        # bookmarkable across merges.
+        # bookmarkable across merges. No channel tag — see header comment:
+        # the feed URL is the only channel selector; a tag would make
+        # Sparkle filter this item out for every client that doesn't
+        # implement `allowedChannelsForUpdater:`.
         enclosure_url="https://github.com/${REPO}/releases/download/dev-latest/${ZIP_NAME}"
         release_notes_url="https://github.com/${REPO}/releases/tag/dev-latest"
         item_title="Dev ${VERSION}"
-        channel_tag="      <sparkle:channel>dev</sparkle:channel>"
+        channel_tag=""
         ;;
     *)
         echo "generate_appcast.sh: unknown CHANNEL=${CHANNEL} (expected stable|dev)" >&2
