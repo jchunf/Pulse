@@ -16,9 +16,9 @@ enum WeeklyReportRenderer {
         let startString = formatDate(report.weekStart, style: .long)
         let endInclusive = Calendar.current.date(byAdding: .day, value: -1, to: report.weekEnd) ?? report.weekEnd
         let endString = formatDate(endInclusive, style: .long)
-        let title = String(localized: "weekly.report.title", bundle: .module)
+        let title = String(localized: "weekly.report.title", bundle: .pulse)
         let subtitle = String.localizedStringWithFormat(
-            String(localized: "weekly.report.subtitle", bundle: .module),
+            String(localized: "weekly.report.subtitle", bundle: .pulse),
             startString,
             endString
         )
@@ -27,19 +27,19 @@ enum WeeklyReportRenderer {
         let strings = WeeklyReportHTMLRenderer.Strings(
             title: title,
             subtitle: subtitle,
-            distanceLabel:   String(localized: "Distance", bundle: .module),
-            keystrokesLabel: String(localized: "Keystrokes", bundle: .module),
-            clicksLabel:     String(localized: "Clicks", bundle: .module),
-            scrollsLabel:    String(localized: "Scrolls", bundle: .module),
-            idleLabel:       String(localized: "Idle time", bundle: .module),
-            topAppsHeading:  String(localized: "Top apps", bundle: .module),
-            dailyBreakdownHeading: String(localized: "weekly.report.dailyBreakdown", bundle: .module),
-            dayHeader:       String(localized: "weekly.report.day", bundle: .module),
-            appHeader:       String(localized: "weekly.report.app", bundle: .module),
-            secondsHeader:   String(localized: "Active time", bundle: .module),
+            distanceLabel:   String(localized: "Distance", bundle: .pulse),
+            keystrokesLabel: String(localized: "Keystrokes", bundle: .pulse),
+            clicksLabel:     String(localized: "Clicks", bundle: .pulse),
+            scrollsLabel:    String(localized: "Scrolls", bundle: .pulse),
+            idleLabel:       String(localized: "Idle time", bundle: .pulse),
+            topAppsHeading:  String(localized: "Top apps", bundle: .pulse),
+            dailyBreakdownHeading: String(localized: "weekly.report.dailyBreakdown", bundle: .pulse),
+            dayHeader:       String(localized: "weekly.report.day", bundle: .pulse),
+            appHeader:       String(localized: "weekly.report.app", bundle: .pulse),
+            secondsHeader:   String(localized: "Active time", bundle: .pulse),
             landmarkSentence: landmarkSentence,
             generatedFooter: String.localizedStringWithFormat(
-                String(localized: "weekly.report.generated", bundle: .module),
+                String(localized: "weekly.report.generated", bundle: .pulse),
                 formatDate(Date(), style: .medium)
             )
         )

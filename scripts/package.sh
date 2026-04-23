@@ -68,8 +68,14 @@ chmod +x "$MACOS/$EXEC_NAME"
 
 echo "==> copy resource bundles"
 # SPM emits <PackageName>_<TargetName>.bundle next to the executable.
-# Bundle.module inside the app looks them up via Bundle.main.resourceURL,
-# so they belong in Contents/Resources/.
+# Canonical location inside an .app is Contents/Resources/. Our own
+# `Bundle.pulse` accessor (Sources/*/ResourceBundle.swift) is what
+# looks these up at runtime, intentionally replacing SPM's auto-
+# generated `Bundle.module` — the latter ships an accessor that only
+# probes `Bundle.main.bundleURL/<name>.bundle` + a hardcoded CI build
+# path, neither of which exists inside a shipped .app. dev-latest 111
+# crashed on launch with exactly that fatalError; see git log for
+# details.
 shopt -s nullglob
 for b in "$BUILD_DIR"/*.bundle; do
     cp -R "$b" "$RESOURCES/"

@@ -47,8 +47,8 @@ public struct Migrator: Sendable {
         let resourceNames = BundledMigrations.resourceNames
         var steps: [Step] = []
         for name in resourceNames {
-            guard let url = Bundle.module.url(forResource: name.withoutExtension, withExtension: "sql", subdirectory: "Migrations")
-                ?? Bundle.module.url(forResource: name.withoutExtension, withExtension: "sql") else {
+            guard let url = Bundle.pulseCore.url(forResource: name.withoutExtension, withExtension: "sql", subdirectory: "Migrations")
+                ?? Bundle.pulseCore.url(forResource: name.withoutExtension, withExtension: "sql") else {
                 throw MigrationError.bundledResourceMissing(name)
             }
             let sql: String
@@ -82,7 +82,7 @@ public struct Migrator: Sendable {
 }
 
 /// Inventory of bundled migrations. Kept as a separate enum so tests can
-/// assert ordering and parsing rules without needing `Bundle.module`.
+/// assert ordering and parsing rules without needing `Bundle.pulseCore`.
 enum BundledMigrations {
     /// Every migration filename shipped with PulseCore. Update when adding
     /// a new `V{n}__*.sql` file.

@@ -165,7 +165,7 @@ struct OnboardingView: View {
                 Button {
                     model.back()
                 } label: {
-                    Text("Back", bundle: .module)
+                    Text("Back", bundle: .pulse)
                 }
                 .buttonStyle(.bordered)
             }
@@ -175,7 +175,7 @@ struct OnboardingView: View {
                     OnboardingModel.markCompleted()
                     onFinish()
                 } label: {
-                    Text("Open Pulse", bundle: .module)
+                    Text("Open Pulse", bundle: .pulse)
                         .padding(.horizontal, 10)
                 }
                 .buttonStyle(.borderedProminent)
@@ -185,7 +185,7 @@ struct OnboardingView: View {
                 Button {
                     model.advance()
                 } label: {
-                    Text("Continue", bundle: .module)
+                    Text("Continue", bundle: .pulse)
                         .padding(.horizontal, 10)
                 }
                 .buttonStyle(.borderedProminent)
@@ -220,9 +220,9 @@ private struct WelcomeStep: View {
                     .foregroundStyle(PulseDesign.coral)
             }
             .padding(.bottom, 4)
-            Text("Welcome to Pulse", bundle: .module)
+            Text("Welcome to Pulse", bundle: .pulse)
                 .font(.system(.largeTitle, design: .rounded, weight: .semibold))
-            Text("A local-first dashboard for the way you actually use your Mac. Pulse turns the noisy stream of clicks, key presses, scrolls and app switches into a daily story you can read in 30 seconds.", bundle: .module)
+            Text("A local-first dashboard for the way you actually use your Mac. Pulse turns the noisy stream of clicks, key presses, scrolls and app switches into a daily story you can read in 30 seconds.", bundle: .pulse)
                 .font(.body)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
@@ -239,9 +239,9 @@ private struct PledgeStep: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Privacy promises", bundle: .module)
+            Text("Privacy promises", bundle: .pulse)
                 .font(.system(.title2, design: .rounded, weight: .semibold))
-            Text("Before we ask for any permissions, here is what Pulse will and will not do — read it first.", bundle: .module)
+            Text("Before we ask for any permissions, here is what Pulse will and will not do — read it first.", bundle: .pulse)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 12) {
@@ -253,7 +253,7 @@ private struct PledgeStep: View {
             }
             .padding(.vertical, 4)
             Toggle(isOn: $accepted) {
-                Text("I've read these promises and want to continue.", bundle: .module)
+                Text("I've read these promises and want to continue.", bundle: .pulse)
                     .font(.body)
             }
             .toggleStyle(.checkbox)
@@ -268,7 +268,7 @@ private struct PledgeStep: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Image(systemName: "checkmark.shield.fill")
                 .foregroundStyle(PulseDesign.sage)
-            Text(key, bundle: .module)
+            Text(key, bundle: .pulse)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -305,9 +305,9 @@ private struct PermissionStep: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text(headline, bundle: .module)
+            Text(headline, bundle: .pulse)
                 .font(.system(.title2, design: .rounded, weight: .semibold))
-            Text(body1, bundle: .module)
+            Text(body1, bundle: .pulse)
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -316,7 +316,7 @@ private struct PermissionStep: View {
 
             HStack(spacing: 12) {
                 Button(action: onOpenSettings) {
-                    Text("Open System Settings", bundle: .module)
+                    Text("Open System Settings", bundle: .pulse)
                         .padding(.horizontal, 8)
                 }
                 .buttonStyle(.borderedProminent)
@@ -352,7 +352,7 @@ private struct PermissionStep: View {
                 .font(.body.monospacedDigit())
                 .foregroundStyle(PulseDesign.coral)
                 .frame(width: 18, alignment: .leading)
-            Text(text, bundle: .module)
+            Text(text, bundle: .pulse)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -362,14 +362,14 @@ private struct PermissionStep: View {
         switch status {
         case .granted:
             Label {
-                Text("Granted", bundle: .module)
+                Text("Granted", bundle: .pulse)
             } icon: {
                 Image(systemName: "checkmark.circle.fill")
             }
             .foregroundStyle(PulseDesign.sage)
         case .denied, .notDetermined, .unknown:
             Label {
-                Text("Waiting…", bundle: .module)
+                Text("Waiting…", bundle: .pulse)
             } icon: {
                 Image(systemName: "clock")
             }
@@ -392,9 +392,9 @@ private struct ReadyStep: View {
                     .foregroundStyle(PulseDesign.sage)
             }
             .padding(.bottom, 4)
-            Text("You're set", bundle: .module)
+            Text("You're set", bundle: .pulse)
                 .font(.system(.largeTitle, design: .rounded, weight: .semibold))
-            Text("Pulse is now collecting your activity locally. Open the menu bar icon any time to pause, peek at today's numbers, or read the privacy ledger.", bundle: .module)
+            Text("Pulse is now collecting your activity locally. Open the menu bar icon any time to pause, peek at today's numbers, or read the privacy ledger.", bundle: .pulse)
                 .font(.body)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)

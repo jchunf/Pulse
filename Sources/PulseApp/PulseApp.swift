@@ -115,7 +115,7 @@ struct MenuBarLabel: View {
                     .fill(PulseDesign.critical)
                     .frame(width: 5, height: 5)
                     .offset(x: 2, y: -2)
-                    .accessibilityLabel(Text("Anomaly", bundle: .module))
+                    .accessibilityLabel(Text("Anomaly", bundle: .pulse))
             }
         }
         .onReceive(briefingTrigger) { _ in
@@ -350,7 +350,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .databaseUnavailable:
                 return String(
                     localized: "Database is not available — permission or storage issue.",
-                    bundle: .module,
+                    bundle: .pulse,
                     comment: "F-47 error — no database to purge against."
                 )
             }
@@ -623,7 +623,7 @@ final class HealthModel: ObservableObject {
 
     func recordStartupError(_ error: Error) {
         self.errorMessage = String.localizedStringWithFormat(
-            NSLocalizedString("Couldn't start the collector: %@", bundle: .module, comment: ""),
+            NSLocalizedString("Couldn't start the collector: %@", bundle: .pulse, comment: ""),
             error.localizedDescription
         )
     }
@@ -761,7 +761,7 @@ final class DashboardModel: ObservableObject {
 
     func refresh() async {
         guard let store else {
-            errorMessage = String(localized: "Database not available.", bundle: .module)
+            errorMessage = String(localized: "Database not available.", bundle: .pulse)
             return
         }
         let now = Date()
@@ -852,7 +852,7 @@ final class DashboardModel: ObservableObject {
             )
         } catch {
             self.errorMessage = String.localizedStringWithFormat(
-                NSLocalizedString("Failed to load summary: %@", bundle: .module, comment: ""),
+                NSLocalizedString("Failed to load summary: %@", bundle: .pulse, comment: ""),
                 error.localizedDescription
             )
         }
@@ -938,7 +938,7 @@ func localizedPermissionStatus(_ status: PermissionStatus) -> String {
     case .notDetermined:  key = "permission.status.notDetermined"
     case .unknown:        key = "permission.status.unknown"
     }
-    return NSLocalizedString(key, bundle: .module, value: status.rawValue, comment: "")
+    return NSLocalizedString(key, bundle: .pulse, value: status.rawValue, comment: "")
 }
 
 func localizedPermissionName(_ permission: Permission) -> String {
@@ -950,7 +950,7 @@ func localizedPermissionName(_ permission: Permission) -> String {
     case .location:        key = "Location Services"
     case .notifications:   key = "Notifications"
     }
-    return NSLocalizedString(key, bundle: .module, value: permission.displayName, comment: "")
+    return NSLocalizedString(key, bundle: .pulse, value: permission.displayName, comment: "")
 }
 
 // MARK: - Views
@@ -971,7 +971,7 @@ struct HealthMenuView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Pulse", bundle: .module)
+                Text("Pulse", bundle: .pulse)
                     .font(.system(.headline, design: .rounded, weight: .semibold))
                 // Gearshape right next to the app name — the only
                 // Settings entry on a menu-bar-only (LSUIElement=1)
@@ -990,10 +990,10 @@ struct HealthMenuView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .help(Text("Settings…", bundle: .module))
-                .accessibilityLabel(Text("Settings…", bundle: .module))
+                .help(Text("Settings…", bundle: .pulse))
+                .accessibilityLabel(Text("Settings…", bundle: .pulse))
                 Spacer()
-                Text(localizedStatusHeadline(for: model.snapshot), bundle: .module)
+                Text(localizedStatusHeadline(for: model.snapshot), bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.trailing)
@@ -1040,13 +1040,13 @@ struct HealthMenuView: View {
                         openWindow(id: "dashboard")
                         NSApp.activate(ignoringOtherApps: true)
                     } label: {
-                        Text("Open Dashboard", bundle: .module)
+                        Text("Open Dashboard", bundle: .pulse)
                             .menuBarChip(fill: PulseDesign.coral, foreground: .white)
                     }
                     .buttonStyle(.plain)
                     Spacer()
                     Button { NSApp.terminate(nil) } label: {
-                        Text("Quit Pulse", bundle: .module)
+                        Text("Quit Pulse", bundle: .pulse)
                             .menuBarChip(fill: PulseDesign.warmGray(0.18))
                     }
                     .buttonStyle(.plain)
@@ -1060,35 +1060,35 @@ struct HealthMenuView: View {
                 // row above.
                 HStack(spacing: 0) {
                     Button(action: onShowBriefing) {
-                        Text("Yesterday's briefing", bundle: .module)
+                        Text("Yesterday's briefing", bundle: .pulse)
                             .font(.footnote)
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                     Spacer(minLength: 8)
                     Button(action: onGenerateReport) {
-                        Text("Generate weekly report", bundle: .module)
+                        Text("Generate weekly report", bundle: .pulse)
                             .font(.footnote)
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                     Spacer(minLength: 8)
                     Button(action: onGenerateReportPDF) {
-                        Text("Weekly PDF…", bundle: .module)
+                        Text("Weekly PDF…", bundle: .pulse)
                             .font(.footnote)
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                     Spacer(minLength: 8)
                     Button(action: onExportData) {
-                        Text("Export data…", bundle: .module)
+                        Text("Export data…", bundle: .pulse)
                             .font(.footnote)
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                     Spacer(minLength: 8)
                     Button(action: onCheckForUpdates) {
-                        Text("Check for updates…", bundle: .module)
+                        Text("Check for updates…", bundle: .pulse)
                             .font(.footnote)
                     }
                     .buttonStyle(.plain)
@@ -1162,29 +1162,29 @@ struct PauseControlsView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Label {
-                        Text("Paused", bundle: .module)
+                        Text("Paused", bundle: .pulse)
                     } icon: {
                         Image(systemName: "pause.circle.fill")
                     }
                     .font(.footnote)
                     .foregroundStyle(PulseDesign.amber)
-                    Text("Resumes \(PulseFormat.countdown(from: capturedAt, to: resumesAt))", bundle: .module)
+                    Text("Resumes \(PulseFormat.countdown(from: capturedAt, to: resumesAt))", bundle: .pulse)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button(action: onResume) {
-                    Text("Resume now", bundle: .module)
+                    Text("Resume now", bundle: .pulse)
                 }
             }
         } else {
             Menu {
-                Button { onPause(15 * 60) } label: { Text("15 minutes", bundle: .module) }
-                Button { onPause(30 * 60) } label: { Text("30 minutes", bundle: .module) }
-                Button { onPause(60 * 60) } label: { Text("1 hour",     bundle: .module) }
+                Button { onPause(15 * 60) } label: { Text("15 minutes", bundle: .pulse) }
+                Button { onPause(30 * 60) } label: { Text("30 minutes", bundle: .pulse) }
+                Button { onPause(60 * 60) } label: { Text("1 hour",     bundle: .pulse) }
             } label: {
                 Label {
-                    Text("Pause collection…", bundle: .module)
+                    Text("Pause collection…", bundle: .pulse)
                 } icon: {
                     Image(systemName: "pause.circle")
                 }
@@ -1271,7 +1271,7 @@ struct DashboardView: View {
                         .foregroundStyle(PulseDesign.critical)
                 } else {
                     ProgressView {
-                        Text("Loading today's data…", bundle: .module)
+                        Text("Loading today's data…", bundle: .pulse)
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.top, 40)
@@ -1298,7 +1298,7 @@ struct DashboardView: View {
                     Task { await model.refresh() }
                 } label: {
                     Label {
-                        Text("Refresh", bundle: .module)
+                        Text("Refresh", bundle: .pulse)
                     } icon: {
                         Image(systemName: "arrow.clockwise")
                     }
@@ -1309,10 +1309,10 @@ struct DashboardView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Today", bundle: .module)
+            Text("Today", bundle: .pulse)
                 .font(.system(.largeTitle, design: .rounded, weight: .semibold))
             if let last = model.lastRefreshAt {
-                Text("Updated \(PulseFormat.ago(from: last, to: Date()))", bundle: .module)
+                Text("Updated \(PulseFormat.ago(from: last, to: Date()))", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -1349,7 +1349,7 @@ struct DashboardSectionHeader: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            Text(titleKey, bundle: .module)
+            Text(titleKey, bundle: .pulse)
                 .font(.system(.title3, design: .rounded, weight: .semibold))
                 .foregroundStyle(.primary)
             Capsule()
@@ -1380,10 +1380,10 @@ struct DashboardPermissionBanner: View {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(PulseDesign.amber)
-                    Text("Pulse isn't collecting right now", bundle: .module)
+                    Text("Pulse isn't collecting right now", bundle: .pulse)
                         .font(PulseDesign.cardTitleFont)
                 }
-                Text("Grant the permissions below in System Settings, then relaunch Pulse. Until then the numbers on this page won't update.", bundle: .module)
+                Text("Grant the permissions below in System Settings, then relaunch Pulse. Until then the numbers on this page won't update.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1395,7 +1395,7 @@ struct DashboardPermissionBanner: View {
                             }
                         } label: {
                             Label {
-                                Text("Open \(localizedPermissionName(permission))", bundle: .module)
+                                Text("Open \(localizedPermissionName(permission))", bundle: .pulse)
                             } icon: {
                                 Image(systemName: "arrow.up.forward.app")
                             }
@@ -1435,9 +1435,9 @@ struct CrashBeaconBanner: View {
                 .font(.system(size: 18, weight: .medium))
                 .padding(.top, 2)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Pulse exited unexpectedly last time", bundle: .module)
+                Text("Pulse exited unexpectedly last time", bundle: .pulse)
                     .font(.body.weight(.medium))
-                Text("A diagnostic report was saved by macOS. Open it to see the stack trace, or dismiss this banner — it won't reappear unless another crash happens.", bundle: .module)
+                Text("A diagnostic report was saved by macOS. Open it to see the stack trace, or dismiss this banner — it won't reappear unless another crash happens.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1445,14 +1445,14 @@ struct CrashBeaconBanner: View {
                     Button {
                         beacon.revealLatestCrashReport()
                     } label: {
-                        Text("Show crash report", bundle: .module)
+                        Text("Show crash report", bundle: .pulse)
                             .font(.footnote)
                     }
                     .buttonStyle(.link)
                     Button {
                         beacon.acknowledge()
                     } label: {
-                        Text("Dismiss", bundle: .module)
+                        Text("Dismiss", bundle: .pulse)
                             .font(.footnote)
                     }
                     .buttonStyle(.link)
@@ -1489,14 +1489,14 @@ struct MilestoneAchievementBanner: View {
                 .font(.title3)
                 .foregroundStyle(PulseDesign.sage)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Milestone reached", bundle: .module)
+                Text("Milestone reached", bundle: .pulse)
                     .font(PulseDesign.labelFont)
                     .tracking(0.3)
                     .foregroundStyle(PulseDesign.sage)
-                Text("Today's mileage just hit \(landmarkName) — \(landmarkDistance).", bundle: .module)
+                Text("Today's mileage just hit \(landmarkName) — \(landmarkDistance).", bundle: .pulse)
                     .font(.body)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("You've moved \(movedSoFar) so far today.", bundle: .module)
+                Text("You've moved \(movedSoFar) so far today.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -1508,7 +1508,7 @@ struct MilestoneAchievementBanner: View {
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(.borderless)
-            .help(Text("Dismiss", bundle: .module))
+            .help(Text("Dismiss", bundle: .pulse))
         }
         .pulseFeaturedCard()
     }
@@ -1541,7 +1541,7 @@ struct MileageHeroCard: View {
                 .padding([.top, .trailing], 18)
 
             VStack(alignment: .leading, spacing: 12) {
-                Text("Mouse mileage today", bundle: .module)
+                Text("Mouse mileage today", bundle: .pulse)
                     .font(PulseDesign.labelFont)
                     .tracking(0.4)
                     .foregroundStyle(.secondary)
@@ -1593,7 +1593,7 @@ struct GoalsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Today I want to", bundle: .module)
+            Text("Today I want to", bundle: .pulse)
                 .font(PulseDesign.cardTitleFont)
             VStack(spacing: 10) {
                 ForEach(progress) { row in
@@ -1612,12 +1612,12 @@ struct GoalProgressRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                Text(GoalPresetLocalizer.title(for: progress.definition), bundle: .module)
+                Text(GoalPresetLocalizer.title(for: progress.definition), bundle: .pulse)
                     .font(.footnote)
                 Spacer()
                 if progress.isAchieved {
                     Label {
-                        Text("Achieved", bundle: .module)
+                        Text("Achieved", bundle: .pulse)
                     } icon: {
                         Image(systemName: "checkmark.circle.fill")
                     }
@@ -1704,7 +1704,7 @@ struct LandmarkProgressPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Landmarks", bundle: .module)
+            Text("Landmarks", bundle: .pulse)
                 .font(PulseDesign.cardTitleFont)
             VStack(spacing: 10) {
                 ForEach(rows, id: \.0.key) { row in
@@ -1833,7 +1833,7 @@ struct SummaryMetricCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                Text(titleKey, bundle: .module)
+                Text(titleKey, bundle: .pulse)
                     .font(PulseDesign.labelFont)
                     .tracking(0.3)
                     .foregroundStyle(.secondary)
@@ -1949,10 +1949,10 @@ struct WeekTrendChart: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Weekly trend", bundle: .module)
+            Text("Weekly trend", bundle: .pulse)
                 .font(PulseDesign.cardTitleFont)
             if points.allSatisfy({ $0.totalEvents == 0 }) {
-                Text("No rolled-up activity yet. Check back once hourly roll-ups have run.", bundle: .module)
+                Text("No rolled-up activity yet. Check back once hourly roll-ups have run.", bundle: .pulse)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 12)
             } else {
@@ -2046,10 +2046,10 @@ struct WeekHourlyHeatmap: View {
     @ViewBuilder
     private var headlineText: some View {
         switch days {
-        case ..<7:   Text("Recent heatmap",   bundle: .module)
-        case 7:      Text("Weekly heatmap",   bundle: .module)
-        case 8...14: Text("Two-week heatmap", bundle: .module)
-        default:     Text("\(days)-day heatmap", bundle: .module)
+        case ..<7:   Text("Recent heatmap",   bundle: .pulse)
+        case 7:      Text("Weekly heatmap",   bundle: .pulse)
+        case 8...14: Text("Two-week heatmap", bundle: .pulse)
+        default:     Text("\(days)-day heatmap", bundle: .pulse)
         }
     }
 
@@ -2089,10 +2089,10 @@ struct WeekHourlyHeatmap: View {
             let descriptorKey = Self.descriptorKey(forHour: peak)
             let hourString = String(format: "%02d:00", peak)
             HStack(spacing: 6) {
-                Text("Peak at \(hourString)", bundle: .module)
+                Text("Peak at \(hourString)", bundle: .pulse)
                 Text("·")
                     .foregroundStyle(.tertiary)
-                Text(descriptorKey, bundle: .module)
+                Text(descriptorKey, bundle: .pulse)
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -2137,11 +2137,11 @@ struct WeekHourlyHeatmap: View {
     private func dayLabel(for dayOffset: Int) -> some View {
         switch dayOffset {
         case 0:
-            Text("Today", bundle: .module)
+            Text("Today", bundle: .pulse)
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.secondary)
         case 1:
-            Text("Yday", bundle: .module)
+            Text("Yday", bundle: .pulse)
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.secondary)
         default:
@@ -2183,12 +2183,12 @@ struct DiagnosticsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Diagnostics", bundle: .module)
+            Text("Diagnostics", bundle: .pulse)
                 .font(PulseDesign.cardTitleFont)
 
             if snapshot.isSilentlyFailing {
                 Label {
-                    Text("No writes in the last minute — Pulse may have lost permission or stopped.", bundle: .module)
+                    Text("No writes in the last minute — Pulse may have lost permission or stopped.", bundle: .pulse)
                 } icon: {
                     Image(systemName: "exclamationmark.circle.fill")
                 }
@@ -2203,10 +2203,10 @@ struct DiagnosticsCard: View {
 
             metricRow(labelKey: "Last data point",
                       value: snapshot.lastWriteAt.map { PulseFormat.ago(from: $0, to: snapshot.capturedAt) }
-                        ?? String(localized: "never", bundle: .module))
+                        ?? String(localized: "never", bundle: .pulse))
             metricRow(labelKey: "Last rollup",
                       value: mostRecentRollup.map { PulseFormat.ago(from: $0, to: snapshot.capturedAt) }
-                        ?? String(localized: "never", bundle: .module))
+                        ?? String(localized: "never", bundle: .pulse))
             metricRow(labelKey: "Database size",
                       value: snapshot.databaseFileSizeBytes.map(PulseFormat.bytes) ?? "–")
             metricRow(labelKey: "Total ingest batches",
@@ -2217,7 +2217,7 @@ struct DiagnosticsCard: View {
                 Divider().overlay(PulseDesign.warmGray(0.12))
                 VStack(alignment: .leading, spacing: 4) {
                     Label {
-                        Text("Last writer error", bundle: .module)
+                        Text("Last writer error", bundle: .pulse)
                     } icon: {
                         Image(systemName: "exclamationmark.triangle")
                     }
@@ -2237,7 +2237,7 @@ struct DiagnosticsCard: View {
     @ViewBuilder
     private func metricRow(labelKey: LocalizedStringKey, value: String) -> some View {
         HStack {
-            Text(labelKey, bundle: .module)
+            Text(labelKey, bundle: .pulse)
                 .font(.footnote)
             Spacer()
             Text(value)
@@ -2288,7 +2288,7 @@ struct InsightsCard: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "sparkles")
                     .foregroundStyle(PulseDesign.coral)
-                Text("Today's insights", bundle: .module)
+                Text("Today's insights", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
             VStack(alignment: .leading, spacing: 14) {
@@ -2348,7 +2348,7 @@ struct InsightsCard: View {
                 return String.localizedStringWithFormat(
                     NSLocalizedString(
                         "Today is %lld%% busier than usual",
-                        bundle: .module,
+                        bundle: .pulse,
                         comment: "Insight headline — activity anomaly, above baseline"
                     ),
                     Int64(percentOff)
@@ -2357,7 +2357,7 @@ struct InsightsCard: View {
                 return String.localizedStringWithFormat(
                     NSLocalizedString(
                         "Today is %lld%% quieter than usual",
-                        bundle: .module,
+                        bundle: .pulse,
                         comment: "Insight headline — activity anomaly, below baseline"
                     ),
                     Int64(percentOff)
@@ -2366,7 +2366,7 @@ struct InsightsCard: View {
         case .deepFocusStandout:
             return String(
                 localized: "Biggest focus stretch this week",
-                bundle: .module,
+                bundle: .pulse,
                 comment: "Insight headline — today's longest focus beats the weekly median"
             )
         case let .singleAppDominance(bundleId, _, _):
@@ -2374,7 +2374,7 @@ struct InsightsCard: View {
             return String.localizedStringWithFormat(
                 NSLocalizedString(
                     "Focused day in %@",
-                    bundle: .module,
+                    bundle: .pulse,
                     comment: "Insight headline — one app dominated today; %@ is display name"
                 ),
                 app
@@ -2386,7 +2386,7 @@ struct InsightsCard: View {
                 return String.localizedStringWithFormat(
                     NSLocalizedString(
                         "Your %@ hour was %lld%% busier than usual",
-                        bundle: .module,
+                        bundle: .pulse,
                         comment: "Insight headline — hourly anomaly above baseline. %@ is HH:00, %lld is percent."
                     ),
                     label,
@@ -2396,7 +2396,7 @@ struct InsightsCard: View {
                 return String.localizedStringWithFormat(
                     NSLocalizedString(
                         "Your %@ hour was %lld%% quieter than usual",
-                        bundle: .module,
+                        bundle: .pulse,
                         comment: "Insight headline — hourly anomaly below baseline."
                     ),
                     label,
@@ -2407,7 +2407,7 @@ struct InsightsCard: View {
             return String.localizedStringWithFormat(
                 NSLocalizedString(
                     "Keep your %lld-day streak going",
-                    bundle: .module,
+                    bundle: .pulse,
                     comment: "Insight headline — streak at risk. %lld is the current streak in days."
                 ),
                 Int64(currentStreak)
@@ -2421,7 +2421,7 @@ struct InsightsCard: View {
             return String.localizedStringWithFormat(
                 NSLocalizedString(
                     "Typical day: about %lld key presses. Today: %lld.",
-                    bundle: .module,
+                    bundle: .pulse,
                     comment: "Insight body — activity anomaly comparison numbers"
                 ),
                 Int64(medianKeys),
@@ -2433,7 +2433,7 @@ struct InsightsCard: View {
             return String.localizedStringWithFormat(
                 NSLocalizedString(
                     "%@ in %@ — %lld%% longer than your weekly median.",
-                    bundle: .module,
+                    bundle: .pulse,
                     comment: "Insight body — deep focus standout; duration, app, percent"
                 ),
                 duration,
@@ -2447,7 +2447,7 @@ struct InsightsCard: View {
             return String.localizedStringWithFormat(
                 NSLocalizedString(
                     "%@ accounted for %lld%% of your active time (%@).",
-                    bundle: .module,
+                    bundle: .pulse,
                     comment: "Insight body — single app dominance; app, percent, duration"
                 ),
                 app,
@@ -2459,7 +2459,7 @@ struct InsightsCard: View {
             return String.localizedStringWithFormat(
                 NSLocalizedString(
                     "Usually about %lld events at %@. Today: %lld.",
-                    bundle: .module,
+                    bundle: .pulse,
                     comment: "Insight body — hourly anomaly comparison. %lld median, %@ HH:00, %lld today."
                 ),
                 Int64(medianCount),
@@ -2470,7 +2470,7 @@ struct InsightsCard: View {
             return String.localizedStringWithFormat(
                 NSLocalizedString(
                     "%lld active hours so far today — %lld more and today counts toward the streak.",
-                    bundle: .module,
+                    bundle: .pulse,
                     comment: "Insight body — streak at risk. First %lld is hours logged today, second is hours remaining to qualify."
                 ),
                 Int64(activeHoursToday),
@@ -2499,7 +2499,7 @@ struct DeepFocusCard: View {
                 Image(systemName: "waveform.path.ecg")
                     .foregroundStyle(PulseDesign.coral)
                     .opacity(segment == nil ? 0.35 : 0.85)
-                Text("Deep focus today", bundle: .module)
+                Text("Deep focus today", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
             if let segment {
@@ -2521,7 +2521,7 @@ struct DeepFocusCard: View {
             let app = Self.displayNameCache.name(for: segment.bundleId)
             let start = Self.clockTime(segment.startedAt)
             let end = Self.clockTime(segment.endedAt)
-            Text("\(app) · \(start) – \(end)", bundle: .module)
+            Text("\(app) · \(start) – \(end)", bundle: .pulse)
                 .font(.body)
                 .foregroundStyle(.primary)
                 .opacity(0.8)
@@ -2538,7 +2538,7 @@ struct DeepFocusCard: View {
     }
 
     private var empty: some View {
-        Text("Still warming up — your longest focus streak shows up once you've spent 20+ minutes in one app without going idle.", bundle: .module)
+        Text("Still warming up — your longest focus streak shows up once you've spent 20+ minutes in one app without going idle.", bundle: .pulse)
             .font(.footnote)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -2563,10 +2563,10 @@ struct UsagePostureCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Today's rhythm", bundle: .module)
+            Text("Today's rhythm", bundle: .pulse)
                 .font(PulseDesign.cardTitleFont)
             if posture.sessionCount == 0 {
-                Text("Not enough app-switch data yet — keep using your Mac and this card will tell you whether today is a checker day or a deep-worker day.", bundle: .module)
+                Text("Not enough app-switch data yet — keep using your Mac and this card will tell you whether today is a checker day or a deep-worker day.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -2582,24 +2582,24 @@ struct UsagePostureCard: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 28) {
                 stat(
-                    label: Text("Sessions", bundle: .module),
+                    label: Text("Sessions", bundle: .pulse),
                     value: "\(posture.sessionCount)"
                 )
                 stat(
-                    label: Text("Median", bundle: .module),
+                    label: Text("Median", bundle: .pulse),
                     value: PulseFormat.duration(seconds: posture.medianDurationSeconds)
                 )
                 stat(
-                    label: Text("Average", bundle: .module),
+                    label: Text("Average", bundle: .pulse),
                     value: PulseFormat.duration(seconds: posture.averageDurationSeconds)
                 )
                 stat(
-                    label: Text("Longest", bundle: .module),
+                    label: Text("Longest", bundle: .pulse),
                     value: PulseFormat.duration(seconds: posture.longestDurationSeconds)
                 )
                 Spacer()
             }
-            Text(Self.classificationSentence(for: posture), bundle: .module)
+            Text(Self.classificationSentence(for: posture), bundle: .pulse)
                 .font(.body)
                 .foregroundStyle(Self.classificationColor(for: posture))
                 .fixedSize(horizontal: false, vertical: true)
@@ -2684,7 +2684,7 @@ struct DayTimelineCard: View {
                 Image(systemName: "clock")
                     .foregroundStyle(PulseDesign.sage)
                     .opacity(0.85)
-                Text("Today's timeline", bundle: .module)
+                Text("Today's timeline", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
             bar(timeline)
@@ -2796,20 +2796,20 @@ struct RestCard: View {
                 Image(systemName: "cup.and.saucer")
                     .foregroundStyle(PulseDesign.sage)
                     .opacity(0.85)
-                Text("Rests today", bundle: .module)
+                Text("Rests today", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
             HStack(spacing: 28) {
                 stat(
-                    label: Text("Count", bundle: .module),
+                    label: Text("Count", bundle: .pulse),
                     value: "\(rest.count)"
                 )
                 stat(
-                    label: Text("Longest", bundle: .module),
+                    label: Text("Longest", bundle: .pulse),
                     value: PulseFormat.duration(seconds: rest.longestSeconds)
                 )
                 stat(
-                    label: Text("Total", bundle: .module),
+                    label: Text("Total", bundle: .pulse),
                     value: PulseFormat.duration(seconds: rest.totalSeconds)
                 )
                 Spacer()
@@ -2849,7 +2849,7 @@ struct LidCard: View {
                 Image(systemName: "laptopcomputer")
                     .foregroundStyle(PulseDesign.sage)
                     .opacity(todayOpens > 0 ? 0.85 : 0.45)
-                Text("MacBook lid", bundle: .module)
+                Text("MacBook lid", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
             HStack(alignment: .firstTextBaseline) {
@@ -2858,7 +2858,7 @@ struct LidCard: View {
                         .font(PulseDesign.heroSecondaryFont)
                         .monospacedDigit()
                         .foregroundStyle(todayOpens > 0 ? PulseDesign.sage : .secondary)
-                    Text("opens today", bundle: .module)
+                    Text("opens today", bundle: .pulse)
                         .font(PulseDesign.labelFont)
                         .tracking(0.3)
                         .foregroundStyle(.secondary)
@@ -2871,7 +2871,7 @@ struct LidCard: View {
                             String.localizedStringWithFormat(
                                 NSLocalizedString(
                                     "Avg past 7 days: %@",
-                                    bundle: .module,
+                                    bundle: .pulse,
                                     comment: "F-27 LidCard — 7-day average lid-open count, already formatted."
                                 ),
                                 pastAvg
@@ -2929,7 +2929,7 @@ struct ContinuityCard: View {
                 Image(systemName: "square.grid.3x3.topleft.filled")
                     .foregroundStyle(PulseDesign.sage)
                     .opacity(hasAnyActivity ? 0.85 : 0.35)
-                Text("Continuity", bundle: .module)
+                Text("Continuity", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
             if let streak, hasAnyActivity {
@@ -2954,7 +2954,7 @@ struct ContinuityCard: View {
                         .font(PulseDesign.heroSecondaryFont)
                         .monospacedDigit()
                         .foregroundStyle(streak.currentStreak > 0 ? PulseDesign.sage : .secondary)
-                    Text("current streak", bundle: .module)
+                    Text("current streak", bundle: .pulse)
                         .font(PulseDesign.labelFont)
                         .tracking(0.3)
                         .foregroundStyle(.secondary)
@@ -2965,7 +2965,7 @@ struct ContinuityCard: View {
                         String.localizedStringWithFormat(
                             NSLocalizedString(
                                 "Longest: %lld",
-                                bundle: .module,
+                                bundle: .pulse,
                                 comment: "Continuity card — longest streak in the window. %lld is days."
                             ),
                             Int64(streak.longestStreak)
@@ -2977,7 +2977,7 @@ struct ContinuityCard: View {
                         String.localizedStringWithFormat(
                             NSLocalizedString(
                                 "%lld of %lld days qualified",
-                                bundle: .module,
+                                bundle: .pulse,
                                 comment: "Continuity card — qualifying days in the window. First %lld is qualifying, second is total."
                             ),
                             Int64(streak.qualifyingDays),
@@ -2994,7 +2994,7 @@ struct ContinuityCard: View {
                     String.localizedStringWithFormat(
                         NSLocalizedString(
                             "Today: %lld active hours so far — a few more to qualify.",
-                            bundle: .module,
+                            bundle: .pulse,
                             comment: "Continuity card — footer shown when today has activity but has not yet crossed the threshold."
                         ),
                         Int64(today.activeHours)
@@ -3007,7 +3007,7 @@ struct ContinuityCard: View {
     }
 
     private var empty: some View {
-        Text("Every day you use your Mac for more than four hours lights up a square. Keep coming back — this card fills in over time.", bundle: .module)
+        Text("Every day you use your Mac for more than four hours lights up a square. Keep coming back — this card fills in over time.", bundle: .pulse)
             .font(.footnote)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -3123,7 +3123,7 @@ struct MouseTrajectoryCard: View {
                 Image(systemName: "scribble.variable")
                     .foregroundStyle(PulseDesign.coral)
                     .opacity(0.85)
-                Text("Mouse trails", bundle: .module)
+                Text("Mouse trails", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
             subtitle
@@ -3144,7 +3144,7 @@ struct MouseTrajectoryCard: View {
                 String.localizedStringWithFormat(
                     NSLocalizedString(
                         "%@ moves · last 7 days",
-                        bundle: .module,
+                        bundle: .pulse,
                         comment: "F-04 MouseTrajectoryCard — subtitle showing total mouse-move count recorded across all displays in the window."
                     ),
                     formatted
@@ -3154,7 +3154,7 @@ struct MouseTrajectoryCard: View {
             .tracking(0.3)
             .foregroundStyle(.secondary)
         } else {
-            Text("No mouse movement recorded yet.", bundle: .module)
+            Text("No mouse movement recorded yet.", bundle: .pulse)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -3186,14 +3186,14 @@ private struct MouseTrajectoryTile: View {
         if let snapshot = tile.snapshot, snapshot.isPrimary {
             return NSLocalizedString(
                 "Primary display",
-                bundle: .module,
+                bundle: .pulse,
                 comment: "F-04 MouseTrajectoryCard — tile label for the primary display."
             )
         }
         return String.localizedStringWithFormat(
             NSLocalizedString(
                 "Display %lld",
-                bundle: .module,
+                bundle: .pulse,
                 comment: "F-04 MouseTrajectoryCard — fallback tile label for a non-primary display."
             ),
             Int64(tile.histogram.displayId)
@@ -3255,10 +3255,10 @@ struct AppRankingChart: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Top apps", bundle: .module)
+            Text("Top apps", bundle: .pulse)
                 .font(PulseDesign.cardTitleFont)
             if rows.isEmpty {
-                Text("No app activity recorded yet today.", bundle: .module)
+                Text("No app activity recorded yet today.", bundle: .pulse)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 4)
             } else {
@@ -3351,7 +3351,7 @@ struct CountersView: View {
             if let last = snapshot.lastWriteAt {
                 rowText(labelKey: "Last write", value: PulseFormat.ago(from: last, to: snapshot.capturedAt))
             } else {
-                rowText(labelKey: "Last write", value: String(localized: "never", bundle: .module))
+                rowText(labelKey: "Last write", value: String(localized: "never", bundle: .pulse))
             }
             if let bytes = snapshot.databaseFileSizeBytes {
                 rowText(labelKey: "DB size", value: PulseFormat.bytes(bytes))
@@ -3363,7 +3363,7 @@ struct CountersView: View {
     @ViewBuilder
     private func row(labelKey: LocalizedStringKey, value: Int) -> some View {
         HStack {
-            Text(labelKey, bundle: .module)
+            Text(labelKey, bundle: .pulse)
             Spacer()
             Text(PulseFormat.integer(value))
                 .foregroundStyle(.secondary)
@@ -3374,7 +3374,7 @@ struct CountersView: View {
     @ViewBuilder
     private func rowText(labelKey: LocalizedStringKey, value: String) -> some View {
         HStack {
-            Text(labelKey, bundle: .module)
+            Text(labelKey, bundle: .pulse)
             Spacer()
             Text(value)
                 .foregroundStyle(.secondary)
@@ -3426,13 +3426,13 @@ struct PermissionAssistantView: View {
         } else {
             VStack(alignment: .leading, spacing: 8) {
                 Label {
-                    Text("Permissions needed", bundle: .module)
+                    Text("Permissions needed", bundle: .pulse)
                 } icon: {
                     Image(systemName: "exclamationmark.triangle.fill")
                 }
                 .font(.footnote)
                 .foregroundStyle(PulseDesign.amber)
-                Text("Pulse can't collect without the following permissions. Grant them in System Settings, then relaunch Pulse.", bundle: .module)
+                Text("Pulse can't collect without the following permissions. Grant them in System Settings, then relaunch Pulse.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -3443,7 +3443,7 @@ struct PermissionAssistantView: View {
                         }
                     } label: {
                         Label {
-                            Text("Open \(localizedPermissionName(permission)) settings", bundle: .module)
+                            Text("Open \(localizedPermissionName(permission)) settings", bundle: .pulse)
                         } icon: {
                             Image(systemName: "arrow.up.forward.app")
                         }
@@ -3501,32 +3501,32 @@ struct SettingsView: View {
         Form {
             Section {
                 Picker(selection: $refreshIntervalSeconds) {
-                    Text("1 second",   bundle: .module).tag(1.0)
-                    Text("5 seconds",  bundle: .module).tag(5.0)
-                    Text("10 seconds", bundle: .module).tag(10.0)
-                    Text("30 seconds", bundle: .module).tag(30.0)
+                    Text("1 second",   bundle: .pulse).tag(1.0)
+                    Text("5 seconds",  bundle: .pulse).tag(5.0)
+                    Text("10 seconds", bundle: .pulse).tag(10.0)
+                    Text("30 seconds", bundle: .pulse).tag(30.0)
                 } label: {
-                    Text("Refresh every", bundle: .module)
+                    Text("Refresh every", bundle: .pulse)
                 }
-                Text("How often the Dashboard window re-queries the local database. Reducing the interval uses a tiny bit more CPU; raising it is fine for passive monitoring.", bundle: .module)
+                Text("How often the Dashboard window re-queries the local database. Reducing the interval uses a tiny bit more CPU; raising it is fine for passive monitoring.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Picker(selection: $heatmapDays) {
-                    Text("3 days",  bundle: .module).tag(3)
-                    Text("7 days",  bundle: .module).tag(7)
-                    Text("14 days", bundle: .module).tag(14)
-                    Text("30 days", bundle: .module).tag(30)
+                    Text("3 days",  bundle: .pulse).tag(3)
+                    Text("7 days",  bundle: .pulse).tag(7)
+                    Text("14 days", bundle: .pulse).tag(14)
+                    Text("30 days", bundle: .pulse).tag(30)
                 } label: {
-                    Text("Heatmap window", bundle: .module)
+                    Text("Heatmap window", bundle: .pulse)
                 }
-                Text("How many past days the weekly heatmap covers. Longer windows make each cell smaller; shorter windows emphasise recent pattern.", bundle: .module)
+                Text("How many past days the weekly heatmap covers. Longer windows make each cell smaller; shorter windows emphasise recent pattern.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } header: {
-                Text("Dashboard", bundle: .module)
+                Text("Dashboard", bundle: .pulse)
             }
 
             Section {
@@ -3536,34 +3536,34 @@ struct SettingsView: View {
                         set: { goalsStore.setEnabled(preset.id, enabled: $0) }
                     )) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(GoalPresetLocalizer.title(for: preset), bundle: .module)
-                            Text(GoalPresetLocalizer.subtitle(for: preset), bundle: .module)
+                            Text(GoalPresetLocalizer.title(for: preset), bundle: .pulse)
+                            Text(GoalPresetLocalizer.subtitle(for: preset), bundle: .pulse)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
             } header: {
-                Text("Goals", bundle: .module)
+                Text("Goals", bundle: .pulse)
             } footer: {
-                Text("Toggled goals appear at the top of the Dashboard with a progress bar. Nothing here triggers notifications.", bundle: .module)
+                Text("Toggled goals appear at the top of the Dashboard with a progress bar. Nothing here triggers notifications.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
             Section {
                 Button(action: onOpenPrivacyAudit) {
-                    Text("Show what Pulse has recorded…", bundle: .module)
+                    Text("Show what Pulse has recorded…", bundle: .pulse)
                 }
                 Button(role: .destructive) {
                     isPresentingPurgeSheet = true
                 } label: {
-                    Text("Clear data in a time range…", bundle: .module)
+                    Text("Clear data in a time range…", bundle: .pulse)
                 }
             } header: {
-                Text("Privacy", bundle: .module)
+                Text("Privacy", bundle: .pulse)
             } footer: {
-                Text("Opens a window that lists the raw row counts and the full system-events ledger from the last hour — read live from your local SQLite.", bundle: .module)
+                Text("Opens a window that lists the raw row counts and the full system-events ledger from the last hour — read live from your local SQLite.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -3576,7 +3576,7 @@ struct SettingsView: View {
 
             Section {
                 HStack {
-                    Text("Build", bundle: .module)
+                    Text("Build", bundle: .pulse)
                     Spacer()
                     Text(PulsePlatform.buildFingerprint)
                         .font(.footnote.monospacedDigit())
@@ -3588,19 +3588,19 @@ struct SettingsView: View {
                     set: { updateChannel = $0 ? PulseUpdaterDelegate.devChannel : PulseUpdaterDelegate.stableChannel }
                 )) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Receive development builds", bundle: .module)
-                        Text("“Check for updates…” will pull from `main` after every merge. Newer features arrive sooner but may be unstable.", bundle: .module)
+                        Text("Receive development builds", bundle: .pulse)
+                        Text("“Check for updates…” will pull from `main` after every merge. Newer features arrive sooner but may be unstable.", bundle: .pulse)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
                 Button(action: onCheckForUpdates) {
-                    Text("Check for updates…", bundle: .module)
+                    Text("Check for updates…", bundle: .pulse)
                 }
             } header: {
-                Text("About", bundle: .module)
+                Text("About", bundle: .pulse)
             } footer: {
-                Text("Update checks are always manual. Pulse never pings GitHub on its own — see docs/05-privacy.md.", bundle: .module)
+                Text("Update checks are always manual. Pulse never pings GitHub on its own — see docs/05-privacy.md.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -3630,7 +3630,7 @@ struct RangePurgeSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Clear a time range", bundle: .module)
+            Text("Clear a time range", bundle: .pulse)
                 .font(PulseDesign.cardTitleFont)
 
             VStack(alignment: .leading, spacing: 10) {
@@ -3638,7 +3638,7 @@ struct RangePurgeSheet: View {
                     selection: $startDate,
                     displayedComponents: [.date, .hourAndMinute]
                 ) {
-                    Text("From", bundle: .module)
+                    Text("From", bundle: .pulse)
                         .frame(width: 56, alignment: .leading)
                 }
                 DatePicker(
@@ -3646,12 +3646,12 @@ struct RangePurgeSheet: View {
                     in: startDate...,
                     displayedComponents: [.date, .hourAndMinute]
                 ) {
-                    Text("To", bundle: .module)
+                    Text("To", bundle: .pulse)
                         .frame(width: 56, alignment: .leading)
                 }
             }
 
-            Text("Every row whose timestamp falls between these moments will be permanently deleted from every data table. An audit note (\"data_purged\") is added to system_events so the Privacy window still shows that a purge occurred. This cannot be undone.", bundle: .module)
+            Text("Every row whose timestamp falls between these moments will be permanently deleted from every data table. An audit note (\"data_purged\") is added to system_events so the Privacy window still shows that a purge occurred. This cannot be undone.", bundle: .pulse)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -3671,14 +3671,14 @@ struct RangePurgeSheet: View {
                 Button {
                     onDismiss()
                 } label: {
-                    Text("Close", bundle: .module)
+                    Text("Close", bundle: .pulse)
                 }
                 .keyboardShortcut(.cancelAction)
                 Spacer()
                 Button(role: .destructive) {
                     isConfirming = true
                 } label: {
-                    Text("Clear…", bundle: .module)
+                    Text("Clear…", bundle: .pulse)
                 }
                 .disabled(endDate <= startDate)
             }
@@ -3686,18 +3686,18 @@ struct RangePurgeSheet: View {
         .padding(20)
         .frame(minWidth: 380)
         .confirmationDialog(
-            Text("Delete every event between those moments?", bundle: .module),
+            Text("Delete every event between those moments?", bundle: .pulse),
             isPresented: $isConfirming
         ) {
             Button(role: .destructive) {
                 performPurge()
             } label: {
-                Text("Delete permanently", bundle: .module)
+                Text("Delete permanently", bundle: .pulse)
             }
             Button(role: .cancel) {
                 isConfirming = false
             } label: {
-                Text("Cancel", bundle: .module)
+                Text("Cancel", bundle: .pulse)
             }
         }
     }
@@ -3709,7 +3709,7 @@ struct RangePurgeSheet: View {
             resultMessage = String.localizedStringWithFormat(
                 NSLocalizedString(
                     "Deleted %lld rows across all tables.",
-                    bundle: .module,
+                    bundle: .pulse,
                     comment: "F-47 range-purge success message. %lld is the total rows deleted."
                 ),
                 Int64(result.deletedRowCount)
@@ -3762,7 +3762,7 @@ final class DailyBriefingModel: ObservableObject {
 
     func load(for target: BriefingDay, now: Date = Date()) async {
         guard let store else {
-            errorMessage = String(localized: "Database not available.", bundle: .module)
+            errorMessage = String(localized: "Database not available.", bundle: .pulse)
             return
         }
         let (start, end) = target.startAndEnd(now: now)
@@ -3775,7 +3775,7 @@ final class DailyBriefingModel: ObservableObject {
             self.errorMessage = nil
         } catch {
             self.errorMessage = String.localizedStringWithFormat(
-                NSLocalizedString("Failed to load summary: %@", bundle: .module, comment: ""),
+                NSLocalizedString("Failed to load summary: %@", bundle: .pulse, comment: ""),
                 error.localizedDescription
             )
         }
@@ -3824,7 +3824,7 @@ struct DailyBriefingView: View {
                 Button {
                     dismissWindow(id: "briefing")
                 } label: {
-                    Text("Got it", bundle: .module)
+                    Text("Got it", bundle: .pulse)
                         .padding(.horizontal, 6)
                 }
                 .buttonStyle(.borderedProminent)
@@ -3841,7 +3841,7 @@ struct DailyBriefingView: View {
     @ViewBuilder
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Yesterday in Pulse", bundle: .module)
+            Text("Yesterday in Pulse", bundle: .pulse)
                 .font(.system(.title2, design: .rounded, weight: .semibold))
             if let day = model.day {
                 Text(Self.headerDateFormatter.string(from: day))
@@ -3880,7 +3880,7 @@ struct BriefingStatRow: View {
     @ViewBuilder
     private func row(_ titleKey: LocalizedStringKey, _ value: String) -> some View {
         HStack {
-            Text(titleKey, bundle: .module)
+            Text(titleKey, bundle: .pulse)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -3902,7 +3902,7 @@ struct BriefingFocusRow: View {
         let start = Self.clockTime(segment.startedAt)
         let end = Self.clockTime(segment.endedAt)
         VStack(alignment: .leading, spacing: 6) {
-            Text("Deep focus today", bundle: .module)
+            Text("Deep focus today", bundle: .pulse)
                 .font(PulseDesign.labelFont)
                 .tracking(0.3)
                 .foregroundStyle(.secondary)
@@ -3910,7 +3910,7 @@ struct BriefingFocusRow: View {
                 .font(PulseDesign.heroSecondaryFont)
                 .monospacedDigit()
                 .foregroundStyle(PulseDesign.coral)
-            Text("\(app) · \(start) – \(end)", bundle: .module)
+            Text("\(app) · \(start) – \(end)", bundle: .pulse)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -3952,7 +3952,7 @@ final class PrivacyAuditModel: ObservableObject {
     /// read transaction is cheap because raw tables are small.
     func reload(now: Date = Date(), windowSeconds: TimeInterval = 3600) async {
         guard let store else {
-            errorMessage = String(localized: "Database not available.", bundle: .module)
+            errorMessage = String(localized: "Database not available.", bundle: .pulse)
             return
         }
         do {
@@ -3990,7 +3990,7 @@ struct PrivacyAuditView: View {
             } else {
                 HStack {
                     ProgressView()
-                    Text("Reading the database…", bundle: .module)
+                    Text("Reading the database…", bundle: .pulse)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -4008,11 +4008,11 @@ struct PrivacyAuditView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("What Pulse has recorded", bundle: .module)
+            Text("What Pulse has recorded", bundle: .pulse)
                 .font(.system(.title2, design: .rounded, weight: .semibold))
             Text(
                 "Every count and row below is read live from your local SQLite — this window is the ground truth, not a summary we maintain separately.",
-                bundle: .module
+                bundle: .pulse
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -4030,19 +4030,19 @@ struct PrivacyAuditView: View {
                 .foregroundStyle(.secondary)
             LazyVGrid(columns: columns, spacing: 8) {
                 countRow(
-                    label: Text("Mouse move samples", bundle: .module),
+                    label: Text("Mouse move samples", bundle: .pulse),
                     value: snap.mouseMoveCount
                 )
                 countRow(
-                    label: Text("Mouse click samples", bundle: .module),
+                    label: Text("Mouse click samples", bundle: .pulse),
                     value: snap.mouseClickCount
                 )
                 countRow(
-                    label: Text("Key press samples", bundle: .module),
+                    label: Text("Key press samples", bundle: .pulse),
                     value: snap.keyPressCount
                 )
                 countRow(
-                    label: Text("Key codes stored", bundle: .module),
+                    label: Text("Key codes stored", bundle: .pulse),
                     value: snap.keyCodesRecorded,
                     highlight: snap.keyCodesRecorded == 0 ? PulseDesign.sage : PulseDesign.amber
                 )
@@ -4051,7 +4051,7 @@ struct PrivacyAuditView: View {
                 Button {
                     Task { await model.reload() }
                 } label: {
-                    Text("Reload", bundle: .module)
+                    Text("Reload", bundle: .pulse)
                 }
                 .buttonStyle(.bordered)
                 Button {
@@ -4059,7 +4059,7 @@ struct PrivacyAuditView: View {
                         [PrivacyAuditView.databaseDirectoryURL()]
                     )
                 } label: {
-                    Text("Show database in Finder", bundle: .module)
+                    Text("Show database in Finder", bundle: .pulse)
                 }
                 .buttonStyle(.bordered)
                 Spacer()
@@ -4078,7 +4078,7 @@ struct PrivacyAuditView: View {
     private func systemEventsSection(_ snap: PrivacyAuditSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("System events (latest first)", bundle: .module)
+                Text("System events (latest first)", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
                 Spacer()
                 Text("\(snap.systemEvents.count)")
@@ -4086,7 +4086,7 @@ struct PrivacyAuditView: View {
                     .foregroundStyle(.secondary)
             }
             if snap.systemEvents.isEmpty {
-                Text("No events in this window.", bundle: .module)
+                Text("No events in this window.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } else {
@@ -4125,7 +4125,7 @@ struct PrivacyAuditView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(
                 "Pulse runs entirely on your Mac. It makes no outbound network calls (the only potential exception is the future update checker, which will be opt-in and point only at GitHub releases).",
-                bundle: .module
+                bundle: .pulse
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -4148,7 +4148,7 @@ struct PrivacyAuditView: View {
         let end = formatter.string(from: snap.windowEnd)
         let template = NSLocalizedString(
             "privacyAudit.window.template",
-            bundle: .module,
+            bundle: .pulse,
             value: "Window: %@ → %@",
             comment: "Privacy audit window time range"
         )
