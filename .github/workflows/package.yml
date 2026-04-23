@@ -155,6 +155,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # `gh release create`'s `#label` syntax only sets the UI
+          # display label — the downloadable filename is still the
+          # source file's basename. So to give testers the bookmarkable
+          # `.../releases/download/dev-latest/Pulse.dmg` URL we have to
+          # physically copy the versioned artefacts to a stable name
+          # before upload.
+          stable_dir="$RUNNER_TEMP/dev-latest-assets"
+          rm -rf "$stable_dir"
+          mkdir -p "$stable_dir"
+          cp "${{ steps.zip.outputs.zip_path }}" "$stable_dir/Pulse.zip"
+          cp "${{ steps.zip.outputs.zip_path }}.sha256" "$stable_dir/Pulse.zip.sha256"
+          cp "${{ steps.dmg.outputs.dmg_path }}" "$stable_dir/Pulse.dmg"
+          cp "${{ steps.dmg.outputs.dmg_path }}.sha256" "$stable_dir/Pulse.dmg.sha256"
+
           # First run on a fresh clone has no dev-latest; `|| true`
           # keeps the step idempotent in either case. --cleanup-tag
           # drops the old git tag so the new `release create` can
@@ -165,10 +179,10 @@ jobs:
             --prerelease \
             --target "${GITHUB_SHA}" \
             --notes "Rolling build of \`main\` @ \`${GITHUB_SHA}\`. Replaced on every merge — stable download URLs are \`.../releases/download/dev-latest/Pulse.dmg\` and \`.../Pulse.zip\`. Not served through Sparkle; stable / beta auto-update users are unaffected." \
-            "${{ steps.zip.outputs.zip_path }}#Pulse.zip" \
-            "${{ steps.zip.outputs.zip_path }}.sha256#Pulse.zip.sha256" \
-            "${{ steps.dmg.outputs.dmg_path }}#Pulse.dmg" \
-            "${{ steps.dmg.outputs.dmg_path }}.sha256#Pulse.dmg.sha256"
+            "$stable_dir/Pulse.zip" \
+            "$stable_dir/Pulse.zip.sha256" \
+            "$stable_dir/Pulse.dmg" \
+            "$stable_dir/Pulse.dmg.sha256"
 
       # Sparkle appcast publishing is gated on "is this tag a stable
       # final?" — `v1.0.0` yes, `v1.0.0-rc2` no. rc / beta builds still
