@@ -140,12 +140,56 @@ text = (text.replace("__NAME__", name)
 pathlib.Path(dst).write_text(text, encoding="utf-8")
 PY
 
-echo "==> ad-hoc sign"
+echo "==> ad-hoc sign (pass 1: deep-seal helpers + frameworks)"
 # --force overwrites any existing signature from swift build; --deep walks
 # the embedded resource bundles so nothing inside the .app is unsigned
 # when Gatekeeper scans it on first run.
 codesign --force --deep --sign - --timestamp=none "$APP"
+
+echo "==> ad-hoc sign (pass 2: outer bundle w/ stable designated requirement)"
+# macOS TCC (Input Monitoring / Accessibility grants) identifies an app by
+# its designated requirement (DR). The ad-hoc codesign default DR is
+#   identifier "dev.pulse.Pulse" and cdhash H"…"
+# where cdhash hashes the executable. Every rebuild produces a different
+# cdhash, so every Sparkle update looks like a new app to TCC and wipes
+# the user's grants — forcing them to re-authorize Input Monitoring and
+# Accessibility each time.
+#
+# Fix: re-sign the outer bundle with an identifier-only DR. TCC then
+# matches on bundle id alone and grants survive updates.
+#
+# Trade-off: any ad-hoc signed binary declaring the same bundle id can
+# match this DR too. Acceptable until we get a Developer ID cert — at
+# which point codesign will automatically add an `anchor apple generic`
+# + team-id clause that only real Pulse builds can satisfy, closing the
+# hole without any further code change here.
+#
+# Timing note: this only helps for the *next* update onward. TCC already
+# has a cdhash-bound DR recorded for previously installed versions, so
+# the first update that lands this change will still prompt for re-auth;
+# from then on grants persist.
+codesign --force \
+    --identifier "$BUNDLE_ID" \
+    -r="designated => identifier \"$BUNDLE_ID\"" \
+    --sign - \
+    --timestamp=none \
+    "$APP"
 codesign --verify --verbose=1 "$APP"
+
+echo "==> verify designated requirement is identifier-only"
+# Hard-fail if the DR ever drifts back to including cdhash — the whole
+# point of pass 2 is that `codesign -d -r -` reports exactly:
+#   designated => identifier "dev.pulse.Pulse"
+# If a future edit drops `-r=…`, this check catches it before the
+# broken bundle ships and silently resets everyone's permissions.
+dr_line=$(codesign --display --requirements - "$APP" 2>&1 | awk '/^designated =>/ {print; exit}')
+expected="designated => identifier \"$BUNDLE_ID\""
+if [[ "$dr_line" != "$expected" ]]; then
+    echo "error: designated requirement drifted — TCC will reset on update" >&2
+    echo "  got:      $dr_line" >&2
+    echo "  expected: $expected" >&2
+    exit 1
+fi
 
 cat <<EOF
 
