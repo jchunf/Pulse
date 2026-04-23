@@ -184,13 +184,15 @@ jobs:
             "$stable_dir/Pulse.dmg" \
             "$stable_dir/Pulse.dmg.sha256"
 
-      # Sparkle appcast publishing is gated on "is this tag a stable
-      # final?" — `v1.0.0` yes, `v1.0.0-rc2` no. rc / beta builds still
-      # get a GitHub Release (tagged as pre-release) but no appcast.xml,
-      # so the Sparkle clients listed in `releases/latest/download/`
-      # only auto-update between stable finals. See PR #64 for the
-      # client-side wiring and the plan in /reviews for the two-PR
-      # rationale.
+      # Sparkle appcast publishing splits across two paths:
+      #   - Stable final tag (`vX.Y.Z`) → appcast attached to the tagged
+      #     GitHub Release, served from `releases/latest/download/appcast.xml`
+      #     (only non-prereleases win the `latest` redirect). See PR #64.
+      #   - `main` push → dev appcast attached to the rolling `dev-latest`
+      #     release, served from `releases/download/dev-latest/appcast.xml`.
+      #     Client-side opt-in via SPUUpdaterDelegate.feedURLString(for:).
+      # rc / beta tags skip both — they still cut a GitHub pre-release
+      # but no appcast, so Sparkle never promotes them.
       - name: Detect stable-final tag
         id: channel
         if: startsWith(github.ref, 'refs/tags/v')
@@ -204,7 +206,11 @@ jobs:
 
       - name: Sign update zip (EdDSA)
         id: sign
-        if: steps.channel.outputs.is_stable == 'true'
+        # Runs for BOTH stable finals (so `Generate appcast.xml` can
+        # attach to the tagged release) and main pushes (so the dev
+        # appcast can carry a verifiable signature). The two downstream
+        # steps reference `steps.sign.outputs.attributes`.
+        if: steps.channel.outputs.is_stable == 'true' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         env:
           SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
         # Verbose per-stage logging so if any sub-command fails
@@ -297,6 +303,46 @@ jobs:
           SIGN_ATTRIBUTES: ${{ steps.sign.outputs.attributes }}
           REPO: ${{ github.repository }}
         run: bash scripts/generate_appcast.sh > dist/appcast.xml
+
+      # Dev appcast: feeds the opt-in dev channel. Clients that flipped
+      # the "Receive development builds" toggle in Settings resolve
+      # feedURLString(for:) to this file and therefore auto-update on
+      # every main push. Stable clients never see this file because
+      # `SUFeedURL` in Info.plist points at the tagged-release appcast.
+      #
+      # ZIP_NAME is hard-coded to `Pulse.zip` — matches the stable
+      # filename we copied into dev-latest in "Publish rolling
+      # dev-latest release" above. Sparkle will resolve the enclosure
+      # URL to that stable path and validate against the EdDSA sig
+      # emitted below.
+      - name: Generate + upload dev appcast
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD: ${{ steps.version.outputs.build }}
+          ZIP_NAME: Pulse.zip
+          SIGN_ATTRIBUTES: ${{ steps.sign.outputs.attributes }}
+          REPO: ${{ github.repository }}
+          CHANNEL: dev
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # File basename == asset filename on GitHub Releases
+          # (`#label` only retitles the UI, doesn't rename the download).
+          # So write the dev appcast to a file literally named
+          # `appcast.xml` so the feed URL is
+          # `.../releases/download/dev-latest/appcast.xml`.
+          work_dir="$RUNNER_TEMP/dev-appcast"
+          rm -rf "$work_dir"
+          mkdir -p "$work_dir"
+          bash scripts/generate_appcast.sh > "$work_dir/appcast.xml"
+          echo "----- dev appcast -----"
+          cat "$work_dir/appcast.xml"
+          echo "-----------------------"
+          # --clobber overwrites any prior appcast.xml asset on the
+          # dev-latest release, which is what we want for a rolling
+          # feed — the asset is small, no history to preserve.
+          gh release upload dev-latest "$work_dir/appcast.xml" --clobber
 
       - name: Create GitHub Release (tag only)
         if: startsWith(github.ref, 'refs/tags/v')

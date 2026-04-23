@@ -3962,6 +3962,40 @@
         }
       }
     },
+    "Receive development builds": {
+      "comment": "Settings About toggle — opt into the rolling dev channel.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Receive development builds"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接收开发版构建"
+          }
+        }
+      }
+    },
+    "“Check for updates…” will pull from `main` after every merge. Newer features arrive sooner but may be unstable.": {
+      "comment": "Settings About — caption under the dev builds toggle.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“Check for updates…” will pull from `main` after every merge. Newer features arrive sooner but may be unstable."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开启后，「检查更新」会拉取 `main` 分支每次合并后的构建 —— 新功能更早拿到，但可能不稳定。"
+          }
+        }
+      }
+    },
     "Update checks are always manual. Pulse never pings GitHub on its own — see docs/05-privacy.md.": {
       "comment": "Settings About section footer — reinforces the user-initiated-only update promise.",
       "localizations": {

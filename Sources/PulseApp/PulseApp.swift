@@ -3468,6 +3468,8 @@ struct SettingsView: View {
     private var refreshIntervalSeconds: Double = DashboardModel.defaultRefreshIntervalSeconds
     @AppStorage(PulsePreferenceKey.heatmapDays)
     private var heatmapDays: Int = DashboardModel.defaultHeatmapDays
+    @AppStorage(PulseUpdaterDelegate.channelKey)
+    private var updateChannel: String = PulseUpdaterDelegate.stableChannel
     @ObservedObject var goalsStore: GoalsStore
     let onOpenPrivacyAudit: () -> Void
     let onPurgeRange: (Date, Date) throws -> RangePurgeResult
@@ -3560,6 +3562,17 @@ struct SettingsView: View {
                         .font(.footnote.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
+                }
+                Toggle(isOn: Binding(
+                    get: { updateChannel == PulseUpdaterDelegate.devChannel },
+                    set: { updateChannel = $0 ? PulseUpdaterDelegate.devChannel : PulseUpdaterDelegate.stableChannel }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Receive development builds", bundle: .module)
+                        Text("“Check for updates…” will pull from `main` after every merge. Newer features arrive sooner but may be unstable.", bundle: .module)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Button(action: onCheckForUpdates) {
                     Text("Check for updates…", bundle: .module)
