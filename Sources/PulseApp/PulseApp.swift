@@ -1008,78 +1008,71 @@ struct HealthMenuView: View {
             Divider().overlay(PulseDesign.warmGray(0.14))
 
             VStack(spacing: 10) {
+                // Both CTAs share the same hand-drawn chip so they're
+                // exactly symmetrical in size and shape — only the fill
+                // color distinguishes primary (coral) from secondary
+                // (warmGray). Using `.buttonStyle(.borderedProminent)` /
+                // `.bordered` on macOS lets AppKit clamp the label color
+                // to its control tint, which broke dark-mode contrast
+                // and also made the two buttons visibly non-symmetrical.
                 HStack {
                     Button {
                         openWindow(id: "dashboard")
                         NSApp.activate(ignoringOtherApps: true)
                     } label: {
                         Text("Open Dashboard", bundle: .module)
-                            .padding(.horizontal, 4)
+                            .menuBarChip(fill: PulseDesign.coral, foreground: .white)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(PulseDesign.coral)
+                    .buttonStyle(.plain)
                     Spacer()
-                    // Hand-rolled chip instead of `.buttonStyle(.bordered)`:
-                    // the AppKit-backed bordered style overrides inner
-                    // .foregroundStyle on macOS, so the label color
-                    // tracked the control tint. On the dark-mode menu-bar
-                    // popover that tint reads near-white against a
-                    // near-white chip fill, making the label nearly
-                    // invisible. Drawing the background with our own
-                    // warmGray and keeping the label as .primary gives
-                    // stable contrast across both appearances.
                     Button { NSApp.terminate(nil) } label: {
                         Text("Quit Pulse", bundle: .module)
-                            .font(.body)
-                            .foregroundStyle(.primary)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(PulseDesign.warmGray(0.18))
-                            )
+                            .menuBarChip(fill: PulseDesign.warmGray(0.18))
                     }
                     .buttonStyle(.plain)
                     .keyboardShortcut("q")
                 }
-                HStack(spacing: 14) {
-                    // `.buttonStyle(.link)` paints in system accent blue,
-                    // which on the dark menu-bar popover reads as
-                    // glaring — the five actions here are all secondary
-                    // navigation, so .plain + .secondary foreground sits
-                    // quietly in both appearances and lets the primary
-                    // "Open Dashboard" coral CTA dominate the row above.
+                // Evenly distribute the secondary actions across the
+                // full row — first/last button sit flush with the main
+                // CTA edges above, matching their visual column. A
+                // trailing `Spacer()` left them clumped on the left,
+                // which read as an alignment bug against the wide
+                // row above.
+                HStack(spacing: 0) {
                     Button(action: onShowBriefing) {
                         Text("Yesterday's briefing", bundle: .module)
                             .font(.footnote)
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
                     Button(action: onGenerateReport) {
                         Text("Generate weekly report", bundle: .module)
                             .font(.footnote)
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
                     Button(action: onGenerateReportPDF) {
                         Text("Weekly PDF…", bundle: .module)
                             .font(.footnote)
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
                     Button(action: onExportData) {
                         Text("Export data…", bundle: .module)
                             .font(.footnote)
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
                     Button(action: onCheckForUpdates) {
                         Text("Check for updates…", bundle: .module)
                             .font(.footnote)
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
-                    Spacer()
                 }
             }
         }
@@ -1109,6 +1102,27 @@ struct HealthMenuView: View {
             return "Listening to your pulse."
         }
         return "Stopped."
+    }
+}
+
+private extension View {
+    /// Shared chip styling for the two menu-bar CTAs so they're strictly
+    /// symmetrical — same font, padding, corner radius and height. Only
+    /// the fill color distinguishes primary (coral) from secondary
+    /// (warmGray). Kept as a View extension rather than a custom
+    /// ButtonStyle because AppKit-backed styles clamp the label color
+    /// to the control tint, which was how the two prior attempts at
+    /// dark-mode contrast kept regressing.
+    func menuBarChip(fill: Color, foreground: Color = .primary) -> some View {
+        self
+            .font(.body)
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(fill)
+            )
     }
 }
 
