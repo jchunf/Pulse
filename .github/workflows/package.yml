@@ -70,9 +70,20 @@ jobs:
             echo "artifact=Pulse-$raw" >> "$GITHUB_OUTPUT"
           else
             short="$(git rev-parse --short HEAD)"
-            echo "version=0.0.0-ci.${GITHUB_RUN_NUMBER}+${short}" >> "$GITHUB_OUTPUT"
+            # main pushes produce a rolling dev build that lands on the
+            # `dev-latest` GitHub Release (see "Publish rolling dev-latest"
+            # step below); PR / manual dispatch runs keep the `-ci.` label
+            # so the menu-bar version string makes the distinction obvious
+            # ("0.0.0-dev.42+abc1234" = shippable-for-testers rolling build,
+            # "0.0.0-ci.42+abc1234" = throwaway PR validation build).
+            if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == "refs/heads/main" ]]; then
+              echo "version=0.0.0-dev.${GITHUB_RUN_NUMBER}+${short}" >> "$GITHUB_OUTPUT"
+              echo "artifact=Pulse-dev-${short}" >> "$GITHUB_OUTPUT"
+            else
+              echo "version=0.0.0-ci.${GITHUB_RUN_NUMBER}+${short}" >> "$GITHUB_OUTPUT"
+              echo "artifact=Pulse-ci-${short}" >> "$GITHUB_OUTPUT"
+            fi
             echo "build=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
-            echo "artifact=Pulse-ci-${short}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Package .app
@@ -130,6 +141,34 @@ jobs:
           # maintainer to grab or for anyone reviewing a PR to try it.
           retention-days: 14
           if-no-files-found: error
+
+      # Rolling pre-release off `main` so testers can grab a fresh
+      # `.dmg` without waiting on a hand-cut `vX.Y.Z` tag. Same artefacts
+      # as tag builds, just attached to the fixed `dev-latest` tag —
+      # delete + recreate on every merge so the tag follows `main`.
+      # Explicitly *not* served through Sparkle (the appcast generation
+      # below is gated on `refs/tags/v*`), so beta / stable channel
+      # subscribers are not pulled into this firehose.
+      - name: Publish rolling dev-latest release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # First run on a fresh clone has no dev-latest; `|| true`
+          # keeps the step idempotent in either case. --cleanup-tag
+          # drops the old git tag so the new `release create` can
+          # re-point it at the current SHA without a stale tag object.
+          gh release delete dev-latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create dev-latest \
+            --title "Pulse dev — ${{ steps.version.outputs.version }}" \
+            --prerelease \
+            --target "${GITHUB_SHA}" \
+            --notes "Rolling build of \`main\` @ \`${GITHUB_SHA}\`. Replaced on every merge — stable download URLs are \`.../releases/download/dev-latest/Pulse.dmg\` and \`.../Pulse.zip\`. Not served through Sparkle; stable / beta auto-update users are unaffected." \
+            "${{ steps.zip.outputs.zip_path }}#Pulse.zip" \
+            "${{ steps.zip.outputs.zip_path }}.sha256#Pulse.zip.sha256" \
+            "${{ steps.dmg.outputs.dmg_path }}#Pulse.dmg" \
+            "${{ steps.dmg.outputs.dmg_path }}.sha256#Pulse.dmg.sha256"
 
       # Sparkle appcast publishing is gated on "is this tag a stable
       # final?" — `v1.0.0` yes, `v1.0.0-rc2` no. rc / beta builds still
