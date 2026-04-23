@@ -1517,7 +1517,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "约为 %@ 的 %lld%%"
+            "value": "约为 %2$@ 的 %1$lld%%"
           }
         }
       }
