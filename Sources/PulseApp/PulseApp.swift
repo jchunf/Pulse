@@ -1019,19 +1019,27 @@ struct HealthMenuView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(PulseDesign.coral)
                     Spacer()
+                    // Hand-rolled chip instead of `.buttonStyle(.bordered)`:
+                    // the AppKit-backed bordered style overrides inner
+                    // .foregroundStyle on macOS, so the label color
+                    // tracked the control tint. On the dark-mode menu-bar
+                    // popover that tint reads near-white against a
+                    // near-white chip fill, making the label nearly
+                    // invisible. Drawing the background with our own
+                    // warmGray and keeping the label as .primary gives
+                    // stable contrast across both appearances.
                     Button { NSApp.terminate(nil) } label: {
                         Text("Quit Pulse", bundle: .module)
+                            .font(.body)
                             .foregroundStyle(.primary)
-                            .padding(.horizontal, 4)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(PulseDesign.warmGray(0.18))
+                            )
                     }
-                    // `.bordered` gives the button a visible chip
-                    // background in both light and dark mode. The
-                    // inner .primary foregroundStyle is what keeps
-                    // the label readable in dark mode — otherwise
-                    // the label picks up the accent color which in
-                    // our coral theme sits very close to the popover
-                    // background and disappears.
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
                     .keyboardShortcut("q")
                 }
                 HStack(spacing: 14) {
