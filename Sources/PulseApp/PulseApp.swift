@@ -1032,31 +1032,42 @@ struct HealthMenuView: View {
                     .keyboardShortcut("q")
                 }
                 HStack(spacing: 14) {
+                    // `.buttonStyle(.link)` paints in system accent blue,
+                    // which on the dark menu-bar popover reads as
+                    // glaring — the five actions here are all secondary
+                    // navigation, so .plain + .secondary foreground sits
+                    // quietly in both appearances and lets the primary
+                    // "Open Dashboard" coral CTA dominate the row above.
                     Button(action: onShowBriefing) {
                         Text("Yesterday's briefing", bundle: .module)
                             .font(.footnote)
                     }
-                    .buttonStyle(.link)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                     Button(action: onGenerateReport) {
                         Text("Generate weekly report", bundle: .module)
                             .font(.footnote)
                     }
-                    .buttonStyle(.link)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                     Button(action: onGenerateReportPDF) {
                         Text("Weekly PDF…", bundle: .module)
                             .font(.footnote)
                     }
-                    .buttonStyle(.link)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                     Button(action: onExportData) {
                         Text("Export data…", bundle: .module)
                             .font(.footnote)
                     }
-                    .buttonStyle(.link)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                     Button(action: onCheckForUpdates) {
                         Text("Check for updates…", bundle: .module)
                             .font(.footnote)
                     }
-                    .buttonStyle(.link)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                     Spacer()
                 }
             }

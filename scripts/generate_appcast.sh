@@ -17,8 +17,22 @@
 #                     enclosure URL that points at the release asset.
 #
 # Optional:
-#   CHANNEL         — "stable" by default; fills <sparkle:channel>
 #   MIN_MAC         — "14.0" default, matches Info.plist LSMinimumSystemVersion
+#
+# NOTE on channels: we intentionally DO NOT emit a
+# `<sparkle:channel>` tag. Sparkle treats that tag as an **opt-in
+# filter** — clients that haven't explicitly listed the channel via
+# `SUAllowedChannels` in Info.plist or
+# `SPUUpdaterDelegate.allowedChannels(for:)` at runtime skip the item
+# entirely. Pulse 1.1.4 and earlier were built without any
+# `SUAllowedChannels` declaration, so the pre-v1.1.6 appcasts
+# (`<sparkle:channel>stable</sparkle:channel>`) silently hid every
+# release from every installed client — the 1.1.4 → 1.1.5 dialog
+# ("you're on the latest" when you weren't) was this bug. Untagged
+# items are visible to all clients, which is what we want for this
+# project's single-channel release flow. If a beta channel ever
+# appears, tag those items and have the beta build opt in via
+# `SUAllowedChannels`.
 #
 # The appcast intentionally only carries one <item>: the release that
 # just built. Sparkle clients pick the newest `sparkle:version` they
@@ -33,7 +47,6 @@ set -euo pipefail
 : "${SIGN_ATTRIBUTES:?SIGN_ATTRIBUTES is required}"
 : "${REPO:?REPO is required}"
 
-CHANNEL="${CHANNEL:-stable}"
 MIN_MAC="${MIN_MAC:-14.0}"
 
 pub_date="$(LC_ALL=C date -u +"%a, %d %b %Y %H:%M:%S +0000")"
@@ -50,7 +63,6 @@ cat <<XML
     <language>en</language>
     <item>
       <title>Version ${VERSION}</title>
-      <sparkle:channel>${CHANNEL}</sparkle:channel>
       <sparkle:version>${BUILD}</sparkle:version>
       <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>${MIN_MAC}</sparkle:minimumSystemVersion>
