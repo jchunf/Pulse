@@ -686,6 +686,10 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var lidOpensTrend: [Int] = []
     @Published private(set) var restToday: RestDay = RestDay(segments: [])
     @Published private(set) var timelineToday: DayTimeline?
+    /// F-43 — this-week-vs-last-week deltas across the four daily-trend
+    /// metrics. `nil` on a fresh install until enough days have rolled
+    /// into `hour_summary` for both halves to have data.
+    @Published private(set) var weekOverWeek: PeriodComparison?
     /// F-04 — per-display 128×128 density histograms over
     /// `trajectoryDays`. The Card asks a renderer for a `CGImage` off
     /// the main thread via `.task(id:)`, so this struct stays cheap to
@@ -710,6 +714,10 @@ final class DashboardModel: ObservableObject {
     nonisolated static let defaultHeatmapDays = 7
     /// Weekly trend chart span — fixed at 7 days for MVP; not user-tunable.
     nonisolated static let trendDays = 7
+    /// F-43 week-over-week window. Always 14: 7 days "this week" vs
+    /// 7 days "last week". The card builder falls back to an even
+    /// split if a partial fetch returns fewer rows.
+    nonisolated static let weekOverWeekDays = 14
     /// F-11 continuity grid window. 52 × 7 = 364 days, plus one cell so
     /// the newest column is always "this week" regardless of which
     /// weekday today is.
@@ -772,6 +780,11 @@ final class DashboardModel: ObservableObject {
             let summary = try store.todaySummary(start: dayStart, end: dayEnd, capUntil: now)
             let heatmap = try store.hourlyHeatmap(endingAt: now, days: days)
             let trend = try store.dailyTrend(endingAt: now, days: Self.trendDays)
+            let comparisonTrend = try store.dailyTrend(
+                endingAt: now,
+                days: Self.weekOverWeekDays
+            )
+            let weekOverWeek = PeriodComparisonBuilder.split(from: comparisonTrend)
             let focus = try store.longestFocusSegment(on: dayStart, now: now)
             let posture = try store.sessionPosture(on: dayStart, now: now)
             let switches = try store.appSwitchCount(on: dayStart, capUntil: now)
@@ -843,6 +856,7 @@ final class DashboardModel: ObservableObject {
             self.lidOpensTrend = lidTrend
             self.restToday = restDay
             self.timelineToday = timeline
+            self.weekOverWeek = weekOverWeek
             self.trajectoryTiles = trajectoryTiles
             self.lastRefreshAt = now
             self.errorMessage = nil
@@ -1237,6 +1251,9 @@ struct DashboardView: View {
                     DashboardSectionHeader(titleKey: "Rhythm")
                     WeekTrendChart(points: model.trendPoints)
                     WeekHourlyHeatmap(cells: model.heatmapCells, days: model.heatmapDays)
+                    if let comparison = model.weekOverWeek {
+                        WeekOverWeekCard(comparison: comparison)
+                    }
                     ContinuityCard(streak: model.continuity)
                     if model.lidOpensTrend.contains(where: { $0 > 0 }) {
                         LidCard(
@@ -2176,6 +2193,85 @@ struct WeekHourlyHeatmap: View {
             result[cellKey(day: cell.dayOffset, hour: cell.hour)] = cell.activityCount
         }
         return result
+    }
+}
+
+/// F-43 — Rhythm-section card that compares the last N days against
+/// the N days before that across the four daily-trend metrics
+/// (keystrokes, clicks, mouse distance, scrolls). Uses the same
+/// `DeltaChip` visual language the per-tile "vs yesterday" chip
+/// uses so "up %" feels consistent across the Dashboard. When the
+/// previous period is all-zero the chip is replaced with a "new"
+/// label — a 200%-style chip on an empty baseline would be noise.
+struct WeekOverWeekCard: View {
+
+    let comparison: PeriodComparison
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("This week vs last", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+                Spacer()
+                Text(
+                    "\(comparison.currentPeriodDayCount)-day window",
+                    bundle: .pulse
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            VStack(spacing: 10) {
+                ForEach(comparison.rows, id: \.metric) { row in
+                    WeekOverWeekRow(row: row)
+                }
+            }
+        }
+        .pulseFeaturedCard()
+    }
+}
+
+/// One metric's row inside `WeekOverWeekCard`. Title on the left,
+/// current-period total in the middle, delta chip on the right.
+struct WeekOverWeekRow: View {
+
+    let row: PeriodComparisonRow
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(Self.titleKey(for: row.metric), bundle: .pulse)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(Self.formattedCurrent(for: row))
+                .font(.body.monospacedDigit())
+            if let delta = row.deltaFraction {
+                DeltaChip(deltaFraction: delta)
+                    .frame(width: 52, alignment: .trailing)
+            } else {
+                Text("new", bundle: .pulse)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(PulseDesign.deltaPositive)
+                    .frame(width: 52, alignment: .trailing)
+            }
+        }
+    }
+
+    private static func titleKey(for metric: PeriodMetric) -> LocalizedStringKey {
+        switch metric {
+        case .keystrokes:                return "Keystrokes"
+        case .mouseClicks:               return "Clicks"
+        case .mouseDistanceMillimeters:  return "Distance"
+        case .scrollTicks:               return "Scrolls"
+        }
+    }
+
+    private static func formattedCurrent(for row: PeriodComparisonRow) -> String {
+        switch row.metric {
+        case .mouseDistanceMillimeters:
+            return PulseFormat.distance(millimeters: row.currentValue)
+        default:
+            return PulseFormat.integer(Int(row.currentValue.rounded()))
+        }
     }
 }
 
