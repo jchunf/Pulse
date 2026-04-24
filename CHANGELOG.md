@@ -49,6 +49,16 @@ that has been waiting for a dramatic anchor since sec/min/hour
   ∞-style %. Pure builder (`PeriodComparisonBuilder.split`) lives
   in PulseCore so tests cover even/odd splits and zero-baseline
   deltas.
+- **A42** F-22 passive consumption — new
+  `PassiveConsumptionCard` on the Focus section surfaces today's
+  "screen-on idle with an app foregrounded" window. Derivation is
+  purely derived (no new schema): walks `idle_entered` /
+  `idle_exited` pairs, subtracts any overlap with `lock` / `sleep`
+  / `lid_closed` windows, then attributes the remaining seconds to
+  whichever bundle held the foreground at each sub-segment's
+  start. System shells (`loginwindow`, `WindowManager`, `dock`)
+  are dropped via the existing `SystemAppFilter.excludedBundles`
+  set. Card auto-hides on a day with zero qualifying time.
 
 ### Data layer additions
 
@@ -90,6 +100,9 @@ that has been waiting for a dramatic anchor since sec/min/hour
   `typing.tier.sprint`).
 - **A41** 3 new keys in en + zh-Hans: `This week vs last`,
   `%lld-day window`, `new`.
+- **A42** 3 new keys in en + zh-Hans for the passive card:
+  `Passive consumption today`, `Mostly while %@ was in front (%lld%%)`,
+  and the empty-state caption.
 
 ---
 

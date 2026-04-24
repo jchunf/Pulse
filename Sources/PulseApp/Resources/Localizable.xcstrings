@@ -2114,6 +2114,54 @@
         }
       }
     },
+    "Passive consumption today": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passive consumption today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日被动消费时长"
+          }
+        }
+      }
+    },
+    "Mostly while %@ was in front (%lld%%)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostly while %@ was in front (%lld%%)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主要发生在 %@ 前台时（%lld%%）"
+          }
+        }
+      }
+    },
+    "Screen-on time with no input — watched, read, or stepped away while the app kept the foreground.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screen-on time with no input — watched, read, or stepped away while the app kept the foreground."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "屏幕亮着、没有输入的时间 —— 看视频、读长文，或者暂离但应用还在前台。"
+          }
+        }
+      }
+    },
     "%@ · %@ – %@": {
       "localizations": {
         "en": {
