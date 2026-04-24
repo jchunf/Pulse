@@ -92,97 +92,104 @@ enum PulseFormat {
 
     // MARK: - Landmark name + comparison
 
-    /// Looks up the translated display name for a landmark via its stable
-    /// key (e.g. `landmark.marathon.name`). Uses `NSLocalizedString` (not
-    /// `String(localized:)`) because the key is a runtime-composed string
-    /// and `defaultValue` only accepts `StaticString` keys. Falls back to
-    /// the English `Landmark.displayName` when the catalog has no entry.
+    /// Display name for a landmark. Same xcstrings-compile workaround
+    /// as the other dot-key sites: pivot on `Locale.prefersChinese`
+    /// in Swift since the bundle lookup silently misses.
     static func localizedLandmarkName(for landmark: Landmark) -> String {
-        NSLocalizedString(
-            "landmark.\(landmark.key).name",
-            bundle: .pulse,
-            value: landmark.displayName,
-            comment: "Localised landmark display name for the mileage comparison"
-        )
+        let zh = Locale.prefersChinese
+        switch landmark.key {
+        case "step":        return zh ? "一步"        : "step"
+        case "pool":        return zh ? "一个游泳池"  : "swimming pool length"
+        case "track":       return zh ? "一圈田径跑道" : "athletics track lap"
+        case "kilometer":   return zh ? "一公里"      : "kilometer"
+        case "marathon":    return zh ? "一场马拉松"  : "marathon"
+        case "beijing_gz":  return zh ? "北京 → 广州" : "Beijing → Guangzhou"
+        case "pacific":     return zh ? "整个太平洋"  : "the Pacific"
+        case "equator":     return zh ? "地球赤道"    : "Earth's equator"
+        default:            return landmark.displayName
+        }
     }
 
     // MARK: - Generic narrative anchors (A16)
 
-    /// Localised name for a `NarrativeAnchor`. Looks up the catalog key
-    /// (`keystrokes.tweet`, `focus.episode`, …); falls back to the English
-    /// `displayName` when the translation is missing so we never render
-    /// an empty line.
+    /// Display name for a `NarrativeAnchor`. Pivots on
+    /// `Locale.prefersChinese` for the same reason as the landmark
+    /// helper above.
     static func localizedAnchorName(for anchor: NarrativeAnchor) -> String {
-        NSLocalizedString(
-            anchor.key,
-            bundle: .pulse,
-            value: anchor.displayName,
-            comment: "Localised NarrativeEngine anchor name"
-        )
+        let zh = Locale.prefersChinese
+        switch anchor.key {
+        case "keystrokes.headline":       return zh ? "一条新闻标题"        : "news headline"
+        case "keystrokes.sms":            return zh ? "一条短信"           : "text message"
+        case "keystrokes.tweet":          return zh ? "一条推文"           : "tweet"
+        case "keystrokes.shortStory":     return zh ? "一篇短篇小说"        : "short story"
+        case "keystrokes.novella":        return zh ? "一部中篇"           : "novella"
+        case "keystrokes.novel":          return zh ? "一部长篇"           : "novel"
+        case "focus.pomodoro":            return zh ? "一个番茄钟"          : "pomodoro"
+        case "focus.episode":             return zh ? "一集情景喜剧"        : "episode of a sitcom"
+        case "focus.shortFilm":           return zh ? "一部短片"           : "short film"
+        case "focus.feature":             return zh ? "一部长片"           : "feature film"
+        case "focus.workday":             return zh ? "一整个工作日"        : "full work day"
+        case "scroll.blogPost":           return zh ? "一篇博客"           : "blog post"
+        case "scroll.tweetFeed":          return zh ? "一次推文流翻看"      : "tweet-feed session"
+        case "scroll.magazine":           return zh ? "一期杂志"           : "magazine issue"
+        case "scroll.novel":              return zh ? "一本小说"           : "novel"
+        case "scroll.encyclopediaVolume": return zh ? "一卷百科全书"        : "encyclopedia volume"
+        default:                          return anchor.displayName
+        }
     }
 
-    /// One-line dramatic framing for any `NarrativeComparison`. Ladder
-    /// mirrors the mileage landmark branches:
-    /// - `m < 1`   → "X% of a %@"  (anchor bigger than observation)
-    /// - `m < 2`   → "about 1× a %@"
-    /// - else      → "≈ M× a %@"   with one decimal
+    /// Dot-separated keys in `Localizable.xcstrings` aren't surviving
+    /// the current xcstrings → .strings compile path (see the comment
+    /// on `GoalPresetLocalizer` for the longer story). The comparison
+    /// templates below therefore carry inline zh-Hans fallbacks pivoted
+    /// on `Locale.prefersChinese`. These match the strings in the
+    /// catalog verbatim so behaviour is identical once the pipeline
+    /// is fixed.
+    private static func comparisonTemplate(
+        tiny: Bool = false,
+        percent: Bool = false,
+        aboutOne: Bool = false,
+        multi: Bool = false
+    ) -> String {
+        let zh = Locale.prefersChinese
+        if tiny     { return zh ? "仅为 %@ 的一小段"               : "a tiny fraction of %@" }
+        if percent  { return zh ? "约为 %2$@ 的 %1$lld%%"          : "%lld%% of %@" }
+        if aboutOne { return zh ? "约 1× %@"                       : "about 1× %@" }
+        if multi    { return zh ? "约 %@× %@"                      : "≈ %@× %@" }
+        return ""
+    }
+
+    /// One-line dramatic framing for any `NarrativeComparison`.
     static func narrativeSentence(for comparison: NarrativeComparison) -> String {
         let name = localizedAnchorName(for: comparison.anchor)
         let m = comparison.multiplier
         if m < 1 {
             let pct = Int((m * 100).rounded())
-            return String.localizedStringWithFormat(
-                String(localized: "mileage.comparison.percent", bundle: .pulse),
-                pct,
-                name
-            )
+            return String.localizedStringWithFormat(comparisonTemplate(percent: true), pct, name)
         } else if m < 2 {
-            return String.localizedStringWithFormat(
-                String(localized: "mileage.comparison.aboutOne", bundle: .pulse),
-                name
-            )
+            return String.localizedStringWithFormat(comparisonTemplate(aboutOne: true), name)
         } else {
             let rounded = (m * 10).rounded() / 10
             let multiplierString = rounded.formatted(.number.precision(.fractionLength(1)))
-            return String.localizedStringWithFormat(
-                String(localized: "mileage.comparison.multi", bundle: .pulse),
-                multiplierString,
-                name
-            )
+            return String.localizedStringWithFormat(comparisonTemplate(multi: true), multiplierString, name)
         }
     }
 
-    /// Dramatic-comparison line for the Mileage card. Mirrors the
-    /// `LandmarkLibrary.formatMultiplier` branches but composed from
-    /// localised templates in `Localizable.xcstrings`.
+    /// Dramatic-comparison line for the Mileage card.
     static func landmarkComparisonSentence(for comparison: LandmarkComparison) -> String {
         let name = localizedLandmarkName(for: comparison.landmark)
         let m = comparison.multiplier
         if m < 0.01 {
-            return String.localizedStringWithFormat(
-                String(localized: "mileage.comparison.tiny", bundle: .pulse),
-                name
-            )
+            return String.localizedStringWithFormat(comparisonTemplate(tiny: true), name)
         } else if m < 1 {
             let pct = Int((m * 100).rounded())
-            return String.localizedStringWithFormat(
-                String(localized: "mileage.comparison.percent", bundle: .pulse),
-                pct,
-                name
-            )
+            return String.localizedStringWithFormat(comparisonTemplate(percent: true), pct, name)
         } else if m < 2 {
-            return String.localizedStringWithFormat(
-                String(localized: "mileage.comparison.aboutOne", bundle: .pulse),
-                name
-            )
+            return String.localizedStringWithFormat(comparisonTemplate(aboutOne: true), name)
         } else {
             let rounded = (m * 10).rounded() / 10
             let multiplierString = rounded.formatted(.number.precision(.fractionLength(1)))
-            return String.localizedStringWithFormat(
-                String(localized: "mileage.comparison.multi", bundle: .pulse),
-                multiplierString,
-                name
-            )
+            return String.localizedStringWithFormat(comparisonTemplate(multi: true), multiplierString, name)
         }
     }
 }

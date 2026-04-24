@@ -1798,7 +1798,7 @@ struct GoalProgressRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                Text(GoalPresetLocalizer.title(for: progress.definition), bundle: .pulse)
+                Text(GoalPresetLocalizer.title(for: progress.definition))
                     .font(.footnote)
                 Spacer()
                 if progress.isAchieved {
@@ -1832,25 +1832,57 @@ struct GoalProgressRow: View {
 /// Translates a `GoalDefinition` into the presentation strings shown in
 /// the Dashboard card and the Settings toggle. Lives in the app layer
 /// so PulseCore stays locale-free.
+extension Locale {
+    /// `true` when the current locale prefers Simplified Chinese.
+    /// Workaround for the xcstrings compile step not emitting
+    /// dot-separated keys into the packaged resource bundle —
+    /// several localizers fall back to a manual Swift pivot on this
+    /// flag until the catalog pipeline is fixed.
+    static var prefersChinese: Bool {
+        Locale.current.language.languageCode?.identifier == "zh"
+    }
+}
+
+/// Dot-separated keys in `Localizable.xcstrings` aren't resolving
+/// against the app's packaged resource bundle in release builds
+/// (neither through `Text(LocalizedStringKey, bundle:)` nor through
+/// `NSLocalizedString(key:, bundle:)`). The xcstrings compile step
+/// appears to skip these entries for both en + zh-Hans, so the
+/// lookup returns the raw key. Rather than fight the catalog, the
+/// localizers below carry a manual `zh-Hans` fallback pivoted on
+/// `Locale.current`. Once the xcstrings pipeline is fixed the
+/// manual pivots can go back to being straight bundle lookups.
 enum GoalPresetLocalizer {
 
-    static func title(for goal: GoalDefinition) -> LocalizedStringKey {
+    static func title(for goal: GoalDefinition) -> String {
+        let zh = Locale.prefersChinese
         switch goal.id {
-        case "focus.active.3h":      return "goal.active.3h.title"
-        case "focus.longest.45m":    return "goal.longest.45m.title"
-        case "switches.under30":     return "goal.switches.under30.title"
-        case "keystrokes.5k":        return "goal.keystrokes.5k.title"
-        default:                     return LocalizedStringKey(goal.id)
+        case "focus.active.3h":
+            return zh ? "累计活跃 3 小时" : "3 hours of active time"
+        case "focus.longest.45m":
+            return zh ? "一口气专注 45 分钟" : "A 45-minute focus streak"
+        case "switches.under30":
+            return zh ? "应用切换不超过 30 次" : "Under 30 app switches"
+        case "keystrokes.5k":
+            return zh ? "敲满 5,000 键" : "5,000 keystrokes"
+        default:
+            return goal.id
         }
     }
 
-    static func subtitle(for goal: GoalDefinition) -> LocalizedStringKey {
+    static func subtitle(for goal: GoalDefinition) -> String {
+        let zh = Locale.prefersChinese
         switch goal.id {
-        case "focus.active.3h":      return "goal.active.3h.subtitle"
-        case "focus.longest.45m":    return "goal.longest.45m.subtitle"
-        case "switches.under30":     return "goal.switches.under30.subtitle"
-        case "keystrokes.5k":        return "goal.keystrokes.5k.subtitle"
-        default:                     return LocalizedStringKey("")
+        case "focus.active.3h":
+            return zh ? "今天总活跃时间达到 3 小时" : "Reach 3 hours of tracked activity today."
+        case "focus.longest.45m":
+            return zh ? "一次不中断的专注会话 ≥ 45 分钟" : "One uninterrupted focus session ≥ 45 minutes."
+        case "switches.under30":
+            return zh ? "把今天的应用切换次数控制在 30 以内" : "Keep today's app switches below 30."
+        case "keystrokes.5k":
+            return zh ? "今天累计按键 ≥ 5,000 次" : "Accumulate 5,000+ key presses today."
+        default:
+            return ""
         }
     }
 
@@ -2925,7 +2957,7 @@ struct FocusDonutLegendRow: View {
             Circle()
                 .fill(FocusDonutCategoryPalette.color(for: segment.category))
                 .frame(width: 8, height: 8)
-            Text(Self.title(for: segment.category), bundle: .pulse)
+            Text(Self.title(for: segment.category))
                 .font(.footnote)
             Spacer()
             Text("\(Int((fraction * 100).rounded()))% · \(PulseFormat.duration(seconds: segment.seconds))")
@@ -2934,12 +2966,15 @@ struct FocusDonutLegendRow: View {
         }
     }
 
-    private static func title(for category: AppCategory) -> LocalizedStringKey {
+    /// Manually localised label — same catalog-compile workaround
+    /// as `KeyboardPeakCard.Tier.localizedLabel`.
+    private static func title(for category: AppCategory) -> String {
+        let zh = Locale.prefersChinese
         switch category {
-        case .deepFocus:     return "focus.category.deepFocus"
-        case .communication: return "focus.category.communication"
-        case .browsing:      return "focus.category.browsing"
-        case .other:         return "focus.category.other"
+        case .deepFocus:     return zh ? "深度专注" : "Deep focus"
+        case .communication: return zh ? "沟通协作" : "Communication"
+        case .browsing:      return zh ? "浏览网页" : "Browsing"
+        case .other:         return zh ? "其它"     : "Other"
         }
     }
 }
@@ -2985,13 +3020,18 @@ struct KeyboardPeakCard: View {
             }
         }
 
-        var localizationKey: LocalizedStringKey {
+        /// Manually localised label. Same catalog-compile
+        /// workaround as `GoalPresetLocalizer` — the xcstrings
+        /// pipeline drops dot-separated keys, so pivot on
+        /// `Locale.prefersChinese` in Swift.
+        var localizedLabel: String {
+            let zh = Locale.prefersChinese
             switch self {
-            case .huntAndPeck:  return "typing.tier.huntAndPeck"
-            case .casual:       return "typing.tier.casual"
-            case .touchTypist:  return "typing.tier.touchTypist"
-            case .fast:         return "typing.tier.fast"
-            case .sprint:       return "typing.tier.sprint"
+            case .huntAndPeck:  return zh ? "逐键寻找节奏"     : "hunt-and-peck pace"
+            case .casual:       return zh ? "日常写作节奏"     : "casual typing pace"
+            case .touchTypist:  return zh ? "盲打流畅节奏"     : "touch-typist pace"
+            case .fast:         return zh ? "快速打字节奏"     : "fast-typist pace"
+            case .sprint:       return zh ? "键盘冲刺节奏"     : "keyboard-sprint pace"
             }
         }
     }
@@ -3031,7 +3071,7 @@ struct KeyboardPeakCard: View {
                 .font(.body)
                 .foregroundStyle(.primary)
                 .opacity(0.8)
-            Text(tier.localizationKey, bundle: .pulse)
+            Text(tier.localizedLabel)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -3672,8 +3712,18 @@ struct MouseTrajectoryCard: View {
             }
             subtitle
             VStack(spacing: 16) {
-                ForEach(tiles, id: \.histogram.displayId) { tile in
-                    MouseTrajectoryTile(tile: tile)
+                // Pass an ordinal position so the tile labels stay
+                // unique when `display_snapshots` has multiple rows
+                // claiming `is_primary = 1` (observed in real-Mac
+                // dogfooding after a display reconfig). Single-tile
+                // state keeps the "Primary display" wording; any
+                // multi-tile layout falls back to "Display 1", ….
+                ForEach(Array(tiles.enumerated()), id: \.element.histogram.displayId) { index, tile in
+                    MouseTrajectoryTile(
+                        tile: tile,
+                        ordinal: index + 1,
+                        isOnlyTile: tiles.count == 1
+                    )
                 }
             }
         }
@@ -3714,6 +3764,14 @@ struct MouseTrajectoryCard: View {
 private struct MouseTrajectoryTile: View {
 
     let tile: MouseTrajectoryTileData
+    /// 1-based position in the parent's tile list; used to label
+    /// "Display 1 / 2 / …" when more than one tile is visible.
+    let ordinal: Int
+    /// `true` when this is the only tile rendered — the parent
+    /// flips to this when the user has a single display, which lets
+    /// the card keep its concise "Primary display" label instead
+    /// of the noisier "Display 1".
+    let isOnlyTile: Bool
 
     @State private var renderedImage: CGImage?
 
@@ -3727,20 +3785,20 @@ private struct MouseTrajectoryTile: View {
     }
 
     private var displayLabel: String {
-        if let snapshot = tile.snapshot, snapshot.isPrimary {
+        if isOnlyTile {
             return NSLocalizedString(
                 "Primary display",
                 bundle: .pulse,
-                comment: "F-04 MouseTrajectoryCard — tile label for the primary display."
+                comment: "F-04 MouseTrajectoryCard — tile label for the sole display."
             )
         }
         return String.localizedStringWithFormat(
             NSLocalizedString(
                 "Display %lld",
                 bundle: .pulse,
-                comment: "F-04 MouseTrajectoryCard — fallback tile label for a non-primary display."
+                comment: "F-04 MouseTrajectoryCard — tile label for the n-th display."
             ),
-            Int64(tile.histogram.displayId)
+            Int64(ordinal)
         )
     }
 
@@ -4386,8 +4444,8 @@ struct SettingsView: View {
                         set: { goalsStore.setEnabled(preset.id, enabled: $0) }
                     )) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(GoalPresetLocalizer.title(for: preset), bundle: .pulse)
-                            Text(GoalPresetLocalizer.subtitle(for: preset), bundle: .pulse)
+                            Text(GoalPresetLocalizer.title(for: preset))
+                            Text(GoalPresetLocalizer.subtitle(for: preset))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
