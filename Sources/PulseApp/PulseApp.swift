@@ -706,6 +706,12 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var lastRefreshAt: Date?
     @Published private(set) var errorMessage: String?
     @Published private(set) var recentAchievement: LandmarkAchievement?
+    /// F-25 — lifetime-scale celebration. Fires at most once per
+    /// landmark per user (persistence is not day-keyed), so the
+    /// banner doesn't replay every day the user crosses "marathon"
+    /// again today. Larger landmarks like "Pacific" or "equator"
+    /// effectively become rare, earned events.
+    @Published private(set) var recentLifetimeAchievement: LandmarkAchievement?
 
     private let store: EventStore?
     private let goalsStore: GoalsStore
@@ -876,6 +882,11 @@ final class DashboardModel: ObservableObject {
                 distanceMillimeters: summary.totalMouseDistanceMillimeters,
                 now: now
             )
+            let lifetimeMm = (try? store.lifetimeMouseDistanceMillimeters()) ?? 0
+            updateLifetimeAchievementIfNeeded(
+                lifetimeMillimeters: lifetimeMm,
+                now: now
+            )
         } catch {
             self.errorMessage = String.localizedStringWithFormat(
                 NSLocalizedString("Failed to load summary: %@", bundle: .pulse, comment: ""),
@@ -918,6 +929,42 @@ final class DashboardModel: ObservableObject {
             metersReached: meters,
             firstReachedAt: now
         )
+    }
+
+    // MARK: - Lifetime milestones (F-25)
+
+    /// Not day-keyed — a lifetime landmark fires once per user.
+    private static let lifetimeLandmarkIndexKey = "pulse.achievement.lifetimeLandmarkIndex"
+
+    private func updateLifetimeAchievementIfNeeded(lifetimeMillimeters: Double, now: Date) {
+        let meters = lifetimeMillimeters / 1_000.0
+        let storedIndex: Int
+        if UserDefaults.standard.object(forKey: Self.lifetimeLandmarkIndexKey) == nil {
+            storedIndex = -1
+        } else {
+            storedIndex = UserDefaults.standard.integer(forKey: Self.lifetimeLandmarkIndexKey)
+        }
+        let landmarks = LandmarkLibrary.standard.landmarks
+        let currentIndex = landmarks.lastIndex(where: { $0.distanceMeters <= meters }) ?? -1
+        guard currentIndex > storedIndex, currentIndex >= 0 else { return }
+        let landmark = landmarks[currentIndex]
+        recentLifetimeAchievement = LandmarkAchievement(
+            landmark: landmark,
+            metersReached: meters,
+            firstReachedAt: now
+        )
+    }
+
+    /// Acknowledge the lifetime-tier banner. The stored index moves up
+    /// to the dismissed landmark so only higher ones will ever fire
+    /// the lifetime banner again.
+    func dismissLifetimeAchievement() {
+        guard let achievement = recentLifetimeAchievement else { return }
+        let landmarks = LandmarkLibrary.standard.landmarks
+        if let idx = landmarks.firstIndex(where: { $0.key == achievement.landmark.key }) {
+            UserDefaults.standard.set(idx, forKey: Self.lifetimeLandmarkIndexKey)
+        }
+        recentLifetimeAchievement = nil
     }
 
     /// Acknowledge the current achievement so it doesn't re-appear on the
@@ -1235,6 +1282,12 @@ struct DashboardView: View {
                 if crashBeacon.crashedLastSession {
                     CrashBeaconBanner(beacon: crashBeacon)
                 }
+                if let lifetime = model.recentLifetimeAchievement {
+                    LifetimeMilestoneBanner(
+                        achievement: lifetime,
+                        onDismiss: { model.dismissLifetimeAchievement() }
+                    )
+                }
                 if let achievement = model.recentAchievement {
                     MilestoneAchievementBanner(
                         achievement: achievement,
@@ -1499,6 +1552,57 @@ struct CrashBeaconBanner: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(PulseDesign.amber.opacity(0.25), lineWidth: 0.5)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+/// F-25 lifetime-tier celebration. Fires the first time cumulative
+/// mouse distance (across every day the user has run Pulse) crosses
+/// a new `LandmarkLibrary` landmark. Visually bolder than the daily
+/// `MilestoneAchievementBanner` — trophy icon + coral fill — because
+/// these are rare, earned events (Pacific / equator will take years).
+struct LifetimeMilestoneBanner: View {
+
+    let achievement: LandmarkAchievement
+    let onDismiss: () -> Void
+
+    var body: some View {
+        let landmarkName = PulseFormat.localizedLandmarkName(for: achievement.landmark)
+        let landmarkDistance = PulseFormat.metersWhole(achievement.landmark.distanceMeters)
+        let lifetimeSoFar = PulseFormat.metersWhole(achievement.metersReached)
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: "trophy.fill")
+                .font(.title2)
+                .foregroundStyle(PulseDesign.coral)
+                .pulseHeartbeat(amplitude: .hero)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Lifetime milestone", bundle: .pulse)
+                    .font(PulseDesign.labelFont)
+                    .tracking(0.3)
+                    .foregroundStyle(PulseDesign.coral)
+                Text("Across every day you've used Pulse, your cursor has crossed \(landmarkName) — \(landmarkDistance).", bundle: .pulse)
+                    .font(.body.weight(.medium))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Lifetime total: \(lifetimeSoFar).", bundle: .pulse)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.borderless)
+            .help(Text("Dismiss", bundle: .pulse))
+        }
+        .padding(14)
+        .background(PulseDesign.coral.opacity(0.10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(PulseDesign.coral.opacity(0.35), lineWidth: 0.7)
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }

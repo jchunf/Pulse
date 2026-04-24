@@ -59,6 +59,16 @@ that has been waiting for a dramatic anchor since sec/min/hour
   start. System shells (`loginwindow`, `WindowManager`, `dock`)
   are dropped via the existing `SystemAppFilter.excludedBundles`
   set. Card auto-hides on a day with zero qualifying time.
+- **A43** F-25 lifetime milestone tier — the existing daily
+  `MilestoneAchievementBanner` only celebrated "today you hit a
+  marathon", which replayed every day a power user crossed the
+  same threshold. Adds a parallel lifetime tier: sums every
+  `hour_summary.mouse_distance_mm` ever written, compares against
+  the landmark ladder, and fires a one-per-user
+  `LifetimeMilestoneBanner` the first time cumulative usage
+  crosses a new landmark. Trophy icon + `pulseHeartbeat` accent
+  + coral fill — visually bolder because these are rare, earned
+  events. Persistence is not day-keyed.
 
 ### Data layer additions
 
@@ -75,6 +85,10 @@ that has been waiting for a dramatic anchor since sec/min/hour
   `Sources/PulseCore/Storage/KeyboardPeakQueries.swift`. Returns
   the busiest one-minute bucket across `min_key` + fold-to-minute
   `sec_key`, mirroring the layering convention `todaySummary` uses.
+- **A43** `EventStore.lifetimeMouseDistanceMillimeters()` in
+  `Sources/PulseCore/Storage/LifetimeMileageQueries.swift`. One
+  `SELECT SUM(mouse_distance_mm) FROM hour_summary` — lightweight
+  even after years of data.
 
 ### 采集 / Collection (B)
 
@@ -103,6 +117,9 @@ that has been waiting for a dramatic anchor since sec/min/hour
 - **A42** 3 new keys in en + zh-Hans for the passive card:
   `Passive consumption today`, `Mostly while %@ was in front (%lld%%)`,
   and the empty-state caption.
+- **A43** 3 new keys in en + zh-Hans for the lifetime banner:
+  `Lifetime milestone`, the hero sentence, and
+  `Lifetime total: %@.`.
 
 ---
 

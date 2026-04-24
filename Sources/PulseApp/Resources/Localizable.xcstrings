@@ -690,6 +690,54 @@
         }
       }
     },
+    "Lifetime milestone": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lifetime milestone"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "终身里程碑"
+          }
+        }
+      }
+    },
+    "Across every day you've used Pulse, your cursor has crossed %@ — %@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Across every day you've used Pulse, your cursor has crossed %@ — %@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你使用 Pulse 以来，鼠标累计跨越了 %@ —— %@。"
+          }
+        }
+      }
+    },
+    "Lifetime total: %@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lifetime total: %@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "终身累计：%@。"
+          }
+        }
+      }
+    },
     "Mouse clicks (raw)": {
       "localizations": {
         "en": {
