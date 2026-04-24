@@ -1790,7 +1790,8 @@ struct SummaryCardsView: View {
             SummaryMetricCard(
                 titleKey: "Scrolls",
                 value: PulseFormat.integer(summary.totalScrollTicks),
-                series: trend.map { Double($0.scrollTicks) }
+                series: trend.map { Double($0.scrollTicks) },
+                narrativeSubtitle: scrollsNarrative
             )
             SummaryMetricCard(
                 titleKey: "Keystrokes",
@@ -1814,6 +1815,12 @@ struct SummaryCardsView: View {
     private var keystrokesNarrative: String? {
         Self.narrative
             .bestMatch(metric: .keystrokes, value: Double(summary.totalKeyPresses))
+            .map { PulseFormat.narrativeSentence(for: $0) }
+    }
+
+    private var scrollsNarrative: String? {
+        Self.narrative
+            .bestMatch(metric: .scrollTicks, value: Double(summary.totalScrollTicks))
             .map { PulseFormat.narrativeSentence(for: $0) }
     }
 }

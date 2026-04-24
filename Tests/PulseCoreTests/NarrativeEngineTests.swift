@@ -47,6 +47,27 @@ struct NarrativeEngineTests {
         #expect(comparison.anchor.key == "focus.pomodoro")
     }
 
+    @Test("picks the largest anchor that fits — scroll novel tier (F-17)")
+    func pickLargestBelowValueScrollTicks() throws {
+        let engine = NarrativeEngine.standard
+        // Floor candidates (sorted asc): blogPost 30, tweetFeed 150,
+        // magazine 600, novel 3_000, encyclopediaVolume 25_000.
+        // Largest ≤ 9_000 is novel (3_000).
+        let comparison = try #require(
+            engine.bestMatch(metric: .scrollTicks, value: 9_000)
+        )
+        #expect(comparison.anchor.key == "scroll.novel")
+        #expect(comparison.metric == .scrollTicks)
+        #expect(abs(comparison.multiplier - 3.0) < 0.001)
+    }
+
+    @Test("scroll ticks below smallest anchor return nil (F-17)")
+    func scrollTicksBelowFloorReturnsNil() {
+        let engine = NarrativeEngine.standard
+        // scroll.blogPost = 30; 29 ticks is below the smallest anchor.
+        #expect(engine.bestMatch(metric: .scrollTicks, value: 29) == nil)
+    }
+
     @Test("exact anchor boundary returns multiplier 1")
     func boundaryMultiplierIsOne() throws {
         let engine = NarrativeEngine.standard
