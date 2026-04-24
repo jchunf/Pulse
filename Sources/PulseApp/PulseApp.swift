@@ -686,6 +686,10 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var lidOpensTrend: [Int] = []
     @Published private(set) var restToday: RestDay = RestDay(segments: [])
     @Published private(set) var timelineToday: DayTimeline?
+    /// F-12 — today's peak typing minute, or `nil` before the user has
+    /// logged any keystrokes for the day. Surfaces the busiest minute
+    /// as a KPM headline on the Dashboard's Focus section.
+    @Published private(set) var keyPressPeak: KeyPressPeakMinute?
     /// F-43 — this-week-vs-last-week deltas across the four daily-trend
     /// metrics. `nil` on a fresh install until enough days have rolled
     /// into `hour_summary` for both halves to have data.
@@ -793,6 +797,7 @@ final class DashboardModel: ObservableObject {
             let lidTrend = try store.lidOpensTrend(endingAt: now, days: Self.trendDays)
             let restDay = try store.restSegments(on: dayStart, capUntil: now)
             let timeline = try store.dayTimeline(on: dayStart, capUntil: now)
+            let keyPeak = try store.peakKeyPressMinute(start: dayStart, capUntil: now)
             // F-04 — `mouseDensity` reads from the pre-binned
             // `day_mouse_density` table (B9) so this is a lightweight
             // grouped scan even over 7 days. `latestDisplaySnapshot`
@@ -856,6 +861,7 @@ final class DashboardModel: ObservableObject {
             self.lidOpensTrend = lidTrend
             self.restToday = restDay
             self.timelineToday = timeline
+            self.keyPressPeak = keyPeak
             self.weekOverWeek = weekOverWeek
             self.trajectoryTiles = trajectoryTiles
             self.lastRefreshAt = now
@@ -1270,6 +1276,7 @@ struct DashboardView: View {
                         UsagePostureCard(posture: model.sessionPosture)
                             .frame(maxWidth: .infinity)
                     }
+                    KeyboardPeakCard(peak: model.keyPressPeak)
                     RestCard(rest: model.restToday)
 
                     // ── Section 4 — Apps ──
@@ -2642,6 +2649,104 @@ struct DeepFocusCard: View {
 
     private var empty: some View {
         Text("Still warming up — your longest focus streak shows up once you've spent 20+ minutes in one app without going idle.", bundle: .pulse)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.vertical, 4)
+    }
+
+    private static func clockTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.setLocalizedDateFormatFromTemplate("HH:mm")
+        return formatter.string(from: date)
+    }
+}
+
+/// F-12 — Dashboard card that headlines today's busiest typing minute.
+/// Shows KPM + the clock time it hit + a descriptive tier label
+/// ("hunt-and-peck" → "sprint"). Empty state matches DeepFocusCard's
+/// so the Focus section reads consistently on day-zero.
+///
+/// Tier bands are deliberately coarse (five steps) — 5 WPM resolution
+/// is pointless for "whoa, did I type that fast?" payoff. Values and
+/// anchor names match the WPM ladder every touch-typing tutorial uses,
+/// divided by ~5 chars/word to land in keys-per-minute.
+struct KeyboardPeakCard: View {
+
+    let peak: KeyPressPeakMinute?
+
+    enum Tier: Int, CaseIterable {
+        case huntAndPeck    // < 120 KPM ≈ < 24 WPM
+        case casual         // 120 – 200 KPM ≈ 24 – 40 WPM
+        case touchTypist    // 200 – 300 KPM ≈ 40 – 60 WPM
+        case fast           // 300 – 400 KPM ≈ 60 – 80 WPM
+        case sprint         // ≥ 400 KPM
+
+        static func classify(_ kpm: Int) -> Tier {
+            switch kpm {
+            case ..<120:  return .huntAndPeck
+            case ..<200:  return .casual
+            case ..<300:  return .touchTypist
+            case ..<400:  return .fast
+            default:      return .sprint
+            }
+        }
+
+        var localizationKey: LocalizedStringKey {
+            switch self {
+            case .huntAndPeck:  return "typing.tier.huntAndPeck"
+            case .casual:       return "typing.tier.casual"
+            case .touchTypist:  return "typing.tier.touchTypist"
+            case .fast:         return "typing.tier.fast"
+            case .sprint:       return "typing.tier.sprint"
+            }
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "keyboard")
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(peak == nil ? 0.35 : 0.85)
+                Text("Peak typing minute", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            if let peak {
+                filled(peak)
+            } else {
+                empty
+            }
+        }
+        .pulseFeaturedCard()
+    }
+
+    @ViewBuilder
+    private func filled(_ peak: KeyPressPeakMinute) -> some View {
+        let tier = Tier.classify(peak.kpm)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(PulseFormat.integer(peak.kpm))
+                    .font(PulseDesign.heroSecondaryFont)
+                    .monospacedDigit()
+                    .foregroundStyle(PulseDesign.coral)
+                Text("KPM", bundle: .pulse)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+            Text("at \(Self.clockTime(peak.minuteStart))", bundle: .pulse)
+                .font(.body)
+                .foregroundStyle(.primary)
+                .opacity(0.8)
+            Text(tier.localizationKey, bundle: .pulse)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var empty: some View {
+        Text("No typing yet — once you've pressed a key this card will show today's busiest minute.", bundle: .pulse)
             .font(.footnote)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
