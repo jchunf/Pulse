@@ -136,9 +136,22 @@ public final class CGEventTapSource: EventSource, @unchecked Sendable {
         case .scrollWheel:
             handler(.mouseScroll(delta: 0, horizontal: false, at: now))
         case .keyDown:
-            // B1 emits a keycode-less press. Keycode capture is opt-in and
-            // wired in B2 (see Q-06 and docs/05-privacy.md).
+            // `.keyPress` keeps its `keyCode: nil` default — individual
+            // keycode capture (D-K2, for the F-08 heatmap) stays opt-in
+            // per Q-06. The shortcut side (D-K3, F-33) is independent:
+            // we read the flags + keycode, canonicalise to a stable
+            // combo string, and emit a second event. Raw keycodes
+            // never reach storage this way; only the restricted
+            // shortcut vocabulary does.
             handler(.keyPress(keyCode: nil, at: now))
+            let keyCode = UInt16(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeycode))
+            let modifiers = shortcutModifiers(from: event.flags)
+            if let combo = ShortcutCombo.canonical(
+                keyCode: keyCode,
+                modifiers: modifiers
+            ) {
+                handler(.shortcutPressed(combo: combo, at: now))
+            }
         default:
             break
         }
@@ -164,6 +177,17 @@ public final class CGEventTapSource: EventSource, @unchecked Sendable {
         case .otherMouseDown: return .middle
         default: return .other
         }
+    }
+
+    /// Translate `CGEventFlags` → `ShortcutModifiers`. Keeps PulseCore
+    /// free of `CoreGraphics` by funnelling the conversion here.
+    private func shortcutModifiers(from flags: CGEventFlags) -> ShortcutModifiers {
+        var out: ShortcutModifiers = []
+        if flags.contains(.maskCommand)   { out.insert(.cmd) }
+        if flags.contains(.maskControl)   { out.insert(.ctrl) }
+        if flags.contains(.maskAlternate) { out.insert(.opt) }
+        if flags.contains(.maskShift)     { out.insert(.shift) }
+        return out
     }
 }
 #endif

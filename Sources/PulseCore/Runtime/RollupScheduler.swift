@@ -265,8 +265,22 @@ public final class RollupScheduler: @unchecked Sendable {
                     press_count = min_key.press_count + excluded.press_count
                 """, arguments: [cutoffSeconds])
 
+            // F-33 — sec_shortcuts → min_shortcuts. Group by
+            // (minute, combo) so every combo survives the rollup
+            // independently; the ORDER of combos doesn't matter.
+            try db.execute(sql: """
+                INSERT INTO min_shortcuts (ts_minute, combo, count)
+                SELECT (ts_second / 60) * 60, combo, SUM(count)
+                FROM sec_shortcuts
+                WHERE ts_second < ?
+                GROUP BY ts_second / 60, combo
+                ON CONFLICT(ts_minute, combo) DO UPDATE SET
+                    count = min_shortcuts.count + excluded.count
+                """, arguments: [cutoffSeconds])
+
             try db.execute(sql: "DELETE FROM sec_mouse WHERE ts_second < ?", arguments: [cutoffSeconds])
             try db.execute(sql: "DELETE FROM sec_key WHERE ts_second < ?", arguments: [cutoffSeconds])
+            try db.execute(sql: "DELETE FROM sec_shortcuts WHERE ts_second < ?", arguments: [cutoffSeconds])
         }
     }
 
@@ -303,9 +317,21 @@ public final class RollupScheduler: @unchecked Sendable {
                     idle_seconds = hour_summary.idle_seconds + excluded.idle_seconds
                 """, arguments: [cutoffSeconds])
 
+            // F-33 — min_shortcuts → hour_shortcuts, same pattern.
+            try db.execute(sql: """
+                INSERT INTO hour_shortcuts (ts_hour, combo, count)
+                SELECT (ts_minute / 3600) * 3600, combo, SUM(count)
+                FROM min_shortcuts
+                WHERE ts_minute < ?
+                GROUP BY ts_minute / 3600, combo
+                ON CONFLICT(ts_hour, combo) DO UPDATE SET
+                    count = hour_shortcuts.count + excluded.count
+                """, arguments: [cutoffSeconds])
+
             try db.execute(sql: "DELETE FROM min_mouse WHERE ts_minute < ?", arguments: [cutoffSeconds])
             try db.execute(sql: "DELETE FROM min_key WHERE ts_minute < ?", arguments: [cutoffSeconds])
             try db.execute(sql: "DELETE FROM min_idle WHERE ts_minute < ?", arguments: [cutoffSeconds])
+            try db.execute(sql: "DELETE FROM min_shortcuts WHERE ts_minute < ?", arguments: [cutoffSeconds])
         }
     }
 
@@ -570,6 +596,9 @@ public final class RollupScheduler: @unchecked Sendable {
             try db.execute(sql: "DELETE FROM min_app          WHERE ts_minute < ?", arguments: [minCutoff])
             try db.execute(sql: "DELETE FROM min_switches     WHERE ts_minute < ?", arguments: [minCutoff])
             try db.execute(sql: "DELETE FROM min_idle         WHERE ts_minute < ?", arguments: [minCutoff])
+            try db.execute(sql: "DELETE FROM sec_shortcuts    WHERE ts_second < ?", arguments: [secCutoff])
+            try db.execute(sql: "DELETE FROM min_shortcuts    WHERE ts_minute < ?", arguments: [minCutoff])
+            // hour_shortcuts has permanent retention like hour_summary.
         }
     }
 }

@@ -28,10 +28,10 @@ struct MigratorTests {
         }
     }
 
-    @Test("bundled migrator loads up to V4")
+    @Test("bundled migrator loads up to V5")
     func bundledMigratorLoads() throws {
         let migrator = try Migrator.bundled()
-        #expect(migrator.targetVersion == 4)
+        #expect(migrator.targetVersion == 5)
     }
 
     @Test("in-memory database migrated to head has core tables")
@@ -57,6 +57,9 @@ struct MigratorTests {
             "sec_activity",
             "sec_key",
             "sec_mouse",
+            "sec_shortcuts",
+            "min_shortcuts",
+            "hour_shortcuts",
             "system_events"
         ]
         for table in required {
@@ -70,7 +73,7 @@ struct MigratorTests {
         let version: Int? = try db.queue.read { db in
             try Int.fetchOne(db, sql: "PRAGMA user_version")
         }
-        #expect(version == 4)
+        #expect(version == 5)
     }
 
     @Test("re-running migrator on an up-to-date DB is a no-op")
@@ -78,7 +81,7 @@ struct MigratorTests {
         let db = try PulseDatabase.inMemory()
         let migrator = try Migrator.bundled()
         let version = try migrator.migrate(db.queue)
-        #expect(version == 4)
+        #expect(version == 5)
     }
 
     @Test("V3 adds scroll_ticks to hour_summary")
@@ -103,6 +106,25 @@ struct MigratorTests {
             )
         }
         #expect(columns == ["day", "display_id", "bin_x", "bin_y", "count"])
+    }
+
+    @Test("V5 creates the three shortcut tables with expected shape")
+    func v5CreatesShortcutTables() throws {
+        let db = try PulseDatabase.inMemory()
+        let tables: [String] = try db.queue.read { db in
+            try String.fetchAll(
+                db,
+                sql: "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%shortcuts' ORDER BY name"
+            )
+        }
+        #expect(tables == ["hour_shortcuts", "min_shortcuts", "sec_shortcuts"])
+        let secColumns: [String] = try db.queue.read { db in
+            try String.fetchAll(
+                db,
+                sql: "SELECT name FROM pragma_table_info('sec_shortcuts') ORDER BY cid"
+            )
+        }
+        #expect(secColumns == ["ts_second", "combo", "count"])
     }
 
     @Test("raw_mouse_moves has expected column shape")

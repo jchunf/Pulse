@@ -686,6 +686,8 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var lidOpensTrend: [Int] = []
     @Published private(set) var restToday: RestDay = RestDay(segments: [])
     @Published private(set) var timelineToday: DayTimeline?
+    /// F-33 — top shortcuts used today, sorted by count desc.
+    @Published private(set) var shortcutsToday: [ShortcutUsageRow] = []
     /// F-22 — today's passive consumption summary (foreground + idle
     /// + screen-on time attributed by bundle). `.empty` until the day
     /// has at least one qualifying window.
@@ -809,6 +811,7 @@ final class DashboardModel: ObservableObject {
             let timeline = try store.dayTimeline(on: dayStart, capUntil: now)
             let keyPeak = try store.peakKeyPressMinute(start: dayStart, capUntil: now)
             let passive = try store.passiveConsumption(on: dayStart, capUntil: now)
+            let shortcuts = try store.shortcutLeaderboard(start: dayStart, end: dayEnd, limit: 5)
             // F-04 — `mouseDensity` reads from the pre-binned
             // `day_mouse_density` table (B9) so this is a lightweight
             // grouped scan even over 7 days. `latestDisplaySnapshot`
@@ -874,6 +877,7 @@ final class DashboardModel: ObservableObject {
             self.timelineToday = timeline
             self.keyPressPeak = keyPeak
             self.passiveToday = passive
+            self.shortcutsToday = shortcuts
             self.weekOverWeek = weekOverWeek
             self.trajectoryTiles = trajectoryTiles
             self.lastRefreshAt = now
@@ -1345,6 +1349,9 @@ struct DashboardView: View {
                     DashboardSectionHeader(titleKey: "Apps")
                     DayTimelineCard(timeline: model.timelineToday)
                     AppRankingChart(rows: summary.topApps)
+                    if !model.shortcutsToday.isEmpty {
+                        ShortcutLeaderboardCard(rows: model.shortcutsToday)
+                    }
                     if !model.trajectoryTiles.isEmpty {
                         MouseTrajectoryCard(tiles: model.trajectoryTiles)
                     }
@@ -3610,6 +3617,114 @@ private struct MouseTrajectoryTile: View {
     /// whole card to scroll when the user has multiple displays
     /// stacked.
     private static let maxTileHeight: CGFloat = 220
+}
+
+/// F-33 — the "快捷键使用榜". Bar list of today's most-used cmd/ctrl/
+/// opt shortcut combos. Auto-hides at day-zero via the parent's
+/// `if !model.shortcutsToday.isEmpty`. Combo strings are rendered
+/// into human-friendly form (`cmd+c` → `⌘C`) inline so the list
+/// reads like the system's menu-bar shortcut hints.
+struct ShortcutLeaderboardCard: View {
+
+    let rows: [ShortcutUsageRow]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "command.circle")
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(0.85)
+                Text("Top shortcuts today", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            let maxCount = Double(rows.first?.count ?? 1)
+            VStack(spacing: 8) {
+                ForEach(rows) { row in
+                    ShortcutLeaderboardRow(row: row, maxCount: maxCount)
+                }
+            }
+        }
+        .pulseFeaturedCard()
+    }
+}
+
+struct ShortcutLeaderboardRow: View {
+
+    let row: ShortcutUsageRow
+    let maxCount: Double
+
+    var body: some View {
+        let fraction = maxCount > 0 ? Double(row.count) / maxCount : 0
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(Self.display(combo: row.combo))
+                    .font(.body.monospaced())
+                Spacer()
+                Text(PulseFormat.integer(row.count))
+                    .font(.body.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(PulseDesign.warmGray(0.08))
+                    Capsule()
+                        .fill(PulseDesign.coral)
+                        .frame(width: geo.size.width * CGFloat(max(0.02, fraction)))
+                }
+            }
+            .frame(height: 4)
+        }
+    }
+
+    /// Render a canonical combo string (`cmd+shift+s`) as the glyph
+    /// form macOS users recognise (`⇧⌘S`). Falls back to the raw
+    /// string when a component isn't in the table.
+    static func display(combo: String) -> String {
+        let parts = combo.split(separator: "+").map(String.init)
+        guard !parts.isEmpty else { return combo }
+        var modifiers = ""
+        var keyPart = ""
+        for part in parts {
+            switch part {
+            case "ctrl":   modifiers += "⌃"
+            case "opt":    modifiers += "⌥"
+            case "shift":  modifiers += "⇧"
+            case "cmd":    modifiers += "⌘"
+            default:
+                keyPart = keyDisplay(for: part)
+            }
+        }
+        return modifiers + keyPart
+    }
+
+    private static func keyDisplay(for name: String) -> String {
+        switch name {
+        case "return":        return "↩"
+        case "tab":           return "⇥"
+        case "space":         return "␣"
+        case "delete":        return "⌫"
+        case "escape":        return "⎋"
+        case "forwardDelete": return "⌦"
+        case "left":          return "←"
+        case "right":         return "→"
+        case "up":            return "↑"
+        case "down":          return "↓"
+        case "backtick":      return "`"
+        case "minus":         return "-"
+        case "equal":         return "="
+        case "leftBracket":   return "["
+        case "rightBracket":  return "]"
+        case "quote":         return "'"
+        case "semicolon":     return ";"
+        case "backslash":     return "\\"
+        case "comma":         return ","
+        case "slash":         return "/"
+        case "period":        return "."
+        default:
+            return name.uppercased()
+        }
+    }
 }
 
 struct AppRankingChart: View {
