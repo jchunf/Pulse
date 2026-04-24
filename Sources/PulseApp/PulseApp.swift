@@ -686,6 +686,10 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var lidOpensTrend: [Int] = []
     @Published private(set) var restToday: RestDay = RestDay(segments: [])
     @Published private(set) var timelineToday: DayTimeline?
+    /// F-22 — today's passive consumption summary (foreground + idle
+    /// + screen-on time attributed by bundle). `.empty` until the day
+    /// has at least one qualifying window.
+    @Published private(set) var passiveToday: PassiveConsumption = .empty
     /// F-12 — today's peak typing minute, or `nil` before the user has
     /// logged any keystrokes for the day. Surfaces the busiest minute
     /// as a KPM headline on the Dashboard's Focus section.
@@ -798,6 +802,7 @@ final class DashboardModel: ObservableObject {
             let restDay = try store.restSegments(on: dayStart, capUntil: now)
             let timeline = try store.dayTimeline(on: dayStart, capUntil: now)
             let keyPeak = try store.peakKeyPressMinute(start: dayStart, capUntil: now)
+            let passive = try store.passiveConsumption(on: dayStart, capUntil: now)
             // F-04 — `mouseDensity` reads from the pre-binned
             // `day_mouse_density` table (B9) so this is a lightweight
             // grouped scan even over 7 days. `latestDisplaySnapshot`
@@ -862,6 +867,7 @@ final class DashboardModel: ObservableObject {
             self.restToday = restDay
             self.timelineToday = timeline
             self.keyPressPeak = keyPeak
+            self.passiveToday = passive
             self.weekOverWeek = weekOverWeek
             self.trajectoryTiles = trajectoryTiles
             self.lastRefreshAt = now
@@ -1278,6 +1284,9 @@ struct DashboardView: View {
                     }
                     KeyboardPeakCard(peak: model.keyPressPeak)
                     RestCard(rest: model.restToday)
+                    if model.passiveToday.totalSeconds > 0 {
+                        PassiveConsumptionCard(passive: model.passiveToday)
+                    }
 
                     // ── Section 4 — Apps ──
                     DashboardSectionHeader(titleKey: "Apps")
@@ -3036,6 +3045,50 @@ struct RestCard: View {
             Text(value)
                 .font(PulseDesign.metricFont)
         }
+    }
+}
+
+/// F-22 — today's "passive consumption" (screen-on idle while an app
+/// was foregrounded). Surfaces the dominant bundle so the one-line
+/// story reads "30 min while Safari was in front" — the classic
+/// video / long-form read signature. Auto-hides when the day has no
+/// qualifying time via the parent `if passive.totalSeconds > 0`.
+struct PassiveConsumptionCard: View {
+
+    let passive: PassiveConsumption
+
+    private static let displayNameCache = BundleDisplayNameCache()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "play.rectangle")
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(0.85)
+                Text("Passive consumption today", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            Text(PulseFormat.duration(seconds: passive.totalSeconds))
+                .font(PulseDesign.heroSecondaryFont)
+                .monospacedDigit()
+                .foregroundStyle(PulseDesign.coral)
+            if let top = passive.topBundle {
+                let share = passive.totalSeconds > 0
+                    ? Double(top.seconds) / Double(passive.totalSeconds)
+                    : 0
+                let app = Self.displayNameCache.name(for: top.bundleId)
+                let percent = Int((share * 100).rounded())
+                Text("Mostly while \(app) was in front (\(percent)%)", bundle: .pulse)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .opacity(0.8)
+            }
+            Text("Screen-on time with no input — watched, read, or stepped away while the app kept the foreground.", bundle: .pulse)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .pulseFeaturedCard()
     }
 }
 
