@@ -69,6 +69,16 @@ that has been waiting for a dramatic anchor since sec/min/hour
   crosses a new landmark. Trophy icon + `pulseHeartbeat` accent
   + coral fill — visually bolder because these are rare, earned
   events. Persistence is not day-keyed.
+- **A44** F-45 threshold alerts — two opt-in local fatigue
+  reminders delivered via `UNUserNotificationCenter`: "screen time
+  over 8h today" and "no break for 2h". Settings → Alerts gains
+  toggles for each, both default off. `ThresholdAlertEvaluator` +
+  `ContinuousActiveDeriver` live as pure value types in PulseCore
+  so tests cover crossing + re-fire suppression + still-idle
+  handling. `ThresholdAlertsController` (AppKit, `@MainActor`)
+  owns the `UNUserNotificationCenter` auth request and per-day
+  "fired" memory so a single threshold crossing prompts once,
+  resets at the next calendar day.
 - **A45** F-33 shortcut leaderboard — new
   `ShortcutLeaderboardCard` on the Dashboard's Apps section shows
   today's top-N `cmd` / `ctrl` / `opt` combos rendered in the
@@ -144,6 +154,8 @@ that has been waiting for a dramatic anchor since sec/min/hour
 - **A43** 3 new keys in en + zh-Hans for the lifetime banner:
   `Lifetime milestone`, the hero sentence, and
   `Lifetime total: %@.`.
+- **A44** 10 new keys in en + zh-Hans for the alerts settings
+  section and notification body/title templates.
 - **A45** 1 new key in en + zh-Hans: `Top shortcuts today`.
 
 ---
