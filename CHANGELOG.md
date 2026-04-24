@@ -34,6 +34,12 @@ that has been waiting for a dramatic anchor since sec/min/hour
   the Keystrokes tile pattern ("≈ 2.1× a novel"). Makes today's
   scroll count land as a "滚轮累计转动距离" story instead of a
   bare integer, per `docs/08-roadmap.md` §四 v1.2.
+- **A40** F-12 peak-typing-minute card — new
+  `KeyboardPeakCard` on the Dashboard's Focus section headlines
+  today's busiest one-minute KPM with the clock time it hit and a
+  five-tier label (hunt-and-peck / casual / touch-typist / fast /
+  sprint). Empty state matches DeepFocusCard's so day-zero reads
+  consistently.
 - **A41** F-43 week-over-week comparison — new
   `WeekOverWeekCard` on the Dashboard's Rhythm section compares the
   last 7 days against the 7 days before across keystrokes, clicks,
@@ -55,6 +61,10 @@ that has been waiting for a dramatic anchor since sec/min/hour
   `Sendable`) in `Sources/PulseCore/Rendering/`. Core Graphics +
   Core Image rather than Metal — data is pre-binned in SQL, per
   refresh render is 10-40 ms per tile without the GPU.
+- **A40** `EventStore.peakKeyPressMinute(start:capUntil:)` in
+  `Sources/PulseCore/Storage/KeyboardPeakQueries.swift`. Returns
+  the busiest one-minute bucket across `min_key` + fold-to-minute
+  `sec_key`, mirroring the layering convention `todaySummary` uses.
 
 ### 采集 / Collection (B)
 
@@ -74,6 +84,10 @@ that has been waiting for a dramatic anchor since sec/min/hour
 - **A39** 5 new anchor keys in en + zh-Hans: `scroll.blogPost`,
   `scroll.tweetFeed`, `scroll.magazine`, `scroll.novel`,
   `scroll.encyclopediaVolume`.
+- **A40** 10 new keys in en + zh-Hans for the peak-typing card:
+  `Peak typing minute`, `KPM`, empty-state string, `at %@`, and
+  the five tier labels (`typing.tier.huntAndPeck` →
+  `typing.tier.sprint`).
 - **A41** 3 new keys in en + zh-Hans: `This week vs last`,
   `%lld-day window`, `new`.
 

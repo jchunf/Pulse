@@ -1970,6 +1970,150 @@
         }
       }
     },
+    "Peak typing minute": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peak typing minute"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日打字峰值"
+          }
+        }
+      }
+    },
+    "KPM": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "KPM"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次/分钟"
+          }
+        }
+      }
+    },
+    "No typing yet — once you've pressed a key this card will show today's busiest minute.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No typing yet — once you've pressed a key this card will show today's busiest minute."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天还没打字 —— 有输入后，这里会显示今天最忙的一分钟。"
+          }
+        }
+      }
+    },
+    "at %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "at %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出现在 %@"
+          }
+        }
+      }
+    },
+    "typing.tier.huntAndPeck": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hunt-and-peck pace"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "逐键寻找节奏"
+          }
+        }
+      }
+    },
+    "typing.tier.casual": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "casual typing pace"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日常写作节奏"
+          }
+        }
+      }
+    },
+    "typing.tier.touchTypist": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "touch-typist pace"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "盲打流畅节奏"
+          }
+        }
+      }
+    },
+    "typing.tier.fast": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fast-typist pace"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快速打字节奏"
+          }
+        }
+      }
+    },
+    "typing.tier.sprint": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "keyboard-sprint pace"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "键盘冲刺节奏"
+          }
+        }
+      }
+    },
     "%@ · %@ – %@": {
       "localizations": {
         "en": {
