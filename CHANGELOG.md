@@ -84,6 +84,15 @@ that has been waiting for a dramatic anchor since sec/min/hour
   today's top-N `cmd` / `ctrl` / `opt` combos rendered in the
   macOS glyph form (`⇧⌘S`), each with a coral count-proportional
   bar. Auto-hides on a day with zero recognised combos.
+- **A46** F-08 keyboard heatmap — new `KeyboardHeatmapCard` on the
+  Dashboard's Apps section renders a 5-row US-QWERTY grid with
+  per-key counts as a sage → coral intensity ramp over the last
+  7 days of data. Opt-in per Q-06: the card shows an "enable"
+  CTA until the user flips
+  `pulse.collection.captureKeycodes`; the CGEventTapSource checks
+  the same pref on every `.keyDown` and only then folds keycode
+  into `.keyPress`. Auto-shows an "accumulating" state once opted
+  in but still empty, never renders mock data.
 
 ### Data layer additions
 
@@ -110,6 +119,9 @@ that has been waiting for a dramatic anchor since sec/min/hour
   returns the top-N by count. `ShortcutCombo.canonical(...)`
   (pure) turns a `(keyCode, ShortcutModifiers)` pair into a
   stable combo string.
+- **A46** `EventStore.keyCodeDistribution(endingAt:days:calendar:)`
+  in `Sources/PulseCore/Storage/KeyCodeQueries.swift`. Groups
+  `day_key_codes` by keyCode over the N most recent local days.
 
 ### 采集 / Collection (B)
 
@@ -133,6 +145,14 @@ that has been waiting for a dramatic anchor since sec/min/hour
   preserved. `EventWriter` accumulates per-second combo counts
   and `RollupScheduler` folds them sec → min → hour with the
   same retention the other metrics get.
+- **B11** D-K2 keycode distribution (opt-in) — `V6` migration adds
+  `day_key_codes(day, key_code, count)` with local-midnight-UTC
+  `day` to match V4's `day_mouse_density`. `CGEventTapSource`
+  checks `UserDefaults.pulse.collection.captureKeycodes` on each
+  `.keyDown` and folds the raw keycode into `.keyPress` only
+  when the user has explicitly opted in (default `false`,
+  Q-06 / docs/05-privacy.md §4.1). `EventWriter` accumulates
+  per-day keycode counts into `day_key_codes` UPSERT ops.
 
 ### i18n
 
@@ -157,6 +177,9 @@ that has been waiting for a dramatic anchor since sec/min/hour
 - **A44** 10 new keys in en + zh-Hans for the alerts settings
   section and notification body/title templates.
 - **A45** 1 new key in en + zh-Hans: `Top shortcuts today`.
+- **A46** 4 new keys in en + zh-Hans for the keyboard heatmap:
+  `Keyboard heatmap`, opt-in explanation, `Enable keyboard heatmap`,
+  accumulating-state text.
 
 ---
 

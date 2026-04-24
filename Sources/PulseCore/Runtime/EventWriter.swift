@@ -47,6 +47,11 @@ public actor EventWriter {
     /// `sec_shortcuts` UPSERTs at flush time.
     private var shortcutBuffer: [Int64: [String: Int64]] = [:]
 
+    /// F-08 — per-local-day, per-keycode counts. Populated only
+    /// when `.keyPress` arrives with a non-nil keyCode (i.e. the
+    /// user opted into D-K2). Drains to `day_key_codes` UPSERTs.
+    private var keyCodeBuffer: [Int64: [UInt16: Int64]] = [:]
+
     public init(
         store: EventStore,
         displayProvider: @escaping @Sendable () -> [DisplayInfo],
@@ -81,6 +86,7 @@ public actor EventWriter {
         drainDistanceBuffer()
         drainScrollTickBuffer()
         drainShortcutBuffer()
+        drainKeyCodeBuffer()
         guard !pending.isEmpty else {
             stats = stats.recordingFlush(rows: 0, at: Date())
             lastFlushAt = Date()
@@ -131,7 +137,17 @@ public actor EventWriter {
             scrollTickBuffer[Int64(AggregationRules.secondBucket(for: at).timeIntervalSince1970), default: 0] += 1
             let axis = horizontal ? "h" : "v"
             return .systemEvent(tsMillis: ts, category: "mouse_scroll", payload: "\(axis):\(delta)")
-        case let .keyPress(keyCode, _):
+        case let .keyPress(keyCode, at):
+            // F-08 — when capture is opt-in (keyCode non-nil), fold
+            // into the per-day buffer on top of the raw L0 row. The
+            // raw row stays opt-in-gated too: the event tap decides
+            // whether to pass keyCode.
+            if let keyCode {
+                let localOffset = Int64(TimeZone.current.secondsFromGMT(for: at))
+                let dayLocalUtc =
+                    ((Int64(at.timeIntervalSince1970) + localOffset) / 86_400 * 86_400) - localOffset
+                keyCodeBuffer[dayLocalUtc, default: [:]][keyCode, default: 0] += 1
+            }
             return .keyPress(tsMillis: ts, keyCode: keyCode)
         case let .shortcutPressed(combo, at):
             // No raw-L0 row for shortcuts — counts go straight into
@@ -223,6 +239,18 @@ public actor EventWriter {
             }
         }
         shortcutBuffer.removeAll(keepingCapacity: true)
+    }
+
+    /// F-08 — drain per-day, per-keycode counts into UPSERT ops.
+    /// Stays empty unless the user has opted into D-K2 capture.
+    private func drainKeyCodeBuffer() {
+        guard !keyCodeBuffer.isEmpty else { return }
+        for (day, keyCodes) in keyCodeBuffer {
+            for (keyCode, count) in keyCodes {
+                pending.append(.dayKeyCodeDelta(day: day, keyCode: Int64(keyCode), count: count))
+            }
+        }
+        keyCodeBuffer.removeAll(keepingCapacity: true)
     }
 
     // MARK: - Test hooks

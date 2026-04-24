@@ -136,15 +136,23 @@ public final class CGEventTapSource: EventSource, @unchecked Sendable {
         case .scrollWheel:
             handler(.mouseScroll(delta: 0, horizontal: false, at: now))
         case .keyDown:
-            // `.keyPress` keeps its `keyCode: nil` default — individual
-            // keycode capture (D-K2, for the F-08 heatmap) stays opt-in
-            // per Q-06. The shortcut side (D-K3, F-33) is independent:
-            // we read the flags + keycode, canonicalise to a stable
-            // combo string, and emit a second event. Raw keycodes
-            // never reach storage this way; only the restricted
-            // shortcut vocabulary does.
-            handler(.keyPress(keyCode: nil, at: now))
+            // D-K2 keycode capture is opt-in per Q-06. When the user
+            // flips the "Enable keyboard heatmap" toggle in Settings,
+            // `UserDefaults.pulse.collection.captureKeycodes` becomes
+            // true and we fold the raw keycode into `.keyPress`. When
+            // off, the event still flows through so total keystroke
+            // counts keep working, but the keycode field stays nil.
             let keyCode = UInt16(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeycode))
+            let captureKeycodes = UserDefaults.standard.bool(
+                forKey: "pulse.collection.captureKeycodes"
+            )
+            handler(.keyPress(keyCode: captureKeycodes ? keyCode : nil, at: now))
+
+            // D-K3 shortcut detection is independent of D-K2: we
+            // canonicalise `(keyCode, modifiers)` into a stable
+            // combo string that only carries cmd / ctrl / opt +
+            // key-name vocabulary, so no raw keycode leaks to
+            // storage via this path even when D-K2 is off.
             let modifiers = shortcutModifiers(from: event.flags)
             if let combo = ShortcutCombo.canonical(
                 keyCode: keyCode,

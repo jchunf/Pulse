@@ -108,6 +108,10 @@ public enum WriteOperation: Sendable, Equatable {
     /// UPSERT a per-second shortcut-count increment into `sec_shortcuts`
     /// for the given canonical combo. Feeds F-33 (快捷键使用榜).
     case secShortcutDelta(tsSecond: Int64, combo: String, count: Int64)
+    /// UPSERT a per-day keycode-count increment into `day_key_codes`
+    /// (D-K2, opt-in via Q-06). Feeds F-08 (键盘热力图). `day` is
+    /// local-midnight-in-UTC-seconds, matching V4's `day_mouse_density`.
+    case dayKeyCodeDelta(day: Int64, keyCode: Int64, count: Int64)
 
     func execute(in db: Database) throws {
         switch self {
@@ -159,6 +163,14 @@ public enum WriteOperation: Sendable, Equatable {
                     ON CONFLICT(ts_second, combo) DO UPDATE SET count = sec_shortcuts.count + excluded.count
                     """,
                 arguments: [tsSecond, combo, count]
+            )
+        case let .dayKeyCodeDelta(day, keyCode, count):
+            try db.execute(
+                sql: """
+                    INSERT INTO day_key_codes (day, key_code, count) VALUES (?, ?, ?)
+                    ON CONFLICT(day, key_code) DO UPDATE SET count = day_key_codes.count + excluded.count
+                    """,
+                arguments: [day, keyCode, count]
             )
         }
     }
