@@ -688,6 +688,8 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var timelineToday: DayTimeline?
     /// F-33 — top shortcuts used today, sorted by count desc.
     @Published private(set) var shortcutsToday: [ShortcutUsageRow] = []
+    /// F-09 — today's time-in-category breakdown for the focus donut.
+    @Published private(set) var focusDonut: FocusDonut = .empty
     /// F-08 — 7-day keycode distribution for the keyboard heatmap.
     /// Empty until the user opts into D-K2 capture.
     @Published private(set) var keyCodeDistribution: [KeyCodeCount] = []
@@ -819,6 +821,16 @@ final class DashboardModel: ObservableObject {
             let passive = try store.passiveConsumption(on: dayStart, capUntil: now)
             let shortcuts = try store.shortcutLeaderboard(start: dayStart, end: dayEnd, limit: 5)
             let keyCodes = try store.keyCodeDistribution(endingAt: now, days: 7)
+            // F-09 — ask for up to 200 bundles so the "other" slice is
+            // accurate. In practice a day's distinct-bundle count is
+            // well under 50, so 200 is pure headroom.
+            let allAppsToday = try store.appUsageRanking(
+                start: dayStart,
+                end: dayEnd,
+                capUntil: now,
+                limit: 200
+            )
+            let focusDonut = FocusDonutBuilder.build(from: allAppsToday)
             // F-04 — `mouseDensity` reads from the pre-binned
             // `day_mouse_density` table (B9) so this is a lightweight
             // grouped scan even over 7 days. `latestDisplaySnapshot`
@@ -886,6 +898,7 @@ final class DashboardModel: ObservableObject {
             self.passiveToday = passive
             self.shortcutsToday = shortcuts
             self.keyCodeDistribution = keyCodes
+            self.focusDonut = focusDonut
             self.weekOverWeek = weekOverWeek
             self.trajectoryTiles = trajectoryTiles
             self.lastRefreshAt = now
@@ -1363,6 +1376,9 @@ struct DashboardView: View {
                             .frame(maxWidth: .infinity)
                         UsagePostureCard(posture: model.sessionPosture)
                             .frame(maxWidth: .infinity)
+                    }
+                    if model.focusDonut.totalSeconds > 0 {
+                        FocusDonutCard(donut: model.focusDonut)
                     }
                     KeyboardPeakCard(peak: model.keyPressPeak)
                     RestCard(rest: model.restToday)
@@ -2806,6 +2822,136 @@ struct DeepFocusCard: View {
         formatter.locale = .current
         formatter.setLocalizedDateFormatFromTemplate("HH:mm")
         return formatter.string(from: date)
+    }
+}
+
+/// F-09 — the "专注度环形图". Renders today's per-category foreground
+/// time as a donut (deep focus / communication / browsing / other)
+/// with the deep-focus percentage in the center and a legend below.
+/// Per Q-01 (decision D) the categorisation is auto via
+/// `AppCategoryClassifier`; user-whitelist overrides are deferred
+/// to v1.3.
+struct FocusDonutCard: View {
+
+    let donut: FocusDonut
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "chart.pie")
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(0.85)
+                Text("Focus breakdown", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            HStack(alignment: .top, spacing: 24) {
+                FocusDonutShape(donut: donut)
+                    .frame(width: 120, height: 120)
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(donut.segments) { segment in
+                        FocusDonutLegendRow(
+                            segment: segment,
+                            fraction: donut.totalSeconds > 0
+                                ? Double(segment.seconds) / Double(donut.totalSeconds)
+                                : 0
+                        )
+                    }
+                }
+            }
+        }
+        .pulseFeaturedCard()
+    }
+}
+
+struct FocusDonutShape: View {
+
+    let donut: FocusDonut
+
+    var body: some View {
+        GeometryReader { geo in
+            let diameter = min(geo.size.width, geo.size.height)
+            let lineWidth = diameter * 0.18
+            ZStack {
+                Circle()
+                    .strokeBorder(PulseDesign.warmGray(0.08), lineWidth: lineWidth)
+                    .frame(width: diameter, height: diameter)
+                donutRing(diameter: diameter, lineWidth: lineWidth)
+                VStack(spacing: 0) {
+                    Text("\(Int((donut.deepFocusFraction * 100).rounded()))%")
+                        .font(PulseDesign.heroSecondaryFont)
+                        .monospacedDigit()
+                        .foregroundStyle(PulseDesign.coral)
+                    Text("deep focus", bundle: .pulse)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
+    }
+
+    @ViewBuilder
+    private func donutRing(diameter: CGFloat, lineWidth: CGFloat) -> some View {
+        let total = max(donut.totalSeconds, 1)
+        var cursor: Double = 0
+        ZStack {
+            ForEach(donut.segments) { segment in
+                let fraction = Double(segment.seconds) / Double(total)
+                let startFraction = cursor
+                let endFraction = cursor + fraction
+                let _ = (cursor = endFraction)
+                if segment.seconds > 0 {
+                    Circle()
+                        .trim(from: startFraction, to: endFraction)
+                        .stroke(
+                            FocusDonutCategoryPalette.color(for: segment.category),
+                            style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt)
+                        )
+                        .rotationEffect(.degrees(-90))
+                        .frame(width: diameter, height: diameter)
+                }
+            }
+        }
+    }
+}
+
+struct FocusDonutLegendRow: View {
+
+    let segment: FocusDonutSegment
+    let fraction: Double
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Circle()
+                .fill(FocusDonutCategoryPalette.color(for: segment.category))
+                .frame(width: 8, height: 8)
+            Text(Self.title(for: segment.category), bundle: .pulse)
+                .font(.footnote)
+            Spacer()
+            Text("\(Int((fraction * 100).rounded()))% · \(PulseFormat.duration(seconds: segment.seconds))")
+                .font(.footnote.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private static func title(for category: AppCategory) -> LocalizedStringKey {
+        switch category {
+        case .deepFocus:     return "focus.category.deepFocus"
+        case .communication: return "focus.category.communication"
+        case .browsing:      return "focus.category.browsing"
+        case .other:         return "focus.category.other"
+        }
+    }
+}
+
+enum FocusDonutCategoryPalette {
+    static func color(for category: AppCategory) -> Color {
+        switch category {
+        case .deepFocus:     return PulseDesign.coral
+        case .communication: return PulseDesign.amber
+        case .browsing:      return PulseDesign.sage
+        case .other:         return PulseDesign.warmGray(0.4)
+        }
     }
 }
 

@@ -93,6 +93,14 @@ that has been waiting for a dramatic anchor since sec/min/hour
   the same pref on every `.keyDown` and only then folds keycode
   into `.keyPress`. Auto-shows an "accumulating" state once opted
   in but still empty, never renders mock data.
+- **A47** F-09 focus donut — new `FocusDonutCard` on the Focus
+  section splits today's foreground time into four auto-classified
+  buckets (deep focus / communication / browsing / other) and
+  shows the deep-focus percentage in the ring centre. Classification
+  is Q-01's (D) default — a bundleId-prefix table in
+  `AppCategoryClassifier`; user whitelists are deferred to v1.3.
+  Pure builder in PulseCore (`FocusDonutBuilder.build`) so tests
+  exercise each bucket + empty-input fallback. Closes v1.2.
 
 ### Data layer additions
 
@@ -122,6 +130,12 @@ that has been waiting for a dramatic anchor since sec/min/hour
 - **A46** `EventStore.keyCodeDistribution(endingAt:days:calendar:)`
   in `Sources/PulseCore/Storage/KeyCodeQueries.swift`. Groups
   `day_key_codes` by keyCode over the N most recent local days.
+- **A47** `FocusDonutBuilder.build(from:)` +
+  `AppCategoryClassifier.category(for:)` in
+  `Sources/PulseCore/Reports/FocusDonut.swift` /
+  `Sources/PulseCore/Narrative/AppCategory.swift`. Pure folder:
+  input is the existing `[AppUsageRow]` from `appUsageRanking`;
+  output is `FocusDonut` with four monotonic-order segments.
 
 ### 采集 / Collection (B)
 
@@ -180,6 +194,9 @@ that has been waiting for a dramatic anchor since sec/min/hour
 - **A46** 4 new keys in en + zh-Hans for the keyboard heatmap:
   `Keyboard heatmap`, opt-in explanation, `Enable keyboard heatmap`,
   accumulating-state text.
+- **A47** 6 new keys in en + zh-Hans for the focus donut:
+  `Focus breakdown`, `deep focus`, and the four
+  `focus.category.*` labels.
 
 ---
 
