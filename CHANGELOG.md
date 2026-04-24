@@ -14,6 +14,9 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 Final v1.1 slice — closes F-04 mouse trajectory visualisation, the
 last remaining row in the v1.1 queue from `docs/08-roadmap.md` §四.
+First v1.2 slice opens with F-17 — the scroll-mileage "里程表子指标"
+that has been waiting for a dramatic anchor since sec/min/hour
+`scroll_ticks` landed in B7.
 
 ### Dashboard & Narrative (A)
 
@@ -24,6 +27,13 @@ last remaining row in the v1.1 queue from `docs/08-roadmap.md` §四.
   `MouseTrajectoryCard` hides itself when no display has any
   activity yet; per-display tiles honor physical aspect ratio via
   the latest `display_snapshots` row.
+- **A39** F-17 scroll mileage — `NarrativeEngine` gains a
+  `.scrollTicks` metric with five anchors (blog post → tweet feed →
+  magazine issue → novel → encyclopedia volume). The Dashboard's
+  "Scrolls" summary tile now carries a dramatic subtitle matching
+  the Keystrokes tile pattern ("≈ 2.1× a novel"). Makes today's
+  scroll count land as a "滚轮累计转动距离" story instead of a
+  bare integer, per `docs/08-roadmap.md` §四 v1.2.
 
 ### Data layer additions
 
@@ -52,6 +62,9 @@ last remaining row in the v1.1 queue from `docs/08-roadmap.md` §四.
 - **A35** 5 new keys in en + zh-Hans: `Mouse trails`,
   `No mouse movement recorded yet.`, `Display %lld`,
   `Primary display`, `%@ moves · last 7 days`.
+- **A39** 5 new anchor keys in en + zh-Hans: `scroll.blogPost`,
+  `scroll.tweetFeed`, `scroll.magazine`, `scroll.novel`,
+  `scroll.encyclopediaVolume`.
 
 ---
 

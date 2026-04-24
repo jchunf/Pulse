@@ -1842,6 +1842,86 @@
         }
       }
     },
+    "scroll.blogPost": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "blog post"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一篇博客"
+          }
+        }
+      }
+    },
+    "scroll.tweetFeed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tweet-feed session"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一次推文流翻看"
+          }
+        }
+      }
+    },
+    "scroll.magazine": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "magazine issue"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一期杂志"
+          }
+        }
+      }
+    },
+    "scroll.novel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "novel"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一本小说"
+          }
+        }
+      }
+    },
+    "scroll.encyclopediaVolume": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "encyclopedia volume"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一卷百科全书"
+          }
+        }
+      }
+    },
     "%@ · %@ – %@": {
       "localizations": {
         "en": {
