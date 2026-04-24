@@ -34,6 +34,15 @@ that has been waiting for a dramatic anchor since sec/min/hour
   the Keystrokes tile pattern ("≈ 2.1× a novel"). Makes today's
   scroll count land as a "滚轮累计转动距离" story instead of a
   bare integer, per `docs/08-roadmap.md` §四 v1.2.
+- **A41** F-43 week-over-week comparison — new
+  `WeekOverWeekCard` on the Dashboard's Rhythm section compares the
+  last 7 days against the 7 days before across keystrokes, clicks,
+  mouse distance, and scrolls. Each row shows the current-period
+  total plus a `DeltaChip` (reuses the existing vs-yesterday chip);
+  empty-baseline rows render a "new" label instead of a meaningless
+  ∞-style %. Pure builder (`PeriodComparisonBuilder.split`) lives
+  in PulseCore so tests cover even/odd splits and zero-baseline
+  deltas.
 
 ### Data layer additions
 
@@ -65,6 +74,8 @@ that has been waiting for a dramatic anchor since sec/min/hour
 - **A39** 5 new anchor keys in en + zh-Hans: `scroll.blogPost`,
   `scroll.tweetFeed`, `scroll.magazine`, `scroll.novel`,
   `scroll.encyclopediaVolume`.
+- **A41** 3 new keys in en + zh-Hans: `This week vs last`,
+  `%lld-day window`, `new`.
 
 ---
 
