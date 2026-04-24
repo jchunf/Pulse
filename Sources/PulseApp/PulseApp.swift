@@ -688,6 +688,9 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var timelineToday: DayTimeline?
     /// F-33 — top shortcuts used today, sorted by count desc.
     @Published private(set) var shortcutsToday: [ShortcutUsageRow] = []
+    /// F-08 — 7-day keycode distribution for the keyboard heatmap.
+    /// Empty until the user opts into D-K2 capture.
+    @Published private(set) var keyCodeDistribution: [KeyCodeCount] = []
     /// F-22 — today's passive consumption summary (foreground + idle
     /// + screen-on time attributed by bundle). `.empty` until the day
     /// has at least one qualifying window.
@@ -815,6 +818,7 @@ final class DashboardModel: ObservableObject {
             let keyPeak = try store.peakKeyPressMinute(start: dayStart, capUntil: now)
             let passive = try store.passiveConsumption(on: dayStart, capUntil: now)
             let shortcuts = try store.shortcutLeaderboard(start: dayStart, end: dayEnd, limit: 5)
+            let keyCodes = try store.keyCodeDistribution(endingAt: now, days: 7)
             // F-04 — `mouseDensity` reads from the pre-binned
             // `day_mouse_density` table (B9) so this is a lightweight
             // grouped scan even over 7 days. `latestDisplaySnapshot`
@@ -881,6 +885,7 @@ final class DashboardModel: ObservableObject {
             self.keyPressPeak = keyPeak
             self.passiveToday = passive
             self.shortcutsToday = shortcuts
+            self.keyCodeDistribution = keyCodes
             self.weekOverWeek = weekOverWeek
             self.trajectoryTiles = trajectoryTiles
             self.lastRefreshAt = now
@@ -1372,6 +1377,7 @@ struct DashboardView: View {
                     if !model.shortcutsToday.isEmpty {
                         ShortcutLeaderboardCard(rows: model.shortcutsToday)
                     }
+                    KeyboardHeatmapCard(keyCodes: model.keyCodeDistribution)
                     if !model.trajectoryTiles.isEmpty {
                         MouseTrajectoryCard(tiles: model.trajectoryTiles)
                     }
@@ -3639,6 +3645,189 @@ private struct MouseTrajectoryTile: View {
     private static let maxTileHeight: CGFloat = 220
 }
 
+/// F-08 — the "键盘热力图". Renders a US-QWERTY grid with per-key
+/// counts as a `sage → coral` intensity ramp. Empty / opt-out
+/// states:
+///
+/// - **Not opted in (`pulse.collection.captureKeycodes == false`)**:
+///   shows a short explanation + toggle CTA. Flipping the toggle
+///   writes the preference; the live event tap checks the same key
+///   on every keyDown and starts folding keycodes into the buffer.
+///   Per Q-06 / docs/05-privacy.md §4.1, capture is explicitly opt-in.
+/// - **Opted in but empty**: "Typing data will start accumulating…"
+///   Once the user has actually typed with capture on, the grid
+///   renders. No mock / demo data ever shows here.
+struct KeyboardHeatmapCard: View {
+
+    let keyCodes: [KeyCodeCount]
+
+    @AppStorage("pulse.collection.captureKeycodes")
+    private var captureEnabled: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "rectangle.3.offgrid")
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(captureEnabled ? 0.85 : 0.35)
+                Text("Keyboard heatmap", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            if !captureEnabled {
+                optInState
+            } else if keyCodes.isEmpty {
+                emptyState
+            } else {
+                grid
+            }
+        }
+        .pulseFeaturedCard()
+    }
+
+    private var optInState: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Keycode capture is off by default. Enable it to see which keys you press most — only counts per key leave the event tap, never content or timing.", bundle: .pulse)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                captureEnabled = true
+            } label: {
+                Text("Enable keyboard heatmap", bundle: .pulse)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var emptyState: some View {
+        Text("Typing data will start accumulating on the next keydown. Come back after a writing session.", bundle: .pulse)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.vertical, 4)
+    }
+
+    private var grid: some View {
+        let byKey = Dictionary(uniqueKeysWithValues: keyCodes.map { ($0.keyCode, $0.count) })
+        let maxCount = max(1, keyCodes.map(\.count).max() ?? 1)
+        return VStack(spacing: 4) {
+            ForEach(Self.rows.indices, id: \.self) { idx in
+                HStack(spacing: 4) {
+                    ForEach(Self.rows[idx], id: \.keyCode) { key in
+                        KeyboardHeatmapKey(
+                            label: key.label,
+                            count: byKey[key.keyCode] ?? 0,
+                            maxCount: maxCount
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private struct Key: Hashable {
+        let keyCode: UInt16
+        let label: String
+    }
+
+    /// Rows of the US-QWERTY layout we render. Deliberately
+    /// truncated to the keys with visible count payoff — function
+    /// keys / numpad / modifiers add clutter without insight.
+    private static let rows: [[Key]] = [
+        [
+            Key(keyCode: 50,  label: "`"),
+            Key(keyCode: 18,  label: "1"),
+            Key(keyCode: 19,  label: "2"),
+            Key(keyCode: 20,  label: "3"),
+            Key(keyCode: 21,  label: "4"),
+            Key(keyCode: 23,  label: "5"),
+            Key(keyCode: 22,  label: "6"),
+            Key(keyCode: 26,  label: "7"),
+            Key(keyCode: 28,  label: "8"),
+            Key(keyCode: 25,  label: "9"),
+            Key(keyCode: 29,  label: "0"),
+            Key(keyCode: 27,  label: "-"),
+            Key(keyCode: 24,  label: "="),
+            Key(keyCode: 51,  label: "⌫")
+        ],
+        [
+            Key(keyCode: 48,  label: "⇥"),
+            Key(keyCode: 12,  label: "Q"),
+            Key(keyCode: 13,  label: "W"),
+            Key(keyCode: 14,  label: "E"),
+            Key(keyCode: 15,  label: "R"),
+            Key(keyCode: 17,  label: "T"),
+            Key(keyCode: 16,  label: "Y"),
+            Key(keyCode: 32,  label: "U"),
+            Key(keyCode: 34,  label: "I"),
+            Key(keyCode: 31,  label: "O"),
+            Key(keyCode: 35,  label: "P"),
+            Key(keyCode: 33,  label: "["),
+            Key(keyCode: 30,  label: "]"),
+            Key(keyCode: 42,  label: "\\")
+        ],
+        [
+            Key(keyCode: 0,   label: "A"),
+            Key(keyCode: 1,   label: "S"),
+            Key(keyCode: 2,   label: "D"),
+            Key(keyCode: 3,   label: "F"),
+            Key(keyCode: 5,   label: "G"),
+            Key(keyCode: 4,   label: "H"),
+            Key(keyCode: 38,  label: "J"),
+            Key(keyCode: 40,  label: "K"),
+            Key(keyCode: 37,  label: "L"),
+            Key(keyCode: 41,  label: ";"),
+            Key(keyCode: 39,  label: "'"),
+            Key(keyCode: 36,  label: "↩")
+        ],
+        [
+            Key(keyCode: 6,   label: "Z"),
+            Key(keyCode: 7,   label: "X"),
+            Key(keyCode: 8,   label: "C"),
+            Key(keyCode: 9,   label: "V"),
+            Key(keyCode: 11,  label: "B"),
+            Key(keyCode: 45,  label: "N"),
+            Key(keyCode: 46,  label: "M"),
+            Key(keyCode: 43,  label: ","),
+            Key(keyCode: 47,  label: "."),
+            Key(keyCode: 44,  label: "/")
+        ],
+        [
+            Key(keyCode: 49,  label: "␣")
+        ]
+    ]
+}
+
+/// One key tile in `KeyboardHeatmapCard`'s grid. Colour intensity
+/// is `count / maxCount` clamped to [0, 1], ramped sage → coral on
+/// top of a faint warmGray base so zero-count keys stay visible
+/// but muted.
+struct KeyboardHeatmapKey: View {
+
+    let label: String
+    let count: Int
+    let maxCount: Int
+
+    var body: some View {
+        let intensity = min(1.0, Double(count) / Double(max(1, maxCount)))
+        let tint = Color(
+            red:   (1.0 - intensity) * 0.55 + intensity * 0.95,
+            green: (1.0 - intensity) * 0.70 + intensity * 0.45,
+            blue:  (1.0 - intensity) * 0.55 + intensity * 0.35,
+            opacity: 0.25 + intensity * 0.65
+        )
+        ZStack {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(tint)
+            Text(label)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(intensity > 0.55 ? Color.white : Color.primary.opacity(0.7))
+        }
+        .frame(height: 28)
+        .frame(maxWidth: .infinity)
+    }
+}
+
 /// F-33 — the "快捷键使用榜". Bar list of today's most-used cmd/ctrl/
 /// opt shortcut combos. Auto-hides at day-zero via the parent's
 /// `if !model.shortcutsToday.isEmpty`. Combo strings are rendered
@@ -3974,6 +4163,11 @@ enum PulsePreferenceKey {
     /// main-actor graph. `0` means the alert is disabled.
     static let alertScreenTimeSeconds = "pulse.alerts.screenTimeSeconds"
     static let alertNoBreakSeconds = "pulse.alerts.noBreakSeconds"
+    /// F-08 / D-K2 — opt-in keycode capture flag. Mirrored verbatim
+    /// in `CGEventTapSource` (which reads `UserDefaults` directly on
+    /// every `.keyDown` rather than taking a dependency). Default
+    /// `false` per Q-06 / docs/05-privacy.md §4.1.
+    static let captureKeycodes = "pulse.collection.captureKeycodes"
 }
 
 extension UserDefaults {

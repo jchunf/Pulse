@@ -1250,6 +1250,70 @@
         }
       }
     },
+    "Keyboard heatmap": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keyboard heatmap"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "键盘热力图"
+          }
+        }
+      }
+    },
+    "Keycode capture is off by default. Enable it to see which keys you press most — only counts per key leave the event tap, never content or timing.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keycode capture is off by default. Enable it to see which keys you press most — only counts per key leave the event tap, never content or timing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "键码采集默认关闭。启用后可以看到每个键的使用次数 —— 只记录每个键按了多少次，不记录内容，也不记录时序。"
+          }
+        }
+      }
+    },
+    "Enable keyboard heatmap": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable keyboard heatmap"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启用键盘热力图"
+          }
+        }
+      }
+    },
+    "Typing data will start accumulating on the next keydown. Come back after a writing session.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Typing data will start accumulating on the next keydown. Come back after a writing session."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从下一次按键开始累计数据。写一会儿再回来看看。"
+          }
+        }
+      }
+    },
     "Alerts": {
       "localizations": {
         "en": {

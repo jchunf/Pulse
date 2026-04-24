@@ -28,10 +28,10 @@ struct MigratorTests {
         }
     }
 
-    @Test("bundled migrator loads up to V5")
+    @Test("bundled migrator loads up to V6")
     func bundledMigratorLoads() throws {
         let migrator = try Migrator.bundled()
-        #expect(migrator.targetVersion == 5)
+        #expect(migrator.targetVersion == 6)
     }
 
     @Test("in-memory database migrated to head has core tables")
@@ -73,7 +73,7 @@ struct MigratorTests {
         let version: Int? = try db.queue.read { db in
             try Int.fetchOne(db, sql: "PRAGMA user_version")
         }
-        #expect(version == 5)
+        #expect(version == 6)
     }
 
     @Test("re-running migrator on an up-to-date DB is a no-op")
@@ -81,7 +81,7 @@ struct MigratorTests {
         let db = try PulseDatabase.inMemory()
         let migrator = try Migrator.bundled()
         let version = try migrator.migrate(db.queue)
-        #expect(version == 5)
+        #expect(version == 6)
     }
 
     @Test("V3 adds scroll_ticks to hour_summary")
@@ -125,6 +125,18 @@ struct MigratorTests {
             )
         }
         #expect(secColumns == ["ts_second", "combo", "count"])
+    }
+
+    @Test("V6 creates day_key_codes with expected shape")
+    func v6CreatesDayKeyCodes() throws {
+        let db = try PulseDatabase.inMemory()
+        let columns: [String] = try db.queue.read { db in
+            try String.fetchAll(
+                db,
+                sql: "SELECT name FROM pragma_table_info('day_key_codes') ORDER BY cid"
+            )
+        }
+        #expect(columns == ["day", "key_code", "count"])
     }
 
     @Test("raw_mouse_moves has expected column shape")
