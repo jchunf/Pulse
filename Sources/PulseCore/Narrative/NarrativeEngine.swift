@@ -8,6 +8,7 @@ import Foundation
 public enum NarrativeMetric: String, Sendable, Equatable, CaseIterable {
     case keystrokes
     case focusDurationSeconds
+    case scrollTicks
 }
 
 /// A reference value a metric can be multiplied against to produce a
@@ -111,6 +112,29 @@ public struct NarrativeEngine: Sendable {
             NarrativeAnchor(key: "focus.workday", displayName: "full work day",
                             valueInMetricUnits: 8 * 60 * 60,
                             metric: .focusDurationSeconds)
+        ],
+        // F-17: the "mileage" sub-metric for scroll-wheel ticks. 1 tick
+        // is roughly the delta a user gets from one detent on a standard
+        // wheel / one Magic-Mouse swipe pulse — enough to nudge a typical
+        // view ~2–3 lines of body text. Anchors are monotonic and
+        // evocative rather than research-grade precise, same spirit as
+        // `LandmarkLibrary.standard`.
+        .scrollTicks: [
+            NarrativeAnchor(key: "scroll.blogPost", displayName: "blog post",
+                            valueInMetricUnits: 30,
+                            metric: .scrollTicks),
+            NarrativeAnchor(key: "scroll.tweetFeed", displayName: "tweet-feed session",
+                            valueInMetricUnits: 150,
+                            metric: .scrollTicks),
+            NarrativeAnchor(key: "scroll.magazine", displayName: "magazine issue",
+                            valueInMetricUnits: 600,
+                            metric: .scrollTicks),
+            NarrativeAnchor(key: "scroll.novel", displayName: "novel",
+                            valueInMetricUnits: 3_000,
+                            metric: .scrollTicks),
+            NarrativeAnchor(key: "scroll.encyclopediaVolume", displayName: "encyclopedia volume",
+                            valueInMetricUnits: 25_000,
+                            metric: .scrollTicks)
         ]
     ])
 
