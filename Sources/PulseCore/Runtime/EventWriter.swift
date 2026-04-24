@@ -43,6 +43,10 @@ public actor EventWriter {
     /// same second compose without clobbering the row.
     private var scrollTickBuffer: [Int64: Int64] = [:]
 
+    /// F-33 — per-second, per-combo shortcut counts. Drains to
+    /// `sec_shortcuts` UPSERTs at flush time.
+    private var shortcutBuffer: [Int64: [String: Int64]] = [:]
+
     public init(
         store: EventStore,
         displayProvider: @escaping @Sendable () -> [DisplayInfo],
@@ -76,6 +80,7 @@ public actor EventWriter {
     public func flush() async {
         drainDistanceBuffer()
         drainScrollTickBuffer()
+        drainShortcutBuffer()
         guard !pending.isEmpty else {
             stats = stats.recordingFlush(rows: 0, at: Date())
             lastFlushAt = Date()
@@ -128,6 +133,14 @@ public actor EventWriter {
             return .systemEvent(tsMillis: ts, category: "mouse_scroll", payload: "\(axis):\(delta)")
         case let .keyPress(keyCode, _):
             return .keyPress(tsMillis: ts, keyCode: keyCode)
+        case let .shortcutPressed(combo, at):
+            // No raw-L0 row for shortcuts — counts go straight into
+            // `sec_shortcuts` via the per-second accumulator. This
+            // matches the design for scroll ticks: compact rollup
+            // rows, no L0 pile-up.
+            let tsSecond = Int64(AggregationRules.secondBucket(for: at).timeIntervalSince1970)
+            shortcutBuffer[tsSecond, default: [:]][combo, default: 0] += 1
+            return nil
         case let .foregroundApp(bundleId, _):
             return .systemEvent(tsMillis: ts, category: "foreground_app", payload: bundleId)
         case let .windowTitleHash(bundleId, hash, _):
@@ -198,6 +211,18 @@ public actor EventWriter {
             pending.append(.secMouseScrollDelta(tsSecond: tsSecond, ticks: ticks))
         }
         scrollTickBuffer.removeAll(keepingCapacity: true)
+    }
+
+    /// Same flush model as `drainDistanceBuffer` but for F-33 shortcut
+    /// counts. Emits one UPSERT op per (second, combo) pair.
+    private func drainShortcutBuffer() {
+        guard !shortcutBuffer.isEmpty else { return }
+        for (tsSecond, combos) in shortcutBuffer {
+            for (combo, count) in combos {
+                pending.append(.secShortcutDelta(tsSecond: tsSecond, combo: combo, count: count))
+            }
+        }
+        shortcutBuffer.removeAll(keepingCapacity: true)
     }
 
     // MARK: - Test hooks

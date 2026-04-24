@@ -105,6 +105,9 @@ public enum WriteOperation: Sendable, Equatable {
     /// the B7 scroll pipeline: sec_mouse.scroll_ticks → min_mouse →
     /// hour_summary. Accumulates rather than replaces.
     case secMouseScrollDelta(tsSecond: Int64, ticks: Int64)
+    /// UPSERT a per-second shortcut-count increment into `sec_shortcuts`
+    /// for the given canonical combo. Feeds F-33 (快捷键使用榜).
+    case secShortcutDelta(tsSecond: Int64, combo: String, count: Int64)
 
     func execute(in db: Database) throws {
         switch self {
@@ -148,6 +151,14 @@ public enum WriteOperation: Sendable, Equatable {
                     ON CONFLICT(ts_second) DO UPDATE SET scroll_ticks = sec_mouse.scroll_ticks + excluded.scroll_ticks
                     """,
                 arguments: [tsSecond, ticks]
+            )
+        case let .secShortcutDelta(tsSecond, combo, count):
+            try db.execute(
+                sql: """
+                    INSERT INTO sec_shortcuts (ts_second, combo, count) VALUES (?, ?, ?)
+                    ON CONFLICT(ts_second, combo) DO UPDATE SET count = sec_shortcuts.count + excluded.count
+                    """,
+                arguments: [tsSecond, combo, count]
             )
         }
     }

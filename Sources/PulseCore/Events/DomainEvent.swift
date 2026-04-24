@@ -16,6 +16,14 @@ public enum DomainEvent: Sendable, Equatable {
     case mouseClick(MouseButton, point: NormalizedPoint, doubleClick: Bool, at: Date)
     case mouseScroll(delta: Double, horizontal: Bool, at: Date)
     case keyPress(keyCode: UInt16?, at: Date)
+    /// D-K3 — a recognised modifier + keyCode combo ("cmd+c"). The
+    /// platform layer canonicalises the combo string (see
+    /// `ShortcutCombo.canonical(...)`) so downstream storage doesn't
+    /// have to care about mapping raw keyCodes to human-readable keys.
+    /// Emitted alongside `.keyPress` on the same CGEvent, never in
+    /// place of it — the F-33 shortcut counter is additive to the
+    /// total-keystrokes counter.
+    case shortcutPressed(combo: String, at: Date)
     case foregroundApp(bundleId: String, at: Date)
     case windowTitleHash(appBundleId: String, titleSHA256: String, at: Date)
     case idleEntered(at: Date)
@@ -36,6 +44,7 @@ public enum DomainEvent: Sendable, Equatable {
              .mouseClick(_, _, _, let at),
              .mouseScroll(_, _, let at),
              .keyPress(_, let at),
+             .shortcutPressed(_, let at),
              .foregroundApp(_, let at),
              .windowTitleHash(_, _, let at),
              .idleEntered(let at),
@@ -56,7 +65,7 @@ public enum DomainEvent: Sendable, Equatable {
     /// System state transitions do not count.
     public var isUserActivity: Bool {
         switch self {
-        case .mouseMove, .mouseClick, .mouseScroll, .keyPress:
+        case .mouseMove, .mouseClick, .mouseScroll, .keyPress, .shortcutPressed:
             return true
         case .foregroundApp, .windowTitleHash, .idleEntered, .idleExited,
              .systemSleep, .systemWake, .screenLocked, .screenUnlocked,

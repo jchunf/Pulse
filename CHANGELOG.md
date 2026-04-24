@@ -69,6 +69,11 @@ that has been waiting for a dramatic anchor since sec/min/hour
   crosses a new landmark. Trophy icon + `pulseHeartbeat` accent
   + coral fill — visually bolder because these are rare, earned
   events. Persistence is not day-keyed.
+- **A45** F-33 shortcut leaderboard — new
+  `ShortcutLeaderboardCard` on the Dashboard's Apps section shows
+  today's top-N `cmd` / `ctrl` / `opt` combos rendered in the
+  macOS glyph form (`⇧⌘S`), each with a coral count-proportional
+  bar. Auto-hides on a day with zero recognised combos.
 
 ### Data layer additions
 
@@ -89,6 +94,12 @@ that has been waiting for a dramatic anchor since sec/min/hour
   `Sources/PulseCore/Storage/LifetimeMileageQueries.swift`. One
   `SELECT SUM(mouse_distance_mm) FROM hour_summary` — lightweight
   even after years of data.
+- **A45** `EventStore.shortcutLeaderboard(start:end:limit:)` in
+  `Sources/PulseCore/Storage/ShortcutQueries.swift`. UNIONs the
+  three shortcut tables (sec / min / hour), groups by combo, and
+  returns the top-N by count. `ShortcutCombo.canonical(...)`
+  (pure) turns a `(keyCode, ShortcutModifiers)` pair into a
+  stable combo string.
 
 ### 采集 / Collection (B)
 
@@ -99,6 +110,19 @@ that has been waiting for a dramatic anchor since sec/min/hour
   60 seconds and `sec_mouse` / `min_mouse` carried no coordinates —
   F-04 now has multi-day data to render. Bounded by design
   (~30 MB / display / year).
+- **B10** D-K3 shortcut counts — `V5` migration adds
+  `sec_shortcuts` / `min_shortcuts` / `hour_shortcuts` with the
+  same L1 / L2 / L3 retention as the other keyboard tables.
+  `CGEventTapSource` now reads `event.flags` on `.keyDown`,
+  canonicalises `(keyCode, modifiers)` to a stable string via
+  `ShortcutCombo.canonical`, and emits a second
+  `.shortcutPressed(combo:)` event alongside the existing
+  keycode-less `.keyPress`. No raw keycodes leave
+  `CGEventTapSource` — only the restricted combo vocabulary does,
+  so Q-06's "keycode capture stays opt-in for F-08" invariant is
+  preserved. `EventWriter` accumulates per-second combo counts
+  and `RollupScheduler` folds them sec → min → hour with the
+  same retention the other metrics get.
 
 ### i18n
 
@@ -120,6 +144,7 @@ that has been waiting for a dramatic anchor since sec/min/hour
 - **A43** 3 new keys in en + zh-Hans for the lifetime banner:
   `Lifetime milestone`, the hero sentence, and
   `Lifetime total: %@.`.
+- **A45** 1 new key in en + zh-Hans: `Top shortcuts today`.
 
 ---
 
