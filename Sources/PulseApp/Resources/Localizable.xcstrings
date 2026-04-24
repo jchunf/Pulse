@@ -1250,6 +1250,166 @@
         }
       }
     },
+    "Alerts": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alerts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "警报"
+          }
+        }
+      }
+    },
+    "Warn me when today's screen time exceeds 8 hours": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warn me when today's screen time exceeds 8 hours"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日屏幕时间超过 8 小时时提醒我"
+          }
+        }
+      }
+    },
+    "Fires at most once per day as a local notification.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fires at most once per day as a local notification."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每天最多触发一次本地通知。"
+          }
+        }
+      }
+    },
+    "Nudge me after 2 hours with no break": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nudge me after 2 hours with no break"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连续 2 小时没有休息时提醒我"
+          }
+        }
+      }
+    },
+    "A short idle segment resets the counter.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A short idle segment resets the counter."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一次短暂的空闲就会重置计时。"
+          }
+        }
+      }
+    },
+    "Alerts stay local — Pulse never sends anything over the network. macOS may ask for notification permission the first time an alert triggers.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alerts stay local — Pulse never sends anything over the network. macOS may ask for notification permission the first time an alert triggers."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "警报全部留在本地 —— Pulse 永远不会走网络。首次触发时 macOS 可能会请求通知权限。"
+          }
+        }
+      }
+    },
+    "Screen time reminder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screen time reminder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "屏幕时间提醒"
+          }
+        }
+      }
+    },
+    "You've been active for %@ today (threshold: %@).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You've been active for %@ today (threshold: %@)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天已经活跃 %@（阈值：%@）。"
+          }
+        }
+      }
+    },
+    "Time for a break?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time for a break?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该休息一下了？"
+          }
+        }
+      }
+    },
+    "You've been active for %@ without a break (threshold: %@).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You've been active for %@ without a break (threshold: %@)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连续活跃 %@ 还没休息（阈值：%@）。"
+          }
+        }
+      }
+    },
     "Total flushes": {
       "localizations": {
         "en": {

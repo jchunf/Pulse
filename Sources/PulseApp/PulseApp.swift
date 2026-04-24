@@ -746,7 +746,10 @@ final class DashboardModel: ObservableObject {
     init(store: EventStore?, goalsStore: GoalsStore) {
         self.store = store
         self.goalsStore = goalsStore
+        self.alertsController = ThresholdAlertsController()
     }
+
+    private let alertsController: ThresholdAlertsController
 
     /// Begin polling. Idempotent — calling twice is a no-op. Cadence is
     /// read from `UserDefaults` on every iteration so changes in the
@@ -889,6 +892,23 @@ final class DashboardModel: ObservableObject {
             let lifetimeMm = (try? store.lifetimeMouseDistanceMillimeters()) ?? 0
             updateLifetimeAchievementIfNeeded(
                 lifetimeMillimeters: lifetimeMm,
+                now: now
+            )
+            // F-45 — threshold alerts. Derive "continuous active" from
+            // today's rest segments + dayStart; evaluator is pure so
+            // the controller just delivers the output.
+            let continuousActive = ContinuousActiveDeriver.derive(
+                restSegments: restDay.segments.map {
+                    (startedAt: $0.startedAt, endedAt: $0.endedAt)
+                },
+                dayStart: dayStart,
+                now: now
+            )
+            alertsController.evaluateAndFire(
+                metrics: ThresholdAlertMetrics(
+                    activeSecondsToday: summary.totalActiveSeconds,
+                    continuousActiveSeconds: continuousActive
+                ),
                 now: now
             )
         } catch {
@@ -3948,6 +3968,12 @@ struct PermissionAssistantView: View {
 enum PulsePreferenceKey {
     static let dashboardRefreshIntervalSeconds = "pulse.dashboard.refreshIntervalSeconds"
     static let heatmapDays = "pulse.dashboard.heatmapDays"
+    /// F-45 — mirrors `ThresholdAlertsController.screenTimeThresholdKey`
+    /// / `noBreakThresholdKey`. Duplicated here so SettingsView can
+    /// bind `@AppStorage` without pulling the controller onto the
+    /// main-actor graph. `0` means the alert is disabled.
+    static let alertScreenTimeSeconds = "pulse.alerts.screenTimeSeconds"
+    static let alertNoBreakSeconds = "pulse.alerts.noBreakSeconds"
 }
 
 extension UserDefaults {
@@ -3970,6 +3996,10 @@ struct SettingsView: View {
     private var heatmapDays: Int = DashboardModel.defaultHeatmapDays
     @AppStorage(PulseUpdaterDelegate.channelKey)
     private var updateChannel: String = PulseUpdaterDelegate.stableChannel
+    @AppStorage(PulsePreferenceKey.alertScreenTimeSeconds)
+    private var alertScreenTimeSeconds: Int = 0
+    @AppStorage(PulsePreferenceKey.alertNoBreakSeconds)
+    private var alertNoBreakSeconds: Int = 0
     @ObservedObject var goalsStore: GoalsStore
     let onOpenPrivacyAudit: () -> Void
     let onPurgeRange: (Date, Date) throws -> RangePurgeResult
@@ -4027,6 +4057,37 @@ struct SettingsView: View {
                 Text("Goals", bundle: .pulse)
             } footer: {
                 Text("Toggled goals appear at the top of the Dashboard with a progress bar. Nothing here triggers notifications.", bundle: .pulse)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle(isOn: Binding(
+                    get: { alertScreenTimeSeconds > 0 },
+                    set: { alertScreenTimeSeconds = $0 ? 8 * 60 * 60 : 0 }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Warn me when today's screen time exceeds 8 hours", bundle: .pulse)
+                        Text("Fires at most once per day as a local notification.", bundle: .pulse)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Toggle(isOn: Binding(
+                    get: { alertNoBreakSeconds > 0 },
+                    set: { alertNoBreakSeconds = $0 ? 2 * 60 * 60 : 0 }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Nudge me after 2 hours with no break", bundle: .pulse)
+                        Text("A short idle segment resets the counter.", bundle: .pulse)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Alerts", bundle: .pulse)
+            } footer: {
+                Text("Alerts stay local — Pulse never sends anything over the network. macOS may ask for notification permission the first time an alert triggers.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
