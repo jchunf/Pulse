@@ -46,6 +46,17 @@ that has been waiting for a dramatic anchor since sec/min/hour
   handful of cells. Total-count badge moved into the row
   with the display label so the reader can correlate "this
   tile looks empty" with "yes, only 12 moves recorded".
+- **A50** `MouseDensityRenderer` ramp + tile silhouette polish.
+  The default ramp's first stop went from `alpha 0.0` (sage,
+  fully transparent) to `alpha 0.30` (sage, faint floor) so
+  every active cell — not just the hot ones — reads as
+  "you went here". Mid stop bumped to `alpha 0.70` and
+  re-coloured to a sage→coral midpoint so the visual story
+  reads cool-to-warm without the abrupt sage hold the
+  earlier two-sage-stops layout produced. Tiles now also
+  carry a 1pt coral 18%-opacity border so a sparsely-
+  populated heatmap still reads as a screen silhouette
+  rather than blending into the card.
 
 - **A48** Mixed en/zh-Hans rendering — the SPM xcstrings compile
   step is silently dropping every dot-separated key
