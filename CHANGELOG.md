@@ -20,6 +20,33 @@ that has been waiting for a dramatic anchor since sec/min/hour
 
 ### Bug fixes (v1.2 post-merge dogfood)
 
+- **A49** xcstrings catalog now actually reaches the runtime —
+  root cause of A48. SPM's resource pipeline was copying
+  `Localizable.xcstrings` into the emitted resource bundle
+  verbatim instead of compiling it into per-language
+  `<lang>.lproj/Localizable.strings` files. `NSBundle`'s lookup
+  consults `.strings` / `.stringsdict` only, so without the
+  compile step every translation (including simple word-keys
+  like "Today's pulse") silently fell back to the source
+  literal — and dot-keys leaked through as raw strings.
+  `scripts/package.sh` now runs `xcrun xcstringstool compile`
+  on every `.xcstrings` it finds inside the staged resource
+  bundles before the codesign pass, then verifies that every
+  `<lang>.lproj/Localizable.strings` declared in
+  `CFBundleLocalizations` (currently `en` + `zh-Hans`) is
+  present. Hard-fails the build if it isn't, so the next
+  regression of this kind can't ship.
+- **A49** `MouseTrajectoryCard` per-tile "limited movement"
+  placeholder — a display with < 200 moves over the 7-day
+  window now renders a `scribble` glyph + caption instead of
+  the near-invisible heatmap (which read as a broken tile).
+  The plate background also bumped from `warmGray(0.08)` to
+  `warmGray(0.16)` so populated tiles look intentionally
+  display-shaped even when density is concentrated in a
+  handful of cells. Total-count badge moved into the row
+  with the display label so the reader can correlate "this
+  tile looks empty" with "yes, only 12 moves recorded".
+
 - **A48** Mixed en/zh-Hans rendering — the SPM xcstrings compile
   step is silently dropping every dot-separated key
   (`focus.category.deepFocus`, `mileage.comparison.multi`,

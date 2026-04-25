@@ -4836,6 +4836,23 @@
         }
       }
     },
+    "Limited movement on this display yet.": {
+      "comment": "F-04 MouseTrajectoryCard — placeholder shown on a tile whose totalCount falls below the sparse threshold so a near-blank heatmap doesn't read as broken.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limited movement on this display yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这块屏幕的鼠标活动还很少。"
+          }
+        }
+      }
+    },
     "Display %lld": {
       "comment": "F-04 MouseTrajectoryCard — fallback label for a display tile when the display is unnamed. %lld is the internal CGDirectDisplayID.",
       "localizations": {

@@ -3802,16 +3802,38 @@ private struct MouseTrajectoryTile: View {
         )
     }
 
+    /// `true` when the histogram has so few hits that the rendered
+    /// heatmap is effectively invisible against any background.
+    /// Below this threshold the tile shows a "limited activity"
+    /// placeholder; the rendered image is still produced (cheap) but
+    /// hidden so the user isn't staring at a near-blank rectangle.
+    private static let sparseThreshold: Int64 = 200
+
+    private var isSparse: Bool {
+        tile.histogram.totalCount < Self.sparseThreshold
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(displayLabel)
-                .font(PulseDesign.labelFont)
-                .tracking(0.3)
-                .foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline) {
+                Text(displayLabel)
+                    .font(PulseDesign.labelFont)
+                    .tracking(0.3)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(tile.histogram.totalCount.formatted(.number))
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
             ZStack {
+                // Bumped from `0.08` to `0.16` so the tile reads as a
+                // "screen" plate even when the heatmap density is
+                // concentrated in a few cells (typical for a non-
+                // primary monitor that the user only mouses across
+                // briefly). Without this the tile looks broken.
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(PulseDesign.warmGray(0.08))
-                if let image = renderedImage {
+                    .fill(PulseDesign.warmGray(0.16))
+                if let image = renderedImage, !isSparse {
                     // `.resizable()` without a `.aspectRatio(.fit)` lets
                     // the square 128×128-cell CGImage stretch into the
                     // container's display-aspect rectangle, which is
@@ -3821,6 +3843,8 @@ private struct MouseTrajectoryTile: View {
                     Image(decorative: image, scale: 1, orientation: .up)
                         .resizable()
                         .interpolation(.high)
+                } else if isSparse {
+                    sparsePlaceholder
                 }
             }
             // Size the tile to the display's real aspect, capped at a
@@ -3839,6 +3863,24 @@ private struct MouseTrajectoryTile: View {
             // whenever the histogram changes.
             let image = Self.renderer.render(tile.histogram)
             self.renderedImage = image
+        }
+    }
+
+    /// Centred caption shown inside the tile when
+    /// `tile.histogram.totalCount < sparseThreshold`. Better signal
+    /// than a near-invisible heatmap on a display the user only
+    /// briefly visited.
+    private var sparsePlaceholder: some View {
+        VStack(spacing: 4) {
+            Image(systemName: "scribble")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+                .opacity(0.6)
+            Text("Limited movement on this display yet.", bundle: .pulse)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 12)
         }
     }
 
