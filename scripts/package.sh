@@ -82,6 +82,59 @@ for b in "$BUILD_DIR"/*.bundle; do
 done
 shopt -u nullglob
 
+echo "==> compile xcstrings into per-language .lproj"
+# SPM's resource pipeline COPIES `.xcstrings` files into the bundle
+# verbatim instead of compiling them into per-language
+# `<lang>.lproj/Localizable.strings`. The runtime `NSBundle` lookup
+# only consults `.strings` / `.stringsdict` files — `.xcstrings` is
+# inert at runtime — so without this step zh-Hans translations never
+# reach the user, and dot-separated keys like
+# `mileage.comparison.multi` leak through as raw strings on the
+# Dashboard. Run Xcode's `xcstringstool` to generate the tables that
+# SPM should have generated.
+#
+# Idempotent: if SPM ever starts compiling xcstrings itself, this loop
+# becomes a no-op (the `.xcstrings` file is gone, the loop body is
+# skipped).
+shopt -s nullglob
+for bundle in "$RESOURCES"/*.bundle; do
+    xcs="$bundle/Localizable.xcstrings"
+    if [[ -f "$xcs" ]]; then
+        echo "    compiling: $xcs"
+        # `xcrun xcstringstool compile` writes one `Localizable.strings`
+        # per declared language under matching `.lproj` directories.
+        # Output dir is the bundle root — same layout the runtime
+        # NSBundle expects.
+        xcrun xcstringstool compile "$xcs" -o "$bundle"
+        # The .xcstrings itself isn't useful at runtime; remove it so
+        # the bundle stays small and doesn't ship the source catalog.
+        rm -f "$xcs"
+    fi
+done
+shopt -u nullglob
+
+echo "==> verify each resource bundle carries the declared localizations"
+# Hard-fail if any expected `<lang>.lproj/Localizable.strings` is
+# missing. Catches both the pre-fix bug ("xcstrings not compiled at
+# all") and any future regression where xcstringstool stops emitting
+# a language we declared.
+expected_langs=(en zh-Hans)
+shopt -s nullglob
+for bundle in "$RESOURCES"/*.bundle; do
+    # Only check bundles that actually carry a strings catalog.
+    if compgen -G "$bundle"/*.lproj/Localizable.strings >/dev/null \
+        || compgen -G "$bundle"/*.lproj/Localizable.stringsdict >/dev/null; then
+        for lang in "${expected_langs[@]}"; do
+            file="$bundle/$lang.lproj/Localizable.strings"
+            if [[ ! -f "$file" ]]; then
+                echo "error: missing $file" >&2
+                exit 1
+            fi
+        done
+    fi
+done
+shopt -u nullglob
+
 echo "==> embed Sparkle.framework"
 # Sparkle ships as a binary `.xcframework` via SPM. `swift build` writes
 # the framework into its artifacts cache and links the executable with
