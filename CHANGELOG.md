@@ -18,6 +18,33 @@ First v1.2 slice opens with F-17 — the scroll-mileage "里程表子指标"
 that has been waiting for a dramatic anchor since sec/min/hour
 `scroll_ticks` landed in B7.
 
+### Bug fixes (v1.2 post-merge dogfood)
+
+- **A48** Mixed en/zh-Hans rendering — the SPM xcstrings compile
+  step is silently dropping every dot-separated key
+  (`focus.category.deepFocus`, `mileage.comparison.multi`,
+  `typing.tier.*`, `goal.*.title`, `landmark.*.name`,
+  `scroll.*`, `keystrokes.*`, `focus.*`). The runtime lookup then
+  returns the raw key, which leaked through the Dashboard as e.g.
+  "focus.category.deepFocus" where "深度专注" / "Deep focus" was
+  expected. Work around by inlining the zh-Hans/en fallback
+  directly in Swift, pivoted on `Locale.prefersChinese`, at
+  every affected site: `GoalPresetLocalizer`,
+  `KeyboardPeakCard.Tier.localizedLabel`,
+  `FocusDonutLegendRow.title`, `PulseFormat.comparisonTemplate`,
+  `PulseFormat.localizedLandmarkName`,
+  `PulseFormat.localizedAnchorName`. The xcstrings entries stay
+  in place so the bundle path can resume once the compile
+  pipeline is fixed; the Swift pivots are labelled as the
+  workaround.
+- **A48** F-04 `MouseTrajectoryCard` labelling — two tiles were
+  both captioned "Primary display" when `display_snapshots`
+  carried stale rows with `is_primary = 1` for both monitors
+  after a reconfig. Labels are now derived from the tile's
+  1-based position in the list (`Display 1`, `Display 2`, …)
+  whenever the card renders more than one tile; the single-tile
+  case keeps the concise "Primary display" wording.
+
 ### Dashboard & Narrative (A)
 
 - **A35** F-04 mouse-trails card — per-display 128×128 density
