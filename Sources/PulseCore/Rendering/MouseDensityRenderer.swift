@@ -64,13 +64,19 @@ public struct MouseDensityRenderer: Sendable {
         }
     }
 
-    /// Default ramp — transparent → sage → coral, matching the Vital
-    /// Pulse palette in `PulseDesign.sage` / `PulseDesign.coral` with
-    /// alpha rising to 1.0 at peak.
+    /// Default ramp — sage floor → mid blend → coral peak. Tuned so
+    /// every active cell (the renderer skips `count == 0`) lands at
+    /// alpha ≥ 0.30. Earlier versions opened the ramp at alpha 0.0
+    /// which made low-intensity cells vanish into the tile
+    /// background; on a screen the user only briefly mouses across,
+    /// that meant near-blank tiles even with thousands of moves
+    /// recorded. The lift here keeps the dim → bright story (sage at
+    /// the floor, coral at the peak) but ensures every real-data
+    /// cell reads as "yes, you went here".
     public static let defaultRamp: [ColorStop] = [
-        ColorStop(red: 0.527, green: 0.764, blue: 0.627, alpha: 0.0), // sage, transparent
-        ColorStop(red: 0.527, green: 0.764, blue: 0.627, alpha: 0.55), // sage, mid
-        ColorStop(red: 0.961, green: 0.396, blue: 0.396, alpha: 1.0)  // coral, peak
+        ColorStop(red: 0.527, green: 0.764, blue: 0.627, alpha: 0.30), // sage, faint floor
+        ColorStop(red: 0.745, green: 0.580, blue: 0.512, alpha: 0.70), // sage→coral mid
+        ColorStop(red: 0.961, green: 0.396, blue: 0.396, alpha: 1.0)   // coral, peak
     ]
 
     public let configuration: Configuration

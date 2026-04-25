@@ -3846,6 +3846,13 @@ private struct MouseTrajectoryTile: View {
                 } else if isSparse {
                     sparsePlaceholder
                 }
+                // Faint coral border to anchor the tile as a "screen
+                // silhouette" — without it, a sparsely-populated
+                // heatmap blends into the surrounding card and reads
+                // as a bug. 1pt at 18% opacity is intentionally just
+                // visible, not a hard frame.
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(PulseDesign.coral.opacity(0.18), lineWidth: 1)
             }
             // Size the tile to the display's real aspect, capped at a
             // fixed max height so the Dashboard card doesn't balloon
