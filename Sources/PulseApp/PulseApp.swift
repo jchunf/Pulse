@@ -3755,10 +3755,92 @@ struct MouseTrajectoryCard: View {
     }
 }
 
+/// F-04 — renders the per-display histogram as a small set of
+/// soft coral "hot-spot" glows positioned at the cells the cursor
+/// visited most. Replaces the earlier 128×128 heatmap rendering: a
+/// dense low-contrast bitmap looked broken on real-world data
+/// where 99%+ of cells were empty, even with thousands of moves
+/// recorded. The hot-spots reading is closer to how users
+/// describe the metric ("I always live in this corner") and stays
+/// legible regardless of how concentrated the data is.
+///
+/// Implementation:
+/// - Sort cells by `count` desc, take the top `topN` (default 14).
+///   The long tail of low-count cells was visual noise at 16 384-
+///   cell resolution; trimming it sharpens the reading.
+/// - Each surviving cell becomes a `RadialGradient` glow whose
+///   radius is proportional to `log1p(count) / log1p(maxCount)`.
+///   `log1p` keeps a single dominant cell from drowning the
+///   others while still giving it the largest visual weight.
+/// - Cells are positioned by their bin centre projected into
+///   the tile's display-aspect rectangle (so the hot-spots read
+///   as "where on this monitor", not "where on a square").
+/// - Pure SwiftUI — no `CGImage` rasterisation, so it survives
+///   live-updates as new data arrives without an off-thread
+///   render pass.
+struct MouseHotSpotsView: View {
+
+    let histogram: MouseDisplayHistogram
+
+    /// The number of hottest cells to render. 14 is a sweet spot
+    /// in dogfood: dense enough to convey region shapes, sparse
+    /// enough that overlapping glows still resolve into individual
+    /// spots rather than a single mush.
+    private static let topN = 14
+    private static let minDiameter: CGFloat = 12
+    private static let maxDiameter: CGFloat = 80
+
+    private var topCells: [MouseDensityCell] {
+        Array(histogram.cells
+            .sorted { $0.count > $1.count }
+            .prefix(Self.topN))
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let cells = topCells
+            if !cells.isEmpty {
+                let peakCount = max(1, cells.first?.count ?? 1)
+                let peakLog = log1p(Double(peakCount))
+                let grid = CGFloat(histogram.gridSize)
+                ZStack {
+                    ForEach(cells.indices, id: \.self) { idx in
+                        let cell = cells[idx]
+                        let intensity = peakLog > 0
+                            ? log1p(Double(cell.count)) / peakLog
+                            : 0
+                        let diameter = Self.minDiameter +
+                            CGFloat(intensity) * (Self.maxDiameter - Self.minDiameter)
+                        let xFrac = (CGFloat(cell.binX) + 0.5) / grid
+                        let yFrac = (CGFloat(cell.binY) + 0.5) / grid
+                        // Soft radial gradient: opaque centre,
+                        // fully transparent at the rim. Multiple
+                        // overlaps blend into a "region" shape
+                        // without any explicit blur pass.
+                        RadialGradient(
+                            colors: [
+                                PulseDesign.coral.opacity(0.55 + intensity * 0.30),
+                                PulseDesign.coral.opacity(0.0)
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: diameter / 2
+                        )
+                        .frame(width: diameter, height: diameter)
+                        .position(x: geo.size.width * xFrac,
+                                  y: geo.size.height * yFrac)
+                    }
+                }
+                .compositingGroup()
+                .blendMode(.normal)
+            }
+        }
+    }
+}
+
 /// One tile inside `MouseTrajectoryCard`. Renders the display's
-/// density heatmap as a `CGImage` computed via `.task(id:)` so the
-/// work happens off the main actor on first appearance and whenever
-/// the histogram changes. Aspect ratio comes from the latest
+/// hot-spot view, with a "limited movement" placeholder for tiles
+/// below the sparse threshold. Aspect ratio comes from the latest
 /// `display_snapshots` row for this display; tiles fall back to a
 /// square when no snapshot is available yet.
 private struct MouseTrajectoryTile: View {
@@ -3772,10 +3854,6 @@ private struct MouseTrajectoryTile: View {
     /// the card keep its concise "Primary display" label instead
     /// of the noisier "Display 1".
     let isOnlyTile: Bool
-
-    @State private var renderedImage: CGImage?
-
-    private static let renderer = MouseDensityRenderer()
 
     private var aspectRatio: CGFloat {
         if let snapshot = tile.snapshot, snapshot.heightPoints > 0 {
@@ -3803,10 +3881,9 @@ private struct MouseTrajectoryTile: View {
     }
 
     /// `true` when the histogram has so few hits that the rendered
-    /// heatmap is effectively invisible against any background.
-    /// Below this threshold the tile shows a "limited activity"
-    /// placeholder; the rendered image is still produced (cheap) but
-    /// hidden so the user isn't staring at a near-blank rectangle.
+    /// hot-spots are pinpoint-sized and the tile reads as broken.
+    /// Below this we show the "limited movement" placeholder
+    /// instead.
     private static let sparseThreshold: Int64 = 200
 
     private var isSparse: Bool {
@@ -3826,31 +3903,19 @@ private struct MouseTrajectoryTile: View {
                     .foregroundStyle(.secondary)
             }
             ZStack {
-                // Bumped from `0.08` to `0.16` so the tile reads as a
-                // "screen" plate even when the heatmap density is
-                // concentrated in a few cells (typical for a non-
-                // primary monitor that the user only mouses across
-                // briefly). Without this the tile looks broken.
+                // Plate that reads as a "screen" even when the
+                // hot-spots are concentrated in a corner.
                 RoundedRectangle(cornerRadius: 8)
                     .fill(PulseDesign.warmGray(0.16))
-                if let image = renderedImage, !isSparse {
-                    // `.resizable()` without a `.aspectRatio(.fit)` lets
-                    // the square 128×128-cell CGImage stretch into the
-                    // container's display-aspect rectangle, which is
-                    // what the user expects ("this is what my screen
-                    // looks like, density-wise"). The surrounding ZStack
-                    // supplies the aspect via the modifier below.
-                    Image(decorative: image, scale: 1, orientation: .up)
-                        .resizable()
-                        .interpolation(.high)
-                } else if isSparse {
+                if isSparse {
                     sparsePlaceholder
+                } else {
+                    MouseHotSpotsView(histogram: tile.histogram)
+                        .padding(8)
                 }
-                // Faint coral border to anchor the tile as a "screen
-                // silhouette" — without it, a sparsely-populated
-                // heatmap blends into the surrounding card and reads
-                // as a bug. 1pt at 18% opacity is intentionally just
-                // visible, not a hard frame.
+                // Faint coral border so the tile reads as a
+                // screen silhouette regardless of how many spots
+                // are lit.
                 RoundedRectangle(cornerRadius: 8)
                     .strokeBorder(PulseDesign.coral.opacity(0.18), lineWidth: 1)
             }
@@ -3862,14 +3927,6 @@ private struct MouseTrajectoryTile: View {
             .aspectRatio(aspectRatio, contentMode: .fit)
             .frame(maxWidth: .infinity, maxHeight: Self.maxTileHeight)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-        .task(id: tile.histogram) {
-            // `.task(id:)` runs a child Task off the view-update
-            // critical path; the ~10–40 ms render therefore doesn't
-            // stall the DashboardModel refresh. Re-runs automatically
-            // whenever the histogram changes.
-            let image = Self.renderer.render(tile.histogram)
-            self.renderedImage = image
         }
     }
 
