@@ -35,17 +35,29 @@ public struct MouseDensityRenderer: Sendable {
         /// contain at least two stops; the first is intensity 0, the
         /// last is intensity 1, intermediate stops are evenly spaced.
         public let rampStops: [ColorStop]
+        /// Exponent applied to the `log1p`-normalised intensity before
+        /// the ramp lookup. `1.0` is no-op (linear); higher values
+        /// push quiet cells towards the floor of the ramp, so a
+        /// Strava-style "dark surface, peaks pop" reading is achieved
+        /// without needing a non-monotonic ramp. Default `1.6` —
+        /// felt right in dogfood: peaks stay punchy, the long tail of
+        /// 1-or-2-hit cells fades into the dark plate so the eye is
+        /// drawn to the regions the cursor actually parked in.
+        public let intensityGamma: Double
 
         public init(
             pixelsPerCell: Int = 4,
             blurRadius: Double? = 3.5,
-            rampStops: [ColorStop] = MouseDensityRenderer.defaultRamp
+            rampStops: [ColorStop] = MouseDensityRenderer.defaultRamp,
+            intensityGamma: Double = 1.6
         ) {
             precondition(pixelsPerCell >= 1, "pixelsPerCell must be positive")
             precondition(rampStops.count >= 2, "ramp needs ≥ 2 stops")
+            precondition(intensityGamma > 0, "intensityGamma must be positive")
             self.pixelsPerCell = pixelsPerCell
             self.blurRadius = blurRadius
             self.rampStops = rampStops
+            self.intensityGamma = intensityGamma
         }
     }
 
@@ -64,19 +76,23 @@ public struct MouseDensityRenderer: Sendable {
         }
     }
 
-    /// Default ramp — sage floor → mid blend → coral peak. Tuned so
-    /// every active cell (the renderer skips `count == 0`) lands at
-    /// alpha ≥ 0.30. Earlier versions opened the ramp at alpha 0.0
-    /// which made low-intensity cells vanish into the tile
-    /// background; on a screen the user only briefly mouses across,
-    /// that meant near-blank tiles even with thousands of moves
-    /// recorded. The lift here keeps the dim → bright story (sage at
-    /// the floor, coral at the peak) but ensures every real-data
-    /// cell reads as "yes, you went here".
+    /// Default ramp — single-hue coral luminance against a dark
+    /// surface, modelled on Strava's personal heatmap aesthetic
+    /// rather than the thermal blue→red palette web-analytics
+    /// products use (those only work because there's a screenshot
+    /// underneath; without one, "red" has nothing to point at and
+    /// the visual reads as a broken dashboard).
+    ///
+    /// The first stop is fully transparent so the dark display
+    /// plate behind the bitmap shows through for low-density
+    /// regions. Combined with `Configuration.intensityGamma > 1`,
+    /// quiet areas fade into the plate while peaks lift through
+    /// coral toward a near-white halo — the "where did your cursor
+    /// live this week" story emerges without a legend.
     public static let defaultRamp: [ColorStop] = [
-        ColorStop(red: 0.527, green: 0.764, blue: 0.627, alpha: 0.30), // sage, faint floor
-        ColorStop(red: 0.745, green: 0.580, blue: 0.512, alpha: 0.70), // sage→coral mid
-        ColorStop(red: 0.961, green: 0.396, blue: 0.396, alpha: 1.0)   // coral, peak
+        ColorStop(red: 0.961, green: 0.396, blue: 0.396, alpha: 0.0),  // coral, transparent (dark plate shows)
+        ColorStop(red: 0.972, green: 0.498, blue: 0.435, alpha: 0.65), // coral, mid glow
+        ColorStop(red: 1.000, green: 0.870, blue: 0.780, alpha: 1.0)   // coral→white halo at peak
     ]
 
     public let configuration: Configuration
@@ -103,8 +119,13 @@ public struct MouseDensityRenderer: Sendable {
         let peakLog = log1p(Double(histogram.peakCount))
         guard peakLog > 0 else { return nil }
 
+        let gamma = configuration.intensityGamma
         for cell in histogram.cells where cell.count > 0 {
-            let intensity = log1p(Double(cell.count)) / peakLog
+            let raw = log1p(Double(cell.count)) / peakLog
+            // Gamma-curve the normalised intensity before sampling
+            // so quiet cells fall toward the ramp floor and peaks
+            // pop. With `gamma == 1` this is a no-op.
+            let intensity = pow(max(0.0, min(1.0, raw)), gamma)
             let color = Self.sample(ramp: configuration.rampStops, at: intensity)
             let r = UInt8(clamping: Int((color.red * 255).rounded()))
             let g = UInt8(clamping: Int((color.green * 255).rounded()))
