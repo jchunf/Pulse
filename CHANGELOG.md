@@ -46,6 +46,22 @@ that has been waiting for a dramatic anchor since sec/min/hour
   handful of cells. Total-count badge moved into the row
   with the display label so the reader can correlate "this
   tile looks empty" with "yes, only 12 moves recorded".
+- **A51** F-04 redesign — Dashboard tile drops the 128×128
+  `CGImage` heatmap in favour of a "cursor hot spots" reading.
+  The tile now renders the top 14 cells as soft coral
+  `RadialGradient` glows whose diameters scale with
+  `log1p(count)`, positioned at the cells' bin centres
+  projected into the display's aspect rectangle. The earlier
+  heatmap technically encoded all 16 384 cells but was
+  dominated by the 99% of empty ones, which made even
+  thousands of moves look like a near-blank tile (user feedback
+  "看起来很奇怪"). The hot-spots reading is closer to how users
+  describe the metric ("I always live in the top-right
+  corner"), and stays legible whether the data is concentrated
+  in two cells or spread across fifty. Pure SwiftUI — no more
+  off-thread `CGImage` task. `MouseDensityRenderer` stays in
+  PulseCore for potential reuse (weekly report PDF, etc.) but
+  the Dashboard no longer depends on it.
 - **A50** `MouseDensityRenderer` ramp + tile silhouette polish.
   The default ramp's first stop went from `alpha 0.0` (sage,
   fully transparent) to `alpha 0.30` (sage, faint floor) so
