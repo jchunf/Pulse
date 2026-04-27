@@ -72,6 +72,19 @@ public enum PulseDesign {
         ).opacity(opacity)
     }
 
+    /// "Display surface" — the Strava-personal-heatmap dark plate used
+    /// behind the F-04 mouse-trail bitmap so quiet regions fade into
+    /// dark and peaks lift through coral toward a near-white halo.
+    /// Roughly the same colour in light and dark mode (a near-black
+    /// with a faint warm bias) because the bitmap is the figure here
+    /// and the plate is intentionally muted; matching it to the
+    /// surrounding card surface would defeat the "this is a screen"
+    /// silhouette the visualisation depends on.
+    public static let displaySurface = Color.dynamic(
+        light: 0x1A1316,
+        dark:  0x0E0B0E
+    )
+
     // MARK: - Semantic roles
 
     /// Positive delta (up-trend on a metric). Sage, not green. Used by

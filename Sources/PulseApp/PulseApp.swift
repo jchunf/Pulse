@@ -3755,89 +3755,6 @@ struct MouseTrajectoryCard: View {
     }
 }
 
-/// F-04 — renders the per-display histogram as a small set of
-/// soft coral "hot-spot" glows positioned at the cells the cursor
-/// visited most. Replaces the earlier 128×128 heatmap rendering: a
-/// dense low-contrast bitmap looked broken on real-world data
-/// where 99%+ of cells were empty, even with thousands of moves
-/// recorded. The hot-spots reading is closer to how users
-/// describe the metric ("I always live in this corner") and stays
-/// legible regardless of how concentrated the data is.
-///
-/// Implementation:
-/// - Sort cells by `count` desc, take the top `topN` (default 14).
-///   The long tail of low-count cells was visual noise at 16 384-
-///   cell resolution; trimming it sharpens the reading.
-/// - Each surviving cell becomes a `RadialGradient` glow whose
-///   radius is proportional to `log1p(count) / log1p(maxCount)`.
-///   `log1p` keeps a single dominant cell from drowning the
-///   others while still giving it the largest visual weight.
-/// - Cells are positioned by their bin centre projected into
-///   the tile's display-aspect rectangle (so the hot-spots read
-///   as "where on this monitor", not "where on a square").
-/// - Pure SwiftUI — no `CGImage` rasterisation, so it survives
-///   live-updates as new data arrives without an off-thread
-///   render pass.
-struct MouseHotSpotsView: View {
-
-    let histogram: MouseDisplayHistogram
-
-    /// The number of hottest cells to render. 14 is a sweet spot
-    /// in dogfood: dense enough to convey region shapes, sparse
-    /// enough that overlapping glows still resolve into individual
-    /// spots rather than a single mush.
-    private static let topN = 14
-    private static let minDiameter: CGFloat = 12
-    private static let maxDiameter: CGFloat = 80
-
-    private var topCells: [MouseDensityCell] {
-        Array(histogram.cells
-            .sorted { $0.count > $1.count }
-            .prefix(Self.topN))
-    }
-
-    var body: some View {
-        GeometryReader { geo in
-            let cells = topCells
-            if !cells.isEmpty {
-                let peakCount = max(1, cells.first?.count ?? 1)
-                let peakLog = log1p(Double(peakCount))
-                let grid = CGFloat(histogram.gridSize)
-                ZStack {
-                    ForEach(cells.indices, id: \.self) { idx in
-                        let cell = cells[idx]
-                        let intensity = peakLog > 0
-                            ? log1p(Double(cell.count)) / peakLog
-                            : 0
-                        let diameter = Self.minDiameter +
-                            CGFloat(intensity) * (Self.maxDiameter - Self.minDiameter)
-                        let xFrac = (CGFloat(cell.binX) + 0.5) / grid
-                        let yFrac = (CGFloat(cell.binY) + 0.5) / grid
-                        // Soft radial gradient: opaque centre,
-                        // fully transparent at the rim. Multiple
-                        // overlaps blend into a "region" shape
-                        // without any explicit blur pass.
-                        RadialGradient(
-                            colors: [
-                                PulseDesign.coral.opacity(0.55 + intensity * 0.30),
-                                PulseDesign.coral.opacity(0.0)
-                            ],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: diameter / 2
-                        )
-                        .frame(width: diameter, height: diameter)
-                        .position(x: geo.size.width * xFrac,
-                                  y: geo.size.height * yFrac)
-                    }
-                }
-                .compositingGroup()
-                .blendMode(.normal)
-            }
-        }
-    }
-}
-
 /// One tile inside `MouseTrajectoryCard`. Renders the display's
 /// hot-spot view, with a "limited movement" placeholder for tiles
 /// below the sparse threshold. Aspect ratio comes from the latest
@@ -3854,6 +3771,10 @@ private struct MouseTrajectoryTile: View {
     /// the card keep its concise "Primary display" label instead
     /// of the noisier "Display 1".
     let isOnlyTile: Bool
+
+    @State private var renderedImage: CGImage?
+
+    private static let renderer = MouseDensityRenderer()
 
     private var aspectRatio: CGFloat {
         if let snapshot = tile.snapshot, snapshot.heightPoints > 0 {
@@ -3903,21 +3824,32 @@ private struct MouseTrajectoryTile: View {
                     .foregroundStyle(.secondary)
             }
             ZStack {
-                // Plate that reads as a "screen" even when the
-                // hot-spots are concentrated in a corner.
+                // Strava-personal-heatmap style: a dark "display
+                // surface" plate behind a single-hue coral
+                // luminance bitmap. Modelled on the dataviz
+                // canon for "where did this thing live"
+                // (FlowingData house style, Strava personal
+                // heatmaps) rather than the thermal
+                // blue→red palette web-analytics products use —
+                // those only work because there's a screenshot
+                // underneath; without one, the rainbow has
+                // nothing to point at and the visual reads as a
+                // broken dashboard. See A52 commit message for
+                // the full research write-up.
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(PulseDesign.warmGray(0.16))
+                    .fill(PulseDesign.displaySurface)
                 if isSparse {
                     sparsePlaceholder
-                } else {
-                    MouseHotSpotsView(histogram: tile.histogram)
-                        .padding(8)
+                } else if let image = renderedImage {
+                    Image(decorative: image, scale: 1, orientation: .up)
+                        .resizable()
+                        .interpolation(.high)
                 }
                 // Faint coral border so the tile reads as a
-                // screen silhouette regardless of how many spots
-                // are lit.
+                // screen silhouette regardless of how lit the
+                // bitmap is.
                 RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(PulseDesign.coral.opacity(0.18), lineWidth: 1)
+                    .strokeBorder(PulseDesign.coral.opacity(0.22), lineWidth: 1)
             }
             // Size the tile to the display's real aspect, capped at a
             // fixed max height so the Dashboard card doesn't balloon
@@ -3928,6 +3860,14 @@ private struct MouseTrajectoryTile: View {
             .frame(maxWidth: .infinity, maxHeight: Self.maxTileHeight)
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
+        .task(id: tile.histogram) {
+            // `.task(id:)` runs the bitmap render in a child Task
+            // off the view-update critical path; the ~10–40 ms
+            // CGImage allocation therefore doesn't stall the
+            // DashboardModel refresh. Re-runs automatically
+            // whenever the histogram changes.
+            self.renderedImage = Self.renderer.render(tile.histogram)
+        }
     }
 
     /// Centred caption shown inside the tile when
@@ -3935,14 +3875,18 @@ private struct MouseTrajectoryTile: View {
     /// than a near-invisible heatmap on a display the user only
     /// briefly visited.
     private var sparsePlaceholder: some View {
+        // The sparse caption sits on top of the dark
+        // `displaySurface` plate, so its colour can't ride
+        // `.secondary` (which is too dark on the dark plate
+        // even in light mode). A muted warm-white at 60% alpha
+        // reads on both light/dark system appearances.
         VStack(spacing: 4) {
             Image(systemName: "scribble")
                 .font(.title3)
-                .foregroundStyle(.secondary)
-                .opacity(0.6)
+                .foregroundStyle(Color.white.opacity(0.45))
             Text("Limited movement on this display yet.", bundle: .pulse)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.white.opacity(0.60))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 12)
         }

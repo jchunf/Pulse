@@ -46,22 +46,34 @@ that has been waiting for a dramatic anchor since sec/min/hour
   handful of cells. Total-count badge moved into the row
   with the display label so the reader can correlate "this
   tile looks empty" with "yes, only 12 moves recorded".
-- **A51** F-04 redesign — Dashboard tile drops the 128×128
-  `CGImage` heatmap in favour of a "cursor hot spots" reading.
-  The tile now renders the top 14 cells as soft coral
-  `RadialGradient` glows whose diameters scale with
-  `log1p(count)`, positioned at the cells' bin centres
-  projected into the display's aspect rectangle. The earlier
-  heatmap technically encoded all 16 384 cells but was
-  dominated by the 99% of empty ones, which made even
-  thousands of moves look like a near-blank tile (user feedback
-  "看起来很奇怪"). The hot-spots reading is closer to how users
-  describe the metric ("I always live in the top-right
-  corner"), and stays legible whether the data is concentrated
-  in two cells or spread across fifty. Pure SwiftUI — no more
-  off-thread `CGImage` task. `MouseDensityRenderer` stays in
-  PulseCore for potential reuse (weekly report PDF, etc.) but
-  the Dashboard no longer depends on it.
+- **A51** F-04 first redesign — replaced the 128×128 `CGImage`
+  heatmap with a "cursor hot spots" reading (top-N
+  `RadialGradient` glows). Closer to how users describe the
+  metric, but discarded distribution shape; superseded by A52.
+- **A52** F-04 second redesign — after a research pass over how
+  Hotjar / Crazy Egg / WhatPulse / Strava handle "where did
+  this thing live", the dataviz canon for density without an
+  underlying screenshot is a **smoothed bitmap on a dark
+  surface with a single-hue luminance ramp** (Strava personal
+  heatmap, FlowingData house style), not the rainbow thermal
+  gradient web-analytics products use (those only work
+  because there's a screenshot underneath). Bringing back the
+  bitmap with three concrete fixes:
+  1. New `PulseDesign.displaySurface` — a near-black warm
+     plate behind the bitmap, so quiet regions fade to dark
+     instead of vanishing into the card surface.
+  2. `MouseDensityRenderer.defaultRamp` switched to single-hue
+     coral luminance (transparent → coral mid → coral-white
+     halo at peak). The dark plate now does the
+     "low-density = empty" work via show-through; no more
+     sage→coral mid-blend that read as "analytics dashboard".
+  3. New `Configuration.intensityGamma = 1.6` — a power curve
+     applied to the `log1p`-normalised intensity before ramp
+     lookup, pushing quiet cells toward the floor and making
+     peaks pop.
+  Plus border opacity bumped from 0.18 → 0.22 to anchor the
+  tile as a screen silhouette against the dark plate. Pure-
+  SwiftUI hot-spots view from A51 deleted.
 - **A50** `MouseDensityRenderer` ramp + tile silhouette polish.
   The default ramp's first stop went from `alpha 0.0` (sage,
   fully transparent) to `alpha 0.30` (sage, faint floor) so
