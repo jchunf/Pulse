@@ -1318,7 +1318,19 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: PulseDesign.cardSpacing) {
+            // `LazyVStack` instead of `VStack` so off-screen cards
+            // don't render or composite during scroll. The Dashboard
+            // has ~ 20 cards including six charts (week trend, hourly
+            // heatmap, focus donut, app ranking, keyboard heatmap,
+            // mouse heatmap); with an eager `VStack` every one of
+            // them was being laid out + composited on every scroll
+            // frame, and the 5-second poll was re-rendering all of
+            // them at once. Lazy materialisation drops the cost of
+            // a scroll frame to whatever fits in the viewport.
+            // Cards with `.task(id:)` re-fire when scrolled back
+            // into view; for the mouse-heatmap tile that's a 640-
+            // byte CGImage rebuild — microseconds, fine.
+            LazyVStack(alignment: .leading, spacing: PulseDesign.cardSpacing) {
                 header
                 DashboardPermissionBanner(permissions: healthModel.snapshot.permissions)
                 if crashBeacon.crashedLastSession {
@@ -3779,18 +3791,14 @@ private struct MouseTrajectoryTile: View {
     ///
     /// Bumps:
     ///   - A54: 16 × 10 → 32 × 20 ("还是太粗 能细节一点吗")
-    ///   - A56: 32 × 20 → 64 × 40 ("可以再密一些") plus the
-    ///     interpolation switch from `.medium` to `.none`.
-    ///   - A57: 64 × 40 → 40 × 25 ("有点太密 生理不适了") —
-    ///     A56's 64 × 40 read as visual noise/static once the
-    ///     bilinear smoothing was off; 40 × 25 is the middle
-    ///     ground that keeps each cell large enough to register
-    ///     as a discrete tile (~ 8.8pt at standard tile width)
-    ///     while still being noticeably finer than the A54
-    ///     baseline. Multi-hue ramp introduced in the same
-    ///     slice — see `MouseTrailMosaic.render`.
-    private static let mosaicCellsX = 40
-    private static let mosaicCellsY = 25
+    ///   - A56: 32 × 20 → 64 × 40 ("可以再密一些")
+    ///   - A57: 64 × 40 → 40 × 25 ("有点太密 生理不适了")
+    ///   - A58: 40 × 25 → 32 × 20 ("45还是有点多") — settling
+    ///     on the A54 baseline now that the multi-hue ramp does
+    ///     the "more detail" work the density bumps were trying
+    ///     (and failing) to express.
+    private static let mosaicCellsX = 32
+    private static let mosaicCellsY = 20
 
     private var aspectRatio: CGFloat {
         if let snapshot = tile.snapshot, snapshot.heightPoints > 0 {
@@ -3856,6 +3864,14 @@ private struct MouseTrajectoryTile: View {
                 RoundedRectangle(cornerRadius: 8)
                     .strokeBorder(PulseDesign.coral.opacity(0.22), lineWidth: 1)
             }
+            // Flatten plate + image + border into a single GPU
+            // texture so scrolling re-blits one layer instead of
+            // compositing three. Cheap because the underlying
+            // `MouseTrailMosaic` is already an Image, not a
+            // Canvas — `.drawingGroup()` here is closing the gap
+            // between "image is GPU" and "the surrounding
+            // chrome is GPU".
+            .drawingGroup()
             .aspectRatio(aspectRatio, contentMode: .fit)
             .frame(maxWidth: .infinity, maxHeight: Self.maxTileHeight)
             .clipShape(RoundedRectangle(cornerRadius: 8))
