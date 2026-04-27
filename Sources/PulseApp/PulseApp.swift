@@ -710,6 +710,12 @@ final class DashboardModel: ObservableObject {
     /// the main thread via `.task(id:)`, so this struct stays cheap to
     /// publish even when it carries several thousand non-zero cells.
     @Published private(set) var trajectoryTiles: [MouseTrajectoryTileData] = []
+    /// Cumulative mouse-mileage across the whole `mouse_moves` table —
+    /// the right input for `LandmarkProgressPanel` ("how close are you
+    /// to a Pacific crossing?"). Pre-A61 the panel was wired to today's
+    /// distance, which made the larger landmarks (marathon, BJ–GZ,
+    /// Pacific) show 0 % forever.
+    @Published private(set) var lifetimeMouseDistanceMillimeters: Double = 0
     @Published private(set) var lastRefreshAt: Date?
     @Published private(set) var errorMessage: String?
     @Published private(set) var recentAchievement: LandmarkAchievement?
@@ -908,6 +914,7 @@ final class DashboardModel: ObservableObject {
                 now: now
             )
             let lifetimeMm = (try? store.lifetimeMouseDistanceMillimeters()) ?? 0
+            self.lifetimeMouseDistanceMillimeters = lifetimeMm
             updateLifetimeAchievementIfNeeded(
                 lifetimeMillimeters: lifetimeMm,
                 now: now
@@ -1332,7 +1339,7 @@ struct DashboardView: View {
     /// categories on the left, focused content pane on the
     /// right.
     enum Section: String, CaseIterable, Hashable, Identifiable {
-        case today, rhythm, focus, apps, health
+        case today, rhythm, focus, apps, input, health
 
         var id: String { rawValue }
 
@@ -1342,6 +1349,7 @@ struct DashboardView: View {
             case .rhythm: return "Rhythm"
             case .focus:  return "Focus"
             case .apps:   return "Apps"
+            case .input:  return "Input"
             case .health: return "Health"
             }
         }
@@ -1350,14 +1358,18 @@ struct DashboardView: View {
         /// to mirror each section's intent rather than each
         /// section's data — `sun.max` for "today", `waveform.path`
         /// for "rhythm" (the week's shape), `scope` for "focus",
-        /// `app.badge` for "apps", `stethoscope` for "health"
-        /// (collector diagnostics, not human health).
+        /// `app.badge` for "apps" (which apps you used),
+        /// `keyboard` for "input" (where keyboard + mouse heatmaps
+        /// live — they're about input behaviour, not app
+        /// behaviour), `stethoscope` for "health" (collector
+        /// diagnostics, not human health).
         var systemImage: String {
             switch self {
             case .today:  return "sun.max"
             case .rhythm: return "waveform.path"
             case .focus:  return "scope"
             case .apps:   return "app.badge"
+            case .input:  return "keyboard"
             case .health: return "stethoscope"
             }
         }
@@ -1426,6 +1438,7 @@ struct DashboardView: View {
                 sidebarLabel(.rhythm)
                 sidebarLabel(.focus)
                 sidebarLabel(.apps)
+                sidebarLabel(.input)
             }
             SwiftUI.Section {
                 sidebarLabel(.health)
@@ -1473,6 +1486,17 @@ struct DashboardView: View {
                 }
             }
             Spacer(minLength: 0)
+            // `SettingsLink` opens the standard `Settings` scene
+            // (the same window ⌘, opens), so the macOS convention
+            // is preserved — the gear is just a more discoverable
+            // entry point. Plain-button look so it sits quietly
+            // alongside the version + last-refresh strings.
+            SettingsLink {
+                Image(systemName: "gearshape")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(Text("Settings", bundle: .pulse))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -1499,6 +1523,7 @@ struct DashboardView: View {
             case .rhythm: rhythmSection
             case .focus:  focusSection
             case .apps:   appsSection(summary: summary)
+            case .input:  inputSection
             case .health: healthSection
             }
         } else if let error = model.errorMessage {
@@ -1589,6 +1614,14 @@ struct DashboardView: View {
         if !model.shortcutsToday.isEmpty {
             ShortcutLeaderboardCard(rows: model.shortcutsToday)
         }
+    }
+
+    /// "Input" — keyboard + mouse heatmaps. Carved out of `apps`
+    /// in A61 because both visualisations are about *input*
+    /// behaviour (which keys, where the cursor parked) rather
+    /// than which application was foreground.
+    @ViewBuilder
+    private var inputSection: some View {
         KeyboardHeatmapCard(keyCodes: model.keyCodeDistribution)
         if !model.trajectoryTiles.isEmpty {
             MouseTrajectoryCard(tiles: model.trajectoryTiles)
@@ -1622,7 +1655,15 @@ struct DashboardView: View {
         HStack(alignment: .top, spacing: PulseDesign.cardSpacing) {
             VStack(alignment: .leading, spacing: PulseDesign.cardSpacing * 0.6) {
                 MileageHeroCard(distanceMillimeters: summary.totalMouseDistanceMillimeters)
-                LandmarkProgressPanel(distanceMillimeters: summary.totalMouseDistanceMillimeters)
+                // Pre-A61 the panel was wired to today's distance,
+                // so any landmark larger than ~ a few km (marathon,
+                // BJ–GZ, Pacific) showed 0 % forever — meaningless.
+                // Now reads from the cumulative `mouse_moves` total
+                // and titles itself "Lifetime landmarks" so the
+                // semantic is unambiguous.
+                LandmarkProgressPanel(
+                    distanceMillimeters: model.lifetimeMouseDistanceMillimeters
+                )
             }
             .frame(maxWidth: .infinity)
 
@@ -2079,7 +2120,11 @@ struct LandmarkProgressPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Landmarks", bundle: .pulse)
+            // "Lifetime landmarks" rather than just "Landmarks" so
+            // the reader knows the progress bars are cumulative
+            // (A61 re-pointed this card to lifetime distance after
+            // dogfood feedback "里程碑应该是历史的吧").
+            Text("Lifetime landmarks", bundle: .pulse)
                 .font(PulseDesign.cardTitleFont)
             VStack(spacing: 10) {
                 ForEach(rows, id: \.0.key) { row in
@@ -4004,19 +4049,12 @@ private struct MouseTrajectoryTile: View {
                     )
                     .padding(6)
                 }
-                // Faint coral border so the tile reads as a screen
-                // silhouette even when the mosaic is mostly dim.
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(PulseDesign.coral.opacity(0.22), lineWidth: 1)
+                // A61: dropped the explicit coral border. With the
+                // bilinear-smoothed single-hue heatmap the
+                // strokeBorder was reading as visual noise around
+                // an already busy figure ("界面还是很脏"). The
+                // dark plate alone is enough to anchor the tile.
             }
-            // Flatten plate + image + border into a single GPU
-            // texture so scrolling re-blits one layer instead of
-            // compositing three. Cheap because the underlying
-            // `MouseTrailMosaic` is already an Image, not a
-            // Canvas — `.drawingGroup()` here is closing the gap
-            // between "image is GPU" and "the surrounding
-            // chrome is GPU".
-            .drawingGroup()
             .aspectRatio(aspectRatio, contentMode: .fit)
             .frame(maxWidth: .infinity, maxHeight: Self.maxTileHeight)
             .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -4084,16 +4122,17 @@ struct MouseTrailMosaic: View {
     var body: some View {
         Group {
             if let image {
-                // `.interpolation(.none)` — nearest-neighbor sampling
-                // so each source pixel renders as a flat coloured
-                // rectangle. Restores the "quilted" reading A54's
-                // Canvas had: clearly-bounded cells, no bilinear
-                // smudging into a continuous gradient. Switched from
-                // `.medium` in A56 after user feedback ("热力图咋还
-                // 变回去了 我感觉之前的32×20的挺好的呢").
+                // A61 reverted to `.interpolation(.medium)` —
+                // bilinear smoothing — after the chunky-cell
+                // mosaic from A56–A60 read as visually noisy
+                // ("界面还是很脏 我要干净一点"). Combined with
+                // the new transparent-floor single-hue ramp
+                // (see `render`), this gives the Strava-signature
+                // soft-glow look: peaks pop, low cells fade into
+                // the dark plate, no chunky cell grid.
                 Image(decorative: image, scale: 1.0)
                     .resizable()
-                    .interpolation(.none)
+                    .interpolation(.medium)
             } else {
                 // No image yet (first render or empty cells) —
                 // the dark plate from the parent shows through.
@@ -4146,25 +4185,17 @@ struct MouseTrailMosaic: View {
         guard peak > 0 else { return nil }
         let peakLog = log1p(Double(peak))
 
-        // Four-stop ramp: sage (cool, low) → amber (mid) → coral
-        // (hot) → near-white halo (peak). RGB values match the
-        // light-mode hexes used by `PulseDesign` so the heatmap
-        // reads in the same visual language as the rest of the
-        // app. Premultiplied below — required by the bitmap-info
-        // flag in the CGImage step.
-        //
-        // A60: added the 4th near-white stop after the previous
-        // 3-stop ramp read as a flat orange wash on busy
-        // displays ("还是很丑 区分度可以再大一些"). With the
-        // halo stop at the very top, peaks now lift visibly out
-        // of the coral background — clearly "this is where the
-        // cursor parked".
-        let stops: [(r: Double, g: Double, b: Double)] = [
-            (0.525, 0.764, 0.627),  // sage  0x86C3A0 (cool, low)
-            (0.898, 0.631, 0.290),  // amber 0xE5A14A (mid)
-            (0.961, 0.396, 0.396),  // coral 0xF56565 (hot)
-            (1.000, 0.870, 0.780)   // near-white halo (peak)
-        ]
+        // A61: single-hue coral with a near-white halo at peak
+        // and a fully transparent floor. After five iterations
+        // of multi-hue ramps (sage → amber → coral, +halo,
+        // gamma curves) the mosaic still read as "脏 / dirty"
+        // — the multiple hues plus the visible alpha floor
+        // were carpeting every active cell in colour. Strava's
+        // signature personal heatmap uses exactly this minimum:
+        // one warm hue, full transparency for low density, a
+        // near-white pop at the very top.
+        let coralR = 0.961, coralG = 0.396, coralB = 0.396
+        let haloR  = 1.000, haloG  = 0.870, haloB  = 0.780
         let pixelCount = cellsX * cellsY
         var pixels = [UInt8](repeating: 0, count: pixelCount * 4)
         for i in 0..<pixelCount {
@@ -4172,28 +4203,25 @@ struct MouseTrailMosaic: View {
             guard count > 0 else { continue }
             let raw = log1p(Double(count)) / peakLog
             // Gamma > 1 pushes quiet cells toward the floor and
-            // peaks toward the ceiling — the simplest way to
-            // amplify ramp distinction without changing the
-            // colour stops. 1.4 felt right against the busy-
-            // dogfood histograms ("区分度可以再大一些").
-            let intensity = pow(max(0.0, min(1.0, raw)), 1.4)
-            // Floor 0.15 (down from 0.30) so single-hit cells
-            // fade most of the way to the dark plate instead
-            // of carpeting the tile in faint sage. Cap stays
-            // at 1.00 so peaks ride the full near-white halo.
-            let alpha = 0.15 + intensity * 0.85
+            // peaks toward the ceiling. With the floor now at
+            // alpha 0 (fully transparent), gamma 1.6 makes the
+            // long tail of 1- or 2-hit cells fade entirely into
+            // the dark plate; only sustained dwell shows up.
+            let intensity = pow(max(0.0, min(1.0, raw)), 1.6)
+            // Alpha 0 → 1 across the gamma-curved intensity. No
+            // floor: low cells are completely transparent, the
+            // dark plate carries them.
+            let alpha = intensity
 
-            // Sample the ramp by linear interpolation between
-            // adjacent stops at `intensity * (stops.count - 1)`.
-            let scaled = intensity * Double(stops.count - 1)
-            let lower = Int(scaled.rounded(.down))
-            let upper = min(lower + 1, stops.count - 1)
-            let t = scaled - Double(lower)
-            let a = stops[lower]
-            let b = stops[upper]
-            let r = a.r + (b.r - a.r) * t
-            let g = a.g + (b.g - a.g) * t
-            let bC = a.b + (b.b - a.b) * t
+            // Hue is coral up to ~ 75 % intensity, then lerps
+            // toward the near-white halo for the very top. The
+            // crossover threshold + lerp gives peaks a clear
+            // "this is the hottest spot" pop without forcing a
+            // multi-hue ramp through the whole range.
+            let haloT = max(0.0, min(1.0, (intensity - 0.75) / 0.25))
+            let r  = coralR + (haloR - coralR) * haloT
+            let g  = coralG + (haloG - coralG) * haloT
+            let bC = coralB + (haloB - coralB) * haloT
 
             let off = i * 4
             pixels[off]     = UInt8((r  * alpha * 255).rounded())

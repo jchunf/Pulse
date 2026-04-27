@@ -12,6 +12,40 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### A61 — Information architecture pass
+
+Four follow-ups from the A60 dogfood pass ("界面还是很脏 / 不能放
+应用里 / 设置加进去 / 里程碑历史还是每日 / 今日和历史区分一下"):
+
+- **Heatmap visual reset.** After five rounds of multi-hue ramps
+  (A57 sage→amber→coral, A60 +halo, gamma curves) the mosaic still
+  read as visually noisy. Reverted to the **Strava-signature
+  minimum**: single coral hue with a near-white pop only at the
+  very top (≥ 75 % intensity), **fully transparent floor** so low
+  cells are completely invisible against the dark plate, gamma
+  1.6 curve, and `.interpolation(.medium)` bilinear smoothing for
+  a soft-glow look instead of a chunky cell grid. Dropped the
+  explicit coral border on the tile too — it was reading as chrome
+  around an already busy figure.
+- **New "Input" sidebar section.** `KeyboardHeatmapCard` and
+  `MouseTrajectoryCard` carved out of "Apps" — both visualise
+  *input behaviour* (which keys, where the cursor parked) rather
+  than which application was foreground. Sidebar now reads:
+  Today / (Rhythm + Focus + Apps + Input) / Health.
+- **Lifetime landmarks fix.** `LandmarkProgressPanel` was wired
+  to today's distance pre-A61, so any landmark larger than ~ a
+  few km (marathon, BJ–GZ, Pacific) showed 0 % forever — meaning-
+  less. Now reads from `store.lifetimeMouseDistanceMillimeters()`
+  via a new `@Published var lifetimeMouseDistanceMillimeters` on
+  `DashboardModel`. Card title also changed from "Landmarks" to
+  "Lifetime landmarks / 历史里程碑" so the cumulative semantic is
+  unambiguous.
+- **Settings gear in sidebar footer.** Small `SettingsLink`-backed
+  gear icon on the right of the existing footer (heart + version +
+  "Updated …"). Opens the same `Settings` scene that ⌘ , opens —
+  preserves the macOS convention while making Settings more
+  discoverable.
+
 ### Dashboard polish (post-A59 sidebar)
 
 - **A60** Three follow-ups from the A59 sidebar dogfood pass:
