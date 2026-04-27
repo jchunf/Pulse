@@ -12,6 +12,26 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### A64 — Sidebar labels (take 3) + coarser heatmap
+
+- **Sidebar labels.** A62 (`.labelStyle(.titleAndIcon)`) and A63
+  (hand-rolled `HStack(Image, Text)`) both still shipped an icon-
+  only sidebar — the icon was rendering coral but the title view
+  was being elided downstream of SwiftUI's macOS sidebar `List`
+  resolution. Take 3: pre-resolve the catalog lookup eagerly
+  (`String(localized: <key>, bundle: .pulse)`) and feed
+  `Label(_ title: String, systemImage:)` a plain `String` —
+  there's no `LocalizedStringKey` left for the sidebar to
+  silently drop. Multi-language support is preserved because the
+  resolution itself runs against the `.pulse` bundle, just from
+  Swift code instead of from inside SwiftUI.
+- **Coarser, larger heatmap.** "再粗一点吧 要么就范围再大一点" —
+  A63's 32 × 20 grid was reading as noise once every active
+  cell carried a visible saturation. Coarsened the mosaic to
+  **24 × 15** (37 % fewer cells) and bumped tile-height cap
+  220pt → 280pt so each cell now sits at roughly 18pt on a 16:10
+  display. Two stacked tiles still fit inside the Input section.
+
 ### A63 — Heatmap "more = darker" + sidebar labels (take 2)
 
 Three follow-ups from A62 dogfood.

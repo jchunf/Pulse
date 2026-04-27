@@ -1343,6 +1343,10 @@ struct DashboardView: View {
 
         var id: String { rawValue }
 
+        /// `LocalizedStringKey` form — kept for any caller that
+        /// wants to feed the catalog through SwiftUI's automatic
+        /// resolution. The sidebar itself no longer uses this
+        /// (see `localizedTitle` below).
         var titleKey: LocalizedStringKey {
             switch self {
             case .today:  return "Today"
@@ -1351,6 +1355,29 @@ struct DashboardView: View {
             case .apps:   return "Apps"
             case .input:  return "Input"
             case .health: return "Health"
+            }
+        }
+
+        /// Eagerly-resolved `String` form for sidebar `Label`s. A63
+        /// tried two approaches at having SwiftUI resolve the
+        /// title from `bundle: .pulse` inside a sidebar `List` row
+        /// (`Label { Text(key, bundle:) } icon: { … }` and a
+        /// hand-rolled `HStack(Image, Text)`); both shipped as
+        /// icon-only on the user's macOS — the title closure was
+        /// being eaten by the sidebar list style. Doing the
+        /// catalog lookup eagerly via `String(localized:bundle:)`
+        /// and feeding the resulting `String` to
+        /// `Label(_ title: String, systemImage:)` bypasses that
+        /// resolution path entirely; the sidebar gets a verbatim
+        /// `String` it cannot drop.
+        var localizedTitle: String {
+            switch self {
+            case .today:  return String(localized: "Today",  bundle: .pulse)
+            case .rhythm: return String(localized: "Rhythm", bundle: .pulse)
+            case .focus:  return String(localized: "Focus",  bundle: .pulse)
+            case .apps:   return String(localized: "Apps",   bundle: .pulse)
+            case .input:  return String(localized: "Input",  bundle: .pulse)
+            case .health: return String(localized: "Health", bundle: .pulse)
             }
         }
 
@@ -1450,22 +1477,19 @@ struct DashboardView: View {
     }
 
     private func sidebarLabel(_ section: Section) -> some View {
-        // Hand-rolled HStack instead of `Label` because the macOS
-        // sidebar `List` style was rendering `Label` icon-only
-        // even with `.labelStyle(.titleAndIcon)` set (observed
-        // dogfood A61–A62: every row showed only the SF Symbol,
-        // no caption next to it). Composing the row by hand
-        // bypasses whatever style resolution was eating the
-        // title and gives us a guaranteed "<icon> <text>" row.
-        HStack(spacing: 8) {
-            Image(systemName: section.systemImage)
-                .foregroundStyle(PulseDesign.coral)
-                .frame(width: 18, alignment: .center)
-            Text(section.titleKey, bundle: .pulse)
-            Spacer(minLength: 0)
-        }
-        .contentShape(Rectangle())
-        .tag(section)
+        // Pre-resolved `String` form via `String(localized:bundle:)`
+        // — A62 (`.labelStyle(.titleAndIcon)`) and A63
+        // (hand-rolled `HStack(Image, Text)`) both still shipped
+        // an icon-only sidebar. The clue: the icon DID render
+        // with its `foregroundStyle(.coral)`, so the row was
+        // being laid out — but the title view was being elided
+        // somewhere downstream of SwiftUI's macOS sidebar
+        // resolution. Calling the catalog lookup ourselves and
+        // handing the `Label` a plain `String` means there's no
+        // `LocalizedStringKey` left for the sidebar to silently
+        // resolve to empty.
+        Label(section.localizedTitle, systemImage: section.systemImage)
+            .tag(section)
     }
 
     /// Sidebar footer pinned to the bottom of the column. Shows
@@ -3992,12 +4016,15 @@ private struct MouseTrajectoryTile: View {
     ///   - A54: 16 × 10 → 32 × 20 ("还是太粗 能细节一点吗")
     ///   - A56: 32 × 20 → 64 × 40 ("可以再密一些")
     ///   - A57: 64 × 40 → 40 × 25 ("有点太密 生理不适了")
-    ///   - A58: 40 × 25 → 32 × 20 ("45还是有点多") — settling
-    ///     on the A54 baseline now that the multi-hue ramp does
-    ///     the "more detail" work the density bumps were trying
-    ///     (and failing) to express.
-    private static let mosaicCellsX = 32
-    private static let mosaicCellsY = 20
+    ///   - A58: 40 × 25 → 32 × 20 ("45还是有点多")
+    ///   - A64: 32 × 20 → 24 × 15 ("再粗一点吧") + tile height
+    ///     bump — 32 × 20 was reading as visual noise once the
+    ///     A63 dark-on-light ramp pushed every active cell to a
+    ///     visible saturation. Each cell is now ~ 14pt at the
+    ///     standard tile width, large enough to register
+    ///     individually.
+    private static let mosaicCellsX = 24
+    private static let mosaicCellsY = 15
 
     private var aspectRatio: CGFloat {
         if let snapshot = tile.snapshot, snapshot.heightPoints > 0 {
@@ -4092,11 +4119,15 @@ private struct MouseTrajectoryTile: View {
         }
     }
 
-    /// Tile height cap. 220pt on a 16:10 display gives a ~352pt wide
-    /// tile — comfortable inside the Apps section without forcing the
-    /// whole card to scroll when the user has multiple displays
-    /// stacked.
-    private static let maxTileHeight: CGFloat = 220
+    /// Tile height cap. A64 bumped from 220 → 280 alongside the
+    /// 32 × 20 → 24 × 15 grid coarsening ("范围再大一点") — at
+    /// the same coarse cell count the bigger frame gives each
+    /// cell roughly 18pt on a 16:10 display, large enough that
+    /// the per-cell colour reads cleanly without the figure
+    /// fragmenting into noise. Two stacked tiles still fit
+    /// inside the Input section without forcing the whole
+    /// card into a sub-scroll.
+    private static let maxTileHeight: CGFloat = 280
 }
 
 /// F-04 — chunky-mosaic redesign of the mouse-trail tile.
