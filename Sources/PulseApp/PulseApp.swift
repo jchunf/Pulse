@@ -1458,38 +1458,83 @@ struct DashboardView: View {
     /// empty space below it. The footer ("Pulse 1.2.0 · 2 m ago")
     /// fills the bottom of the column with low-contrast meta-info
     /// instead of leaving it visually empty.
+    /// Sidebar layout — abandoned `List(selection:)` + `Label` in
+    /// A65 after four straight attempts to coax the title to
+    /// render past SwiftUI's macOS sidebar style failed (A59:
+    /// `Label { Text(key, bundle:) } icon: { … }`; A62:
+    /// `.labelStyle(.titleAndIcon)`; A63: hand-rolled
+    /// `HStack(Image, Text)`; A64: pre-resolved `String` →
+    /// `Label(_, systemImage:)`). Every attempt rendered the
+    /// SF Symbol icon (so the row WAS laying out) but elided the
+    /// title view; the issue is somewhere inside SwiftUI's
+    /// sidebar `Label` resolution that we couldn't route around.
+    /// The fix here is to throw out `List` entirely and build
+    /// the sidebar from `Button`s in a `VStack` — guaranteed
+    /// rendering of both icon and text, plus full control over
+    /// selection styling (mirrors System Settings / Mail).
     private var sidebar: some View {
-        List(selection: $selection) {
-            sidebarLabel(.today)
-            SwiftUI.Section {
-                sidebarLabel(.rhythm)
-                sidebarLabel(.focus)
-                sidebarLabel(.apps)
-                sidebarLabel(.input)
-            }
-            SwiftUI.Section {
-                sidebarLabel(.health)
-            }
+        VStack(alignment: .leading, spacing: 2) {
+            Spacer().frame(height: 12)
+            sidebarRow(.today)
+
+            sidebarDivider
+
+            sidebarRow(.rhythm)
+            sidebarRow(.focus)
+            sidebarRow(.apps)
+            sidebarRow(.input)
+
+            sidebarDivider
+
+            sidebarRow(.health)
+
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(.regularMaterial)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             sidebarFooter
         }
     }
 
-    private func sidebarLabel(_ section: Section) -> some View {
-        // Pre-resolved `String` form via `String(localized:bundle:)`
-        // — A62 (`.labelStyle(.titleAndIcon)`) and A63
-        // (hand-rolled `HStack(Image, Text)`) both still shipped
-        // an icon-only sidebar. The clue: the icon DID render
-        // with its `foregroundStyle(.coral)`, so the row was
-        // being laid out — but the title view was being elided
-        // somewhere downstream of SwiftUI's macOS sidebar
-        // resolution. Calling the catalog lookup ourselves and
-        // handing the `Label` a plain `String` means there's no
-        // `LocalizedStringKey` left for the sidebar to silently
-        // resolve to empty.
-        Label(section.localizedTitle, systemImage: section.systemImage)
-            .tag(section)
+    /// One row of the hand-rolled sidebar. Selected rows get the
+    /// system accent colour as a rounded backing + white
+    /// foreground (matches the macOS sidebar selection idiom);
+    /// unselected rows render with `.primary` text + a coral
+    /// SF-Symbol icon.
+    private func sidebarRow(_ section: Section) -> some View {
+        let isSelected = selection == section
+        return Button {
+            selection = section
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: section.systemImage)
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 18, height: 18)
+                    .foregroundStyle(isSelected ? Color.white : PulseDesign.coral)
+                Text(section.localizedTitle)
+                    .font(.system(size: 13))
+                    .foregroundStyle(isSelected ? Color.white : Color.primary)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isSelected ? Color.accentColor : Color.clear)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var sidebarDivider: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.06))
+            .frame(height: 1)
+            .padding(.vertical, 6)
     }
 
     /// Sidebar footer pinned to the bottom of the column. Shows
@@ -4190,7 +4235,8 @@ struct MouseTrailMosaic: View {
     }
 
     /// Build a `cellsX × cellsY` premultiplied-RGBA `CGImage` whose
-    /// pixels encode a `coral → dark-wine` ramp keyed by the
+    /// pixels encode the same `sage → coral` ramp the keyboard
+    /// heatmap uses (`KeyboardHeatmapKey`), keyed by the
     /// log-normalised hit count. One pixel per mosaic cell — the
     /// upscale to tile size happens in the GPU during display.
     ///
@@ -4201,12 +4247,10 @@ struct MouseTrailMosaic: View {
     ///   - A60: + near-white halo at peak
     ///   - A61: back to single coral, transparent floor
     ///   - A62: warm sunset `amber → coral → halo`
-    ///   - A63: `coral → dark-wine` (current). Inverts the
-    ///     "peak = lightest" reading the halo had imposed, so
-    ///     hot cells read as the darkest patches against the new
-    ///     light cream plate (`PulseDesign.displaySurface`) —
-    ///     "more usage = darker colour", the natural analytics-
-    ///     heatmap convention.
+    ///   - A63: `coral → dark-wine` against light cream plate
+    ///   - A65: matched to `KeyboardHeatmapKey`'s `sage → coral`
+    ///     formula (current) so the two heatmaps read as the same
+    ///     visualisation language across the Input section.
     nonisolated static func render(
         histogram: MouseDisplayHistogram,
         cellsX: Int,
@@ -4230,47 +4274,34 @@ struct MouseTrailMosaic: View {
         guard peak > 0 else { return nil }
         let peakLog = log1p(Double(peak))
 
-        // A63: light-coral → dark-wine ramp. Inverted vs. the
-        // A60–A62 "→ near-white halo" ramps after dogfood
-        // feedback: "难道不是用的越多越深色吗" — the natural
-        // analytics-heatmap intuition is *more usage = darker
-        // colour*, but the halo at peak made hot cells the
-        // **lightest** point on the figure. Now mid-density
-        // cells are a clean coral and peaks lerp toward a
-        // deep wine red. Combined with the new light cream
-        // plate from `PulseDesign.displaySurface`, peak cells
-        // read as "where the cursor parked" because they're
-        // the darkest patches on a warm plate.
-        let stops: [(r: Double, g: Double, b: Double)] = [
-            (0.961, 0.396, 0.396),  // coral 0xF56565 (low/mid)
-            (0.55, 0.15, 0.15)      // dark wine 0x8C2626 (peak)
-        ]
+        // A65: identical colour formula to `KeyboardHeatmapKey`
+        // ("热力图的配色能不能跟键盘统一") so the keyboard heatmap
+        // and mouse heatmap read as the same visualisation
+        // language. The keyboard cell uses:
+        //
+        //   r = (1 - i) * 0.55 + i * 0.95
+        //   g = (1 - i) * 0.70 + i * 0.45
+        //   b = (1 - i) * 0.55 + i * 0.35
+        //   α = 0.25 + i * 0.65
+        //
+        // i.e. lerp from a sage-olive low to a warm-coral high
+        // with alpha 0.25 → 0.90. We keep the mouse-specific
+        // `log1p` + gamma-1.6 normalisation because mouse data
+        // is heavily skewed (one or two hot regions dominate
+        // the long tail), but feed the resulting `intensity`
+        // into the same RGB lerp.
         let pixelCount = cellsX * cellsY
         var pixels = [UInt8](repeating: 0, count: pixelCount * 4)
         for i in 0..<pixelCount {
             let count = matrix[i]
             guard count > 0 else { continue }
             let raw = log1p(Double(count)) / peakLog
-            // Gamma > 1 pushes quiet cells toward the floor and
-            // peaks toward the ceiling. With the floor at
-            // alpha 0 (fully transparent), gamma 1.6 makes the
-            // long tail of 1- or 2-hit cells fade entirely into
-            // the dark plate; only sustained dwell shows up.
             let intensity = pow(max(0.0, min(1.0, raw)), 1.6)
-            let alpha = intensity
 
-            // Sample the ramp at `intensity * (count - 1)`,
-            // linear-interpolating between the two adjacent
-            // stops.
-            let scaled = intensity * Double(stops.count - 1)
-            let lower = Int(scaled.rounded(.down))
-            let upper = min(lower + 1, stops.count - 1)
-            let t = scaled - Double(lower)
-            let a = stops[lower]
-            let b = stops[upper]
-            let r = a.r + (b.r - a.r) * t
-            let g = a.g + (b.g - a.g) * t
-            let bC = a.b + (b.b - a.b) * t
+            let r  = (1.0 - intensity) * 0.55 + intensity * 0.95
+            let g  = (1.0 - intensity) * 0.70 + intensity * 0.45
+            let bC = (1.0 - intensity) * 0.55 + intensity * 0.35
+            let alpha = 0.25 + intensity * 0.65
 
             let off = i * 4
             pixels[off]     = UInt8((r  * alpha * 255).rounded())

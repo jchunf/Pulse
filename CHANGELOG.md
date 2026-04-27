@@ -12,6 +12,33 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### A65 — Hand-rolled sidebar + heatmap palette unified with keyboard
+
+- **Sidebar throwaway-and-rebuild.** Four straight attempts to coax
+  the sidebar `Label` title to render past SwiftUI's macOS sidebar
+  style failed (A59 / A62 / A63 / A64) — every attempt rendered
+  the SF Symbol icon (so the row WAS being laid out) but elided
+  the title. Throwing out `List(selection:)` + `Label` entirely
+  and rebuilding the sidebar from `Button`s in a `VStack`. Manual
+  selection styling (system accent on selected row, coral icon
+  on unselected, primary text), `.regularMaterial` backdrop to
+  match the macOS sidebar feel, two thin dividers grouping the
+  6 entries 1 / 4 / 1 (Today | Rhythm-Focus-Apps-Input | Health).
+- **Heatmap palette unified with keyboard heatmap.**
+  "热力图的配色能不能跟键盘统一" — replaced the A63 `coral →
+  dark-wine` ramp on the mouse heatmap with the **exact same
+  `sage → coral` lerp formula `KeyboardHeatmapKey` already
+  uses**:
+    `r = (1−i)·0.55 + i·0.95`
+    `g = (1−i)·0.70 + i·0.45`
+    `b = (1−i)·0.55 + i·0.35`
+    `α = 0.25 + i·0.65`
+  Mouse keeps its `log1p` + gamma-1.6 intensity normalisation
+  (the data is heavily skewed by one or two hot regions, linear
+  doesn't cope) but the colour mapping is now bit-for-bit the
+  keyboard's. The Input pane now reads as a single visualisation
+  language across both cards.
+
 ### A64 — Sidebar labels (take 3) + coarser heatmap
 
 - **Sidebar labels.** A62 (`.labelStyle(.titleAndIcon)`) and A63
