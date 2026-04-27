@@ -4968,6 +4968,40 @@
           }
         }
       }
+    },
+    "%1$@ moves · last %2$lld days": {
+      "comment": "F-04 MouseTrajectoryCard — subtitle (post-A66 picker). %1$@ is the formatted move count, %2$lld is the user-selected window size in days.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ moves · last %2$lld days"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 次移动 · 最近 %2$lld 天"
+          }
+        }
+      }
+    },
+    "Last %lld days": {
+      "comment": "F-04 MouseTrajectoryCard — picker option label, e.g. \"Last 7 days\" / \"最近 7 天\".",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last %lld days"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近 %lld 天"
+          }
+        }
+      }
     }
   }
 }
