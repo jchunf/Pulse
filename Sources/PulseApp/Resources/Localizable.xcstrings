@@ -5002,6 +5002,74 @@
           }
         }
       }
+    },
+    "Dwell": {
+      "comment": "F-04/F-16 MouseTrajectoryCard — dwell/click toggle, dwell side (where the cursor parked).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dwell"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停留"
+          }
+        }
+      }
+    },
+    "Clicks": {
+      "comment": "F-04/F-16 MouseTrajectoryCard — dwell/click toggle, click side (where the user actually clicked).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clicks"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点击"
+          }
+        }
+      }
+    },
+    "%1$@ clicks · last %2$lld days": {
+      "comment": "F-16 MouseTrajectoryCard — click-mode subtitle. %1$@ is the formatted click count, %2$lld is the user-selected window size in days.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ clicks · last %2$lld days"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 次点击 · 最近 %2$lld 天"
+          }
+        }
+      }
+    },
+    "No mouse clicks recorded yet.": {
+      "comment": "F-16 MouseTrajectoryCard — click-mode empty state.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No mouse clicks recorded yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无鼠标点击记录。"
+          }
+        }
+      }
     }
   }
 }

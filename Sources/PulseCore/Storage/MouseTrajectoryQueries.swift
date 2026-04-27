@@ -78,6 +78,66 @@ public extension EventStore {
             }
     }
 
+    /// F-16 — same shape as `mouseDensity` but reads from
+    /// `day_click_density` (populated by the V7 rollup pass). Used by
+    /// the "clicks" leg of `MouseTrajectoryCard`'s dwell/click toggle.
+    /// Mirrors the query exactly so a caller can swap one for the
+    /// other without touching the renderer or the per-tile shape.
+    func mouseClickDensity(
+        endingAt: Date,
+        days: Int = 7,
+        calendar: Calendar = .current
+    ) throws -> [MouseDisplayHistogram] {
+        precondition(days >= 1, "days must be at least 1")
+        let endDay = calendar.startOfDay(for: endingAt)
+        guard let startDay = calendar.date(byAdding: .day, value: -(days - 1), to: endDay),
+              let rangeEnd = calendar.date(byAdding: .day, value: 1, to: endDay)
+        else {
+            return []
+        }
+        let startSec = Int64(startDay.timeIntervalSince1970)
+        let endSec = Int64(rangeEnd.timeIntervalSince1970)
+
+        let rows = try database.queue.read { db -> [Row] in
+            try Row.fetchAll(db, sql: """
+                SELECT display_id, bin_x, bin_y, SUM(count) AS total
+                FROM day_click_density
+                WHERE day >= ? AND day < ?
+                GROUP BY display_id, bin_x, bin_y
+                ORDER BY display_id, bin_y, bin_x
+                """, arguments: [startSec, endSec])
+        }
+
+        var byDisplay: [Int64: [MouseDensityCell]] = [:]
+        var totals: [Int64: Int64] = [:]
+        for row in rows {
+            let displayId: Int64 = row["display_id"]
+            let binX: Int = row["bin_x"]
+            let binY: Int = row["bin_y"]
+            let count: Int64 = row["total"]
+            byDisplay[displayId, default: []].append(
+                MouseDensityCell(binX: binX, binY: binY, count: count)
+            )
+            totals[displayId, default: 0] += count
+        }
+
+        return byDisplay
+            .map { (displayId, cells) in
+                MouseDisplayHistogram(
+                    displayId: UInt32(truncatingIfNeeded: displayId),
+                    gridSize: MouseTrajectoryGrid.size,
+                    totalCount: totals[displayId] ?? 0,
+                    cells: cells
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.totalCount != rhs.totalCount {
+                    return lhs.totalCount > rhs.totalCount
+                }
+                return lhs.displayId < rhs.displayId
+            }
+    }
+
     /// Latest `DisplayInfo` snapshot recorded for `displayId`, or `nil`
     /// if this display has never written a snapshot. The trajectory card
     /// uses this to honor the display's physical aspect ratio when

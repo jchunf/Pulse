@@ -399,4 +399,127 @@ struct MouseTrajectoryQueriesTests {
         }
         #expect(storedDay == expectedDay)
     }
+
+    // MARK: - F-16: click density (mouseClickDensity + V7 rollup)
+
+    /// Seed `day_click_density` directly. Mirror of `seedCell` for the
+    /// click-density read tests; avoids running the rollup just to
+    /// populate a single row.
+    private func seedClickCell(
+        _ db: PulseDatabase,
+        day: Int64,
+        displayId: UInt32,
+        binX: Int,
+        binY: Int,
+        count: Int64
+    ) throws {
+        try db.queue.write { db in
+            try db.execute(
+                sql: """
+                INSERT INTO day_click_density (day, display_id, bin_x, bin_y, count)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(day, display_id, bin_x, bin_y)
+                DO UPDATE SET count = day_click_density.count + excluded.count
+                """,
+                arguments: [day, Int64(displayId), binX, binY, count]
+            )
+        }
+    }
+
+    @Test("mouseClickDensity returns empty on a fresh database")
+    func clickDensityEmpty() throws {
+        let (store, _) = try makeStore()
+        let result = try store.mouseClickDensity(
+            endingAt: referenceEnd,
+            days: 7,
+            calendar: utcCalendar
+        )
+        #expect(result.isEmpty)
+    }
+
+    @Test("mouseClickDensity returns a populated cell with the right shape")
+    func clickDensitySingleCell() throws {
+        let (store, db) = try makeStore()
+        try seedClickCell(db, day: referenceDayStartSec, displayId: 3, binX: 12, binY: 34, count: 7)
+
+        let result = try store.mouseClickDensity(
+            endingAt: referenceEnd,
+            days: 7,
+            calendar: utcCalendar
+        )
+        #expect(result.count == 1)
+        #expect(result[0].displayId == 3)
+        #expect(result[0].gridSize == MouseTrajectoryGrid.size)
+        #expect(result[0].totalCount == 7)
+        #expect(result[0].cells == [MouseDensityCell(binX: 12, binY: 34, count: 7)])
+    }
+
+    @Test("rollup bins raw clicks into day_click_density (clamped edges)")
+    func rollupBinsClicksIntoDensity() throws {
+        let clock = FakeClock(start: Date(timeIntervalSince1970: 1_776_000_000))
+        let db = try PulseDatabase.inMemory()
+        let scheduler = RollupScheduler(database: db, clock: clock)
+
+        // Two clicks: one centred, one at the (1.0, 1.0) clamp edge.
+        let baseMs = Int64(clock.now.timeIntervalSince1970) * 1_000 + 100
+        try db.queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO raw_mouse_clicks (ts, display_id, x_norm, y_norm, button, is_double) VALUES (?, 1, 0.5, 0.5, 0, 0)",
+                arguments: [baseMs]
+            )
+            try db.execute(
+                sql: "INSERT INTO raw_mouse_clicks (ts, display_id, x_norm, y_norm, button, is_double) VALUES (?, 1, 1.0, 1.0, 0, 0)",
+                arguments: [baseMs + 1]
+            )
+        }
+
+        clock.advance(5)
+        try scheduler.runOnce(.rawToSecond, now: clock.now)
+
+        let cells: [(Int, Int, Int64)] = try db.queue.read { db in
+            try Row
+                .fetchAll(
+                    db,
+                    sql: "SELECT bin_x, bin_y, count FROM day_click_density WHERE display_id = 1 ORDER BY bin_y, bin_x"
+                )
+                .map { row in
+                    let bx: Int = row["bin_x"]
+                    let by: Int = row["bin_y"]
+                    let c: Int64 = row["count"]
+                    return (bx, by, c)
+                }
+        }
+        // Centre + clamp-edge cell, each one click.
+        #expect(cells.count == 2)
+        #expect(cells[0] == (64, 64, 1))
+        #expect(cells[1] == (127, 127, 1))
+    }
+
+    @Test("click rollup is idempotent — rerun adds no new density")
+    func clickRollupIdempotent() throws {
+        let clock = FakeClock(start: Date(timeIntervalSince1970: 1_776_000_000))
+        let db = try PulseDatabase.inMemory()
+        let scheduler = RollupScheduler(database: db, clock: clock)
+
+        let baseMs = Int64(clock.now.timeIntervalSince1970) * 1_000 + 100
+        try db.queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO raw_mouse_clicks (ts, display_id, x_norm, y_norm, button, is_double) VALUES (?, 1, 0.5, 0.5, 0, 0)",
+                arguments: [baseMs]
+            )
+        }
+
+        clock.advance(5)
+        try scheduler.runOnce(.rawToSecond, now: clock.now)
+        // Rerun: raw row is gone, density should stay at 1.
+        try scheduler.runOnce(.rawToSecond, now: clock.now)
+
+        let cnt: Int64 = try db.queue.read { db in
+            try Int64.fetchOne(db, sql: """
+                SELECT count FROM day_click_density
+                WHERE display_id = 1 AND bin_x = 64 AND bin_y = 64
+                """) ?? -1
+        }
+        #expect(cnt == 1)
+    }
 }

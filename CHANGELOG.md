@@ -12,6 +12,38 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### F-16 — Mouse click heatmap (v2.0 first slice)
+
+Adds the click-position counterpart of F-04's cursor-dwell heatmap.
+Both visualisations now share `MouseTrajectoryCard` — a segmented
+**Dwell / Clicks** toggle on the title row flips between them, the
+existing **Last N days** picker still scopes the window. Renderer,
+per-tile shape, palette, plate, and per-display labelling are
+identical across both modes.
+
+- **V7 migration `V7__click_density.sql`** — new `day_click_density`
+  table mirroring the V4 `day_mouse_density` schema (128 × 128 grid
+  per local-day × display).
+- **Rollup** — `RollupScheduler.rollRawToSecond` now folds rolled
+  rows from `raw_mouse_clicks` into `day_click_density` alongside
+  the existing move-density fold. Same edge clamps, same
+  local-midnight-in-UTC bucketing, same idempotent UPSERT.
+- **Query** — `EventStore.mouseClickDensity(endingAt:days:)` mirrors
+  `mouseDensity` exactly so a caller can swap one for the other
+  without touching the renderer.
+- **Model** — `DashboardModel` gains `clickTrajectoryTiles` (peer of
+  `trajectoryTiles`) and `trajectoryMode: MouseTrajectoryMode`.
+  Refresh fetches both densities so flipping the toggle is instant
+  (no refresh round-trip).
+- **UI** — `MouseTrajectoryCard` takes both tile sets + a `mode`
+  binding; renders the active set, swaps the subtitle copy
+  (`X moves` ↔ `X clicks`) and the empty-state line. `xcstrings`:
+  added `Dwell` / `Clicks` / `%1$@ clicks · last %2$lld days` /
+  `No mouse clicks recorded yet.` (en + zh-Hans).
+- **Tests** — `MouseTrajectoryQueriesTests` adds three F-16 cases:
+  `mouseClickDensity` empty + populated reads + the rollup binning
+  + idempotency.
+
 ### A66 — Heatmap window picker + smoother gradient + subtle breath
 
 - **Time-window picker on the heatmap card.** "用户可以选不同时间
