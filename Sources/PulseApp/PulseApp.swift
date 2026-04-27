@@ -3886,86 +3886,121 @@ private struct MouseTrajectoryTile: View {
 /// F-04 — chunky-mosaic redesign of the mouse-trail tile.
 ///
 /// Earlier versions rendered the 128 × 128 cell histogram as a
-/// 512×512 `CGImage` heatmap. Two real-world problems with that:
+/// 512×512 `CGImage` heatmap, then a SwiftUI `Canvas` driving 640
+/// per-cell `fill` calls. Both produced scroll lag for different
+/// reasons:
 ///
-/// 1. **Visually noisy.** At 320pt-wide tile size, 16 384 cells of
-///    log-normalised density read as dithering, not signal — the
-///    user sees TV-static rather than "I parked here".
-/// 2. **Scroll lag.** `Image(decorative:).resizable().interpolation(.high)`
-///    re-resamples a 512² CGImage on every scroll-layout pass, and
-///    two displays stacked vertically were enough to make the
-///    Dashboard scroll choppy.
+/// 1. The 512² `CGImage` was resampled with `.interpolation(.high)`
+///    on every scroll-layout pass.
+/// 2. The `Canvas` closure re-ran whenever `body` re-ran — and the
+///    Dashboard's 5-second poll plus any sibling `@State` change
+///    re-ran `body`. `.drawingGroup()` flattens the result but does
+///    not memoise the closure.
 ///
-/// Fix: drop to a 16 × 10 mosaic (~ display aspect), draw it in a
-/// single SwiftUI `Canvas`. One draw call, GPU-flat, no CGImage
-/// resample. Aggregation is a single pass over the (already
-/// non-zero-filtered) cell list, so the per-frame cost is the
-/// `Canvas` fill itself.
+/// Fix (A55): collapse the histogram into a tiny `cellsX × cellsY`
+/// pixel buffer (32 × 20 = 640 bytes RGBA) on a background `.task`
+/// keyed by the histogram, store the resulting `CGImage` in
+/// `@State`, and display it via `Image(decorative:).resizable()
+/// .interpolation(.medium)`. SwiftUI/CoreGraphics resamples the
+/// tiny image up to whatever the tile measures during scroll —
+/// effectively free, no redraw work in the view body.
 struct MouseTrailMosaic: View {
 
     let histogram: MouseDisplayHistogram
     let cellsX: Int
     let cellsY: Int
 
-    /// Visible gap between cells. Tightened from 1.5pt → 0.5pt
-    /// alongside the A54 grid bump — at 32 × 20 the gap was
-    /// drowning out the per-cell colour, making the tile look
-    /// like a tiled checkerboard rather than a heatmap.
-    private static let gap: CGFloat = 0.5
+    @State private var image: CGImage?
 
     var body: some View {
-        // Pre-aggregate once per render pass. Cheap — the source
-        // cell list is already stripped of zeros at the SQL layer.
-        let matrix = aggregate()
-        let peak = max(1, matrix.flatMap { $0 }.max() ?? 1)
-        let peakLog = log1p(Double(peak))
-        Canvas { ctx, size in
-            let cellWidth = size.width / CGFloat(cellsX)
-            let cellHeight = size.height / CGFloat(cellsY)
-            for y in 0..<cellsY {
-                for x in 0..<cellsX {
-                    let count = matrix[y][x]
-                    guard count > 0 else { continue }
-                    let intensity = peakLog > 0
-                        ? log1p(Double(count)) / peakLog
-                        : 0
-                    // Floor of 0.20 so even a single-hit cell is
-                    // visible against the dark plate; cap of 0.95
-                    // so the hot spot stays clearly coral rather
-                    // than washing to flat white.
-                    let alpha = 0.20 + intensity * 0.75
-                    let rect = CGRect(
-                        x: CGFloat(x) * cellWidth + Self.gap / 2,
-                        y: CGFloat(y) * cellHeight + Self.gap / 2,
-                        width: max(0, cellWidth - Self.gap),
-                        height: max(0, cellHeight - Self.gap)
-                    )
-                    ctx.fill(
-                        Path(roundedRect: rect, cornerRadius: 1),
-                        with: .color(PulseDesign.coral.opacity(alpha))
-                    )
-                }
+        Group {
+            if let image {
+                Image(decorative: image, scale: 1.0)
+                    .resizable()
+                    .interpolation(.medium)
+            } else {
+                // No image yet (first render or empty cells) —
+                // the dark plate from the parent shows through.
+                Color.clear
             }
         }
-        .drawingGroup()  // Rasterise the Canvas once; cheap to scroll.
+        .task(id: histogram) {
+            let rendered = Self.render(
+                histogram: histogram,
+                cellsX: cellsX,
+                cellsY: cellsY
+            )
+            // Hop back to the main actor for @State assignment.
+            await MainActor.run { self.image = rendered }
+        }
     }
 
-    /// Fold the source 128 × 128 (gridSize × gridSize) histogram
-    /// into the mosaic's `cellsY × cellsX` matrix by integer-bin
-    /// truncation. O(non-zero cells) — usually a few hundred even
-    /// over a busy 7-day window.
-    private func aggregate() -> [[Int64]] {
-        var matrix = Array(
-            repeating: Array(repeating: Int64(0), count: cellsX),
-            count: cellsY
-        )
+    /// Build a `cellsX × cellsY` premultiplied-RGBA `CGImage` whose
+    /// pixels encode coral with a per-cell alpha derived from the
+    /// log-normalised hit count. One pixel per mosaic cell — the
+    /// upscale to tile size happens in the GPU during display.
+    nonisolated static func render(
+        histogram: MouseDisplayHistogram,
+        cellsX: Int,
+        cellsY: Int
+    ) -> CGImage? {
+        guard cellsX > 0, cellsY > 0 else { return nil }
+
+        // Aggregate the 128 × 128 source cells into the mosaic
+        // grid. O(non-zero cells) — typically a few hundred even
+        // for a busy 7-day window.
+        var matrix = [Int64](repeating: 0, count: cellsX * cellsY)
         let src = max(1, histogram.gridSize)
+        var peak: Int64 = 0
         for cell in histogram.cells where cell.count > 0 {
             let mx = min(cellsX - 1, cell.binX * cellsX / src)
             let my = min(cellsY - 1, cell.binY * cellsY / src)
-            matrix[my][mx] &+= cell.count
+            let idx = my * cellsX + mx
+            matrix[idx] &+= cell.count
+            if matrix[idx] > peak { peak = matrix[idx] }
         }
-        return matrix
+        guard peak > 0 else { return nil }
+        let peakLog = log1p(Double(peak))
+
+        // Premultiplied coral RGBA — sRGB (0xF56565 ≈ 245,101,101).
+        // Premultiplying by alpha is required by the bitmap-info
+        // flag below; without it CoreGraphics will reject the
+        // image or render it with halos at low alpha.
+        let rBase = 0.961, gBase = 0.396, bBase = 0.396
+        let pixelCount = cellsX * cellsY
+        var pixels = [UInt8](repeating: 0, count: pixelCount * 4)
+        for i in 0..<pixelCount {
+            let count = matrix[i]
+            guard count > 0 else { continue }
+            let intensity = log1p(Double(count)) / peakLog
+            // Floor of 0.20 so even a single-hit cell is visible
+            // against the dark plate; cap of 0.95 keeps hot spots
+            // clearly coral rather than washing to flat white.
+            let alpha = 0.20 + intensity * 0.75
+            let off = i * 4
+            pixels[off]     = UInt8((rBase * alpha * 255).rounded())
+            pixels[off + 1] = UInt8((gBase * alpha * 255).rounded())
+            pixels[off + 2] = UInt8((bBase * alpha * 255).rounded())
+            pixels[off + 3] = UInt8((alpha * 255).rounded())
+        }
+
+        let bytesPerRow = cellsX * 4
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
+        guard let provider = CGDataProvider(data: Data(pixels) as CFData) else { return nil }
+        return CGImage(
+            width: cellsX,
+            height: cellsY,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo,
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: true,
+            intent: .defaultIntent
+        )
     }
 }
 
