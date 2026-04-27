@@ -710,6 +710,11 @@ final class DashboardModel: ObservableObject {
     /// the main thread via `.task(id:)`, so this struct stays cheap to
     /// publish even when it carries several thousand non-zero cells.
     @Published private(set) var trajectoryTiles: [MouseTrajectoryTileData] = []
+    /// F-16 — same shape as `trajectoryTiles`, but the histograms are
+    /// per-display click densities (rolled into `day_click_density`)
+    /// instead of cursor-dwell densities. Driven by the same refresh
+    /// path; the dwell vs. click split is just a toggle on the card.
+    @Published private(set) var clickTrajectoryTiles: [MouseTrajectoryTileData] = []
     /// User-selected trajectory window (days). Drives the picker in
     /// `MouseTrajectoryCard`. Setting this triggers a refresh so the
     /// next poll's histogram matches the new window.
@@ -719,6 +724,11 @@ final class DashboardModel: ObservableObject {
             Task { await refresh() }
         }
     }
+    /// Dwell vs click mode for the heatmap card. Just toggles which
+    /// of `trajectoryTiles` / `clickTrajectoryTiles` the card
+    /// renders — both are kept warm so flipping the toggle is
+    /// instant (no refresh round-trip).
+    @Published var trajectoryMode: MouseTrajectoryMode = .dwell
     /// Cumulative mouse-mileage across the whole `mouse_moves` table —
     /// the right input for `LandmarkProgressPanel` ("how close are you
     /// to a Pacific crossing?"). Pre-A61 the panel was wired to today's
@@ -869,6 +879,25 @@ final class DashboardModel: ObservableObject {
                     )
                 )
             }
+            // F-16 — same shape as the dwell read above, sourced from
+            // `day_click_density`. Snapshot lookups are cached at the
+            // SQL layer so the second `latestDisplaySnapshot` call per
+            // display is effectively free.
+            let clickHistograms = try store.mouseClickDensity(
+                endingAt: now,
+                days: self.trajectoryDays
+            )
+            var clickTiles: [MouseTrajectoryTileData] = []
+            clickTiles.reserveCapacity(clickHistograms.count)
+            for histogram in clickHistograms {
+                let snapshot = try? store.latestDisplaySnapshot(displayId: histogram.displayId)
+                clickTiles.append(
+                    MouseTrajectoryTileData(
+                        histogram: histogram,
+                        snapshot: snapshot
+                    )
+                )
+            }
             let progress = GoalEvaluator.evaluate(
                 goals: goalsStore.enabledGoals(),
                 summary: summary,
@@ -919,6 +948,7 @@ final class DashboardModel: ObservableObject {
             self.focusDonut = focusDonut
             self.weekOverWeek = weekOverWeek
             self.trajectoryTiles = trajectoryTiles
+            self.clickTrajectoryTiles = clickTiles
             self.lastRefreshAt = now
             self.errorMessage = nil
             updateAchievementIfNeeded(
@@ -1713,10 +1743,12 @@ struct DashboardView: View {
     @ViewBuilder
     private var inputSection: some View {
         KeyboardHeatmapCard(keyCodes: model.keyCodeDistribution)
-        if !model.trajectoryTiles.isEmpty {
+        if !model.trajectoryTiles.isEmpty || !model.clickTrajectoryTiles.isEmpty {
             MouseTrajectoryCard(
-                tiles: model.trajectoryTiles,
-                days: $model.trajectoryDays
+                dwellTiles: model.trajectoryTiles,
+                clickTiles: model.clickTrajectoryTiles,
+                days: $model.trajectoryDays,
+                mode: $model.trajectoryMode
             )
         }
     }
@@ -3988,20 +4020,51 @@ struct MouseTrajectoryTileData: Equatable {
 /// `.task(id:)` so the main actor keeps moving while the CGImage is
 /// produced. The card is omitted entirely when no display has cells
 /// (see the `trajectoryTiles.isEmpty` guard in `DashboardView`).
+/// F-04 dwell vs F-16 click toggle on `MouseTrajectoryCard`. Stored
+/// on `DashboardModel.trajectoryMode`; flipping it is instant (both
+/// histograms are kept warm in the model so no refresh round-trip).
+enum MouseTrajectoryMode: String, Hashable, CaseIterable, Identifiable {
+    case dwell, click
+
+    var id: String { rawValue }
+
+    var titleKey: LocalizedStringKey {
+        switch self {
+        case .dwell: return "Dwell"
+        case .click: return "Clicks"
+        }
+    }
+}
+
 struct MouseTrajectoryCard: View {
 
-    let tiles: [MouseTrajectoryTileData]
+    let dwellTiles: [MouseTrajectoryTileData]
+    let clickTiles: [MouseTrajectoryTileData]
     /// Currently-selected window size, in days. Bound to
     /// `DashboardModel.trajectoryDays` so changing the picker
     /// triggers a refresh that re-queries `mouseDensity` over the
     /// new range.
     @Binding var days: Int
+    /// Dwell vs click mode. Bound to `DashboardModel.trajectoryMode`
+    /// so the toggle drives both this card and any future surface
+    /// that wants to listen.
+    @Binding var mode: MouseTrajectoryMode
 
     /// Window options exposed by the picker. 1 / 3 / 7 / 30 covers
     /// "today's parking", "the last few days", "this week" (the
     /// pre-A66 default), and "last month" — the four density
     /// stories most users want to see for a cursor heatmap.
     private static let dayOptions = [1, 3, 7, 30]
+
+    /// Tiles for the currently-selected mode. The card otherwise
+    /// behaves identically — same renderer, same per-tile shape,
+    /// same per-display labelling.
+    private var tiles: [MouseTrajectoryTileData] {
+        switch mode {
+        case .dwell: return dwellTiles
+        case .click: return clickTiles
+        }
+    }
 
     private var totalMoves: Int64 {
         tiles.reduce(into: Int64(0)) { $0 += $1.histogram.totalCount }
@@ -4024,6 +4087,7 @@ struct MouseTrajectoryCard: View {
                 Text("Mouse heatmap", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
                 Spacer()
+                modePicker
                 daysPicker
             }
             subtitle
@@ -4050,13 +4114,25 @@ struct MouseTrajectoryCard: View {
     private var subtitle: some View {
         if totalMoves > 0 {
             let formatted = totalMoves.formatted(.number)
-            Text(
-                String.localizedStringWithFormat(
-                    NSLocalizedString(
+            let template: String = {
+                switch mode {
+                case .dwell:
+                    return NSLocalizedString(
                         "%1$@ moves · last %2$lld days",
                         bundle: .pulse,
-                        comment: "F-04 MouseTrajectoryCard — subtitle (post-A66 picker)."
-                    ),
+                        comment: "F-04 MouseTrajectoryCard — dwell-mode subtitle."
+                    )
+                case .click:
+                    return NSLocalizedString(
+                        "%1$@ clicks · last %2$lld days",
+                        bundle: .pulse,
+                        comment: "F-16 MouseTrajectoryCard — click-mode subtitle."
+                    )
+                }
+            }()
+            Text(
+                String.localizedStringWithFormat(
+                    template,
                     formatted,
                     Int64(days)
                 )
@@ -4065,15 +4141,34 @@ struct MouseTrajectoryCard: View {
             .tracking(0.3)
             .foregroundStyle(.secondary)
         } else {
-            Text("No mouse movement recorded yet.", bundle: .pulse)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            Text(
+                mode == .dwell
+                    ? "No mouse movement recorded yet."
+                    : "No mouse clicks recorded yet.",
+                bundle: .pulse
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
         }
     }
 
     /// Right-aligned `Menu` picker on the title row. Listed with a
     /// checkmark next to the active option so the user sees the
     /// current state at a glance.
+    /// Segmented dwell/click switch. Compact `.segmented` style sits
+    /// alongside the days picker on the title row; the two together
+    /// answer "what am I looking at?" + "over how long?".
+    private var modePicker: some View {
+        Picker("", selection: $mode) {
+            ForEach(MouseTrajectoryMode.allCases) { value in
+                Text(value.titleKey, bundle: .pulse).tag(value)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+    }
+
     private var daysPicker: some View {
         Menu {
             ForEach(Self.dayOptions, id: \.self) { value in

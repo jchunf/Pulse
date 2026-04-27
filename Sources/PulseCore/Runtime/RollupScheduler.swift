@@ -228,6 +228,27 @@ public final class RollupScheduler: @unchecked Sendable {
                     count = day_mouse_density.count + excluded.count
                 """, arguments: [localOffsetSeconds, localOffsetSeconds, cutoffMillis])
 
+            // F-16: same shape as the move-density fold above, but
+            // sourced from `raw_mouse_clicks`. Each row contributes 1
+            // to the cell containing its (x_norm, y_norm). Same 128×128
+            // grid + same edge clamp + same local-day bucketing so the
+            // F-04 renderer + `MouseDisplayHistogram` shape carries
+            // through unchanged on the read side.
+            try db.execute(sql: """
+                INSERT INTO day_click_density (day, display_id, bin_x, bin_y, count)
+                SELECT
+                    (((ts / 1000 + ?) / 86400) * 86400) - ? AS day,
+                    display_id,
+                    MIN(127, MAX(0, CAST(x_norm * 128 AS INTEGER))) AS bin_x,
+                    MIN(127, MAX(0, CAST(y_norm * 128 AS INTEGER))) AS bin_y,
+                    COUNT(*) AS count
+                FROM raw_mouse_clicks
+                WHERE ts < ?
+                GROUP BY day, display_id, bin_x, bin_y
+                ON CONFLICT(day, display_id, bin_x, bin_y) DO UPDATE SET
+                    count = day_click_density.count + excluded.count
+                """, arguments: [localOffsetSeconds, localOffsetSeconds, cutoffMillis])
+
             // After rolling, mark the rolled rows by deleting them from raw
             // tables that have already been aggregated. Retention purge will
             // also do this on a schedule, but eager removal keeps the L0
