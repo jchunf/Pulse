@@ -12,6 +12,31 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### A66 — Heatmap window picker + smoother gradient + subtle breath
+
+- **Time-window picker on the heatmap card.** "用户可以选不同时间
+  段" — the last-N-days window is now user-selectable. Right-
+  aligned `Menu` picker on the title row offers 1 / 3 / 7 / 30 days
+  with a checkmark on the active option. Selecting a value writes
+  to `DashboardModel.trajectoryDays` (new `@Published` property);
+  the `didSet` triggers a `refresh()` so the next poll re-queries
+  `mouseDensity(endingAt:days:)` over the chosen window. Subtitle
+  rewrites from the hard-coded "last 7 days" to a parameterised
+  `"%1$@ moves · last %2$lld days"` so it tracks the picker.
+- **Cubic smoothstep on intensity.** "渐变能不能再优雅一些" — added
+  a `t² · (3 − 2t)` smoothstep on top of the existing gamma-1.6
+  intensity curve. Smoothstep has zero derivative at both 0 and
+  1, so colour changes accelerate toward the middle of the
+  intensity range and ease in/out at the edges — the visible
+  cell-to-cell colour jumps soften without changing the ramp
+  endpoints.
+- **Heartbeat pulse on the heatmap title icon.**
+  `pulseHeartbeat(active: true, amplitude: .menuBar)` on the
+  `scribble.variable` glyph — at +4 % every 2.4 s the icon
+  gently breathes, picking up the app's heartbeat motif. Doesn't
+  scale the heatmap itself (would shift layout every tick); the
+  glyph carries the "alive" feel for the whole card.
+
 ### A65 — Hand-rolled sidebar + heatmap palette unified with keyboard
 
 - **Sidebar throwaway-and-rebuild.** Four straight attempts to coax

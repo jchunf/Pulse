@@ -710,6 +710,15 @@ final class DashboardModel: ObservableObject {
     /// the main thread via `.task(id:)`, so this struct stays cheap to
     /// publish even when it carries several thousand non-zero cells.
     @Published private(set) var trajectoryTiles: [MouseTrajectoryTileData] = []
+    /// User-selected trajectory window (days). Drives the picker in
+    /// `MouseTrajectoryCard`. Setting this triggers a refresh so the
+    /// next poll's histogram matches the new window.
+    @Published var trajectoryDays: Int = 7 {
+        didSet {
+            guard trajectoryDays != oldValue else { return }
+            Task { await refresh() }
+        }
+    }
     /// Cumulative mouse-mileage across the whole `mouse_moves` table —
     /// the right input for `LandmarkProgressPanel` ("how close are you
     /// to a Pacific crossing?"). Pre-A61 the panel was wired to today's
@@ -749,10 +758,13 @@ final class DashboardModel: ObservableObject {
     /// the newest column is always "this week" regardless of which
     /// weekday today is.
     nonisolated static let continuityDays = 365
-    /// F-04 trajectory-density window. 7 days covers "my last week" —
-    /// the obvious zoom for a density map — and keeps the query under
-    /// ~20k rows even on a two-display setup.
-    nonisolated static let trajectoryDays = 7
+    /// F-04 trajectory-density window default. The picker on
+    /// `MouseTrajectoryCard` lets the user widen / narrow this at
+    /// runtime; 7 covers "my last week" — the obvious default zoom —
+    /// and keeps the query under ~20k rows even on a two-display
+    /// setup. The actual window in flight is `self.trajectoryDays`,
+    /// which is `@Published` so the picker can drive a refresh.
+    nonisolated static let defaultTrajectoryDays = 7
 
     init(store: EventStore?, goalsStore: GoalsStore) {
         self.store = store
@@ -844,7 +856,7 @@ final class DashboardModel: ObservableObject {
             // refresh loop.
             let trajectoryHistograms = try store.mouseDensity(
                 endingAt: now,
-                days: Self.trajectoryDays
+                days: self.trajectoryDays
             )
             var trajectoryTiles: [MouseTrajectoryTileData] = []
             trajectoryTiles.reserveCapacity(trajectoryHistograms.count)
@@ -1702,7 +1714,10 @@ struct DashboardView: View {
     private var inputSection: some View {
         KeyboardHeatmapCard(keyCodes: model.keyCodeDistribution)
         if !model.trajectoryTiles.isEmpty {
-            MouseTrajectoryCard(tiles: model.trajectoryTiles)
+            MouseTrajectoryCard(
+                tiles: model.trajectoryTiles,
+                days: $model.trajectoryDays
+            )
         }
     }
 
@@ -3976,6 +3991,17 @@ struct MouseTrajectoryTileData: Equatable {
 struct MouseTrajectoryCard: View {
 
     let tiles: [MouseTrajectoryTileData]
+    /// Currently-selected window size, in days. Bound to
+    /// `DashboardModel.trajectoryDays` so changing the picker
+    /// triggers a refresh that re-queries `mouseDensity` over the
+    /// new range.
+    @Binding var days: Int
+
+    /// Window options exposed by the picker. 1 / 3 / 7 / 30 covers
+    /// "today's parking", "the last few days", "this week" (the
+    /// pre-A66 default), and "last month" — the four density
+    /// stories most users want to see for a cursor heatmap.
+    private static let dayOptions = [1, 3, 7, 30]
 
     private var totalMoves: Int64 {
         tiles.reduce(into: Int64(0)) { $0 += $1.histogram.totalCount }
@@ -3984,11 +4010,21 @@ struct MouseTrajectoryCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
+                // A66: subtle breath on the title glyph
+                // ("能不能动态来做分析") — at `.menuBar`
+                // amplitude (+4 % every 2.4 s) the icon
+                // gently pulses, picking up the app's
+                // heartbeat motif without scaling the
+                // heatmap itself (which would shift layout
+                // every tick).
                 Image(systemName: "scribble.variable")
                     .foregroundStyle(PulseDesign.coral)
                     .opacity(0.85)
+                    .pulseHeartbeat(active: true, amplitude: .menuBar)
                 Text("Mouse heatmap", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
+                Spacer()
+                daysPicker
             }
             subtitle
             VStack(spacing: 16) {
@@ -4017,11 +4053,12 @@ struct MouseTrajectoryCard: View {
             Text(
                 String.localizedStringWithFormat(
                     NSLocalizedString(
-                        "%@ moves · last 7 days",
+                        "%1$@ moves · last %2$lld days",
                         bundle: .pulse,
-                        comment: "F-04 MouseTrajectoryCard — subtitle showing total mouse-move count recorded across all displays in the window."
+                        comment: "F-04 MouseTrajectoryCard — subtitle (post-A66 picker)."
                     ),
-                    formatted
+                    formatted,
+                    Int64(days)
                 )
             )
             .font(PulseDesign.labelFont)
@@ -4032,6 +4069,48 @@ struct MouseTrajectoryCard: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// Right-aligned `Menu` picker on the title row. Listed with a
+    /// checkmark next to the active option so the user sees the
+    /// current state at a glance.
+    private var daysPicker: some View {
+        Menu {
+            ForEach(Self.dayOptions, id: \.self) { value in
+                Button {
+                    days = value
+                } label: {
+                    HStack {
+                        Text(Self.daysLabel(value))
+                        if value == days {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(Self.daysLabel(days))
+                    .font(PulseDesign.labelFont)
+                Image(systemName: "chevron.down")
+                    .font(.caption2)
+            }
+            .foregroundStyle(.secondary)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+
+    private static func daysLabel(_ days: Int) -> String {
+        String.localizedStringWithFormat(
+            NSLocalizedString(
+                "Last %lld days",
+                bundle: .pulse,
+                comment: "F-04 MouseTrajectoryCard — picker option label."
+            ),
+            Int64(days)
+        )
     }
 }
 
@@ -4296,7 +4375,15 @@ struct MouseTrailMosaic: View {
             let count = matrix[i]
             guard count > 0 else { continue }
             let raw = log1p(Double(count)) / peakLog
-            let intensity = pow(max(0.0, min(1.0, raw)), 1.6)
+            let gammaed = pow(max(0.0, min(1.0, raw)), 1.6)
+            // A66: cubic smoothstep on top of the gamma-curved
+            // intensity ("渐变能不能再优雅一些"). `t² · (3 − 2t)`
+            // has zero derivative at both 0 and 1 — colour
+            // changes accelerate toward the middle of the
+            // intensity range and ease in/out at the edges,
+            // which softens the visible cell-to-cell colour
+            // jumps without changing the ramp endpoints.
+            let intensity = gammaed * gammaed * (3 - 2 * gammaed)
 
             let r  = (1.0 - intensity) * 0.55 + intensity * 0.95
             let g  = (1.0 - intensity) * 0.70 + intensity * 0.45
