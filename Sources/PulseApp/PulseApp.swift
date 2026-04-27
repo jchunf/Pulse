@@ -3707,7 +3707,7 @@ struct MouseTrajectoryCard: View {
                 Image(systemName: "scribble.variable")
                     .foregroundStyle(PulseDesign.coral)
                     .opacity(0.85)
-                Text("Mouse trails", bundle: .pulse)
+                Text("Mouse heatmap", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
             subtitle
@@ -3775,12 +3775,14 @@ private struct MouseTrajectoryTile: View {
     /// Aggregation grid for the mosaic. 16 × 10 ≈ 16:10 display
     /// aspect; on wider monitors the cells stretch horizontally,
     /// which preserves the "screen pixels" reading without
-    /// fragmenting into noise. Earlier versions rendered a
-    /// 128 × 128 bitmap which at 320pt-wide tile size looked
-    /// like dithering noise rather than signal — see commit
-    /// message for the rationale.
-    private static let mosaicCellsX = 16
-    private static let mosaicCellsY = 10
+    /// fragmenting into noise. Bumped from 16 × 10 → 32 × 20 in
+    /// A54 after user feedback ("还是太粗") — at the larger tile
+    /// sizes 16 × 10 read as Lego-blocky; 32 × 20 keeps each cell
+    /// large enough to register as a discrete tile while letting
+    /// neighbour cells blend into a smoother gradient where
+    /// densities are continuous.
+    private static let mosaicCellsX = 32
+    private static let mosaicCellsY = 20
 
     private var aspectRatio: CGFloat {
         if let snapshot = tile.snapshot, snapshot.heightPoints > 0 {
@@ -3905,9 +3907,11 @@ struct MouseTrailMosaic: View {
     let cellsX: Int
     let cellsY: Int
 
-    /// Visible gap between cells. Reads as "screen pixels"; small
-    /// enough not to dominate even at the smallest tile size.
-    private static let gap: CGFloat = 1.5
+    /// Visible gap between cells. Tightened from 1.5pt → 0.5pt
+    /// alongside the A54 grid bump — at 32 × 20 the gap was
+    /// drowning out the per-cell colour, making the tile look
+    /// like a tiled checkerboard rather than a heatmap.
+    private static let gap: CGFloat = 0.5
 
     var body: some View {
         // Pre-aggregate once per render pass. Cheap — the source
@@ -3937,7 +3941,7 @@ struct MouseTrailMosaic: View {
                         height: max(0, cellHeight - Self.gap)
                     )
                     ctx.fill(
-                        Path(roundedRect: rect, cornerRadius: 2),
+                        Path(roundedRect: rect, cornerRadius: 1),
                         with: .color(PulseDesign.coral.opacity(alpha))
                     )
                 }
