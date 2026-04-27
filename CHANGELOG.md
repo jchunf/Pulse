@@ -12,6 +12,22 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Bug fixes (post-1.2.0 dogfood)
+
+- **A56** F-04 mosaic density + crispness — A55's CGImage
+  pipeline shipped with `.interpolation(.medium)`, which gave
+  the heatmap a bilinear-smoothed gradient look that lost the
+  "quilted" cell reading the A54 Canvas had. Switched to
+  `.interpolation(.none)` (nearest-neighbor) so each source
+  pixel renders as a flat-coloured rectangle with sharp cell
+  boundaries, and bumped the grid 32 × 20 → 64 × 40 (4× more
+  cells) per user feedback "可以再密一些". Each cell is now
+  ~ 5.5pt at standard tile width — small enough to read as a
+  fine mosaic, large enough that the eye still registers
+  individual cells. Render perf is unchanged: still a single
+  64 × 40 = 2560-byte buffer rendered once via `.task(id:)`,
+  GPU resamples for free during scroll.
+
 ## [1.2.0] — 2026-04-27
 
 The "narrative loop" release — eight roadmap features from
