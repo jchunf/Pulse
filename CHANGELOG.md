@@ -20,6 +20,21 @@ that has been waiting for a dramatic anchor since sec/min/hour
 
 ### Bug fixes (v1.2 post-merge dogfood)
 
+- **A55** Dashboard scroll lag — root cause of the "滑动起来有点
+  卡顿" report after A54. `MouseTrailMosaic` was driving 640
+  per-cell `Canvas` fills, and the Canvas closure re-ran on
+  every parent `body` invocation (Dashboard's 5-second poll
+  plus any sibling `@State` change). `.drawingGroup()` flattens
+  the result but does not memoise the closure, so each pass
+  rebuilt 640 paths even though the histogram hadn't changed.
+  Replaced with a tiny `cellsX × cellsY` premultiplied-RGBA
+  `CGImage` (32 × 20 = 640 bytes) rendered once via
+  `.task(id: histogram)` and displayed via
+  `Image(decorative:).resizable().interpolation(.medium)` —
+  GPU resamples the 32×20 image up to whatever the tile
+  measures during scroll, no per-frame redraw work in the
+  view body. Two-display dashboards now scroll cleanly on
+  the dogfood Mac.
 - **A49** xcstrings catalog now actually reaches the runtime —
   root cause of A48. SPM's resource pipeline was copying
   `Localizable.xcstrings` into the emitted resource bundle
