@@ -12,6 +12,25 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### A62 — Heatmap ramp + sidebar labels
+
+Two follow-ups from the A61 dogfood pass.
+
+- **Heatmap.** "鼠标还是分块显示吧 颜色搞得好看一些" — A61's
+  bilinear-smoothed single-coral render read as a smoky blur.
+  Reverted to discrete cells (`.interpolation(.none)`) and
+  switched the palette to a warm sunset ramp:
+  **amber → coral → near-white halo** (no sage). Keeps the
+  fully-transparent floor and gamma-1.6 curve so low cells
+  still fade into the dark plate; only the active region
+  carries colour, and within that region the cells lerp through
+  the warm gradient instead of being one flat hue.
+- **Sidebar labels.** "左边栏没有描述了" — the macOS sidebar
+  `List` style was rendering the section `Label`s in icon-only
+  mode (just the SF Symbol, no caption). Added an explicit
+  `.labelStyle(.titleAndIcon)` so each row always shows
+  `<icon> + <text>`.
+
 ### A61 — Information architecture pass
 
 Four follow-ups from the A60 dogfood pass ("界面还是很脏 / 不能放

@@ -1456,6 +1456,13 @@ struct DashboardView: View {
             Image(systemName: section.systemImage)
                 .foregroundStyle(PulseDesign.coral)
         }
+        // Force the title-and-icon presentation. Without this
+        // SwiftUI's macOS sidebar `List` style sometimes resolves
+        // to an icon-only render (observed in dogfood A61: the
+        // sidebar showed coral SF Symbols with no text next to
+        // them). `.titleAndIcon` makes the row contract explicit
+        // so the label always carries its caption.
+        .labelStyle(.titleAndIcon)
         .tag(section)
     }
 
@@ -4122,17 +4129,16 @@ struct MouseTrailMosaic: View {
     var body: some View {
         Group {
             if let image {
-                // A61 reverted to `.interpolation(.medium)` —
-                // bilinear smoothing — after the chunky-cell
-                // mosaic from A56–A60 read as visually noisy
-                // ("界面还是很脏 我要干净一点"). Combined with
-                // the new transparent-floor single-hue ramp
-                // (see `render`), this gives the Strava-signature
-                // soft-glow look: peaks pop, low cells fade into
-                // the dark plate, no chunky cell grid.
+                // A62: back to `.interpolation(.none)` after the
+                // A61 bilinear-smoothed render read as a smoky
+                // blur ("还是分块显示吧 颜色搞得好看一些"). With
+                // discrete cells + the new amber→coral→halo warm
+                // ramp the figure reads as a tiled mosaic again
+                // — but the colours now lerp through a sunset-
+                // gradient, not the flat single-hue of A60.
                 Image(decorative: image, scale: 1.0)
                     .resizable()
-                    .interpolation(.medium)
+                    .interpolation(.none)
             } else {
                 // No image yet (first render or empty cells) —
                 // the dark plate from the parent shows through.
@@ -4151,17 +4157,21 @@ struct MouseTrailMosaic: View {
     }
 
     /// Build a `cellsX × cellsY` premultiplied-RGBA `CGImage` whose
-    /// pixels encode a sage → amber → coral ramp keyed by the
-    /// log-normalised hit count. One pixel per mosaic cell —
+    /// pixels encode a warm `amber → coral → halo` ramp keyed by
+    /// the log-normalised hit count. One pixel per mosaic cell —
     /// the upscale to tile size happens in the GPU during display.
     ///
-    /// A57 introduced the multi-hue ramp after the previous
-    /// single-coral palette read as flat ("可以用不同颜色"). The
-    /// three stops mirror `PulseDesign.sage` / `.amber` / `.coral`
-    /// so the heatmap reads in the same visual language as the
-    /// rest of the Dashboard — calm sage where the cursor barely
-    /// visited, amber on regular work surfaces, coral on the
-    /// regions the cursor parked in.
+    /// Ramp history (kept for context — every change shipped in
+    /// response to dogfood):
+    ///   - A55: single coral, alpha-curved
+    ///   - A57: sage → amber → coral
+    ///   - A60: + near-white halo at peak
+    ///   - A61: back to single coral, transparent floor (the
+    ///     "Strava signature" minimum)
+    ///   - A62: warm sunset `amber → coral → halo` (current).
+    ///     Drops sage so the figure stays warm (no green murk),
+    ///     keeps the halo so peaks pop, keeps the transparent
+    ///     floor so low cells fade into the dark plate.
     nonisolated static func render(
         histogram: MouseDisplayHistogram,
         cellsX: Int,
@@ -4185,17 +4195,19 @@ struct MouseTrailMosaic: View {
         guard peak > 0 else { return nil }
         let peakLog = log1p(Double(peak))
 
-        // A61: single-hue coral with a near-white halo at peak
-        // and a fully transparent floor. After five iterations
-        // of multi-hue ramps (sage → amber → coral, +halo,
-        // gamma curves) the mosaic still read as "脏 / dirty"
-        // — the multiple hues plus the visible alpha floor
-        // were carpeting every active cell in colour. Strava's
-        // signature personal heatmap uses exactly this minimum:
-        // one warm hue, full transparency for low density, a
-        // near-white pop at the very top.
-        let coralR = 0.961, coralG = 0.396, coralB = 0.396
-        let haloR  = 1.000, haloG  = 0.870, haloB  = 0.780
+        // A62: warm sunset ramp — amber → coral → near-white
+        // halo — sampled by linear interpolation against the
+        // gamma-curved intensity. Three stops only (no sage),
+        // so the figure stays warm (no green murk) but is
+        // visibly multi-hued ("颜色搞得好看一些"). Floor is
+        // alpha 0: low cells fully transparent against the
+        // dark plate. The amber→coral→halo progression matches
+        // the rest of the design system's warm palette.
+        let stops: [(r: Double, g: Double, b: Double)] = [
+            (0.898, 0.631, 0.290),  // amber 0xE5A14A (low)
+            (0.961, 0.396, 0.396),  // coral 0xF56565 (mid/high)
+            (1.000, 0.870, 0.780)   // near-white halo (peak)
+        ]
         let pixelCount = cellsX * cellsY
         var pixels = [UInt8](repeating: 0, count: pixelCount * 4)
         for i in 0..<pixelCount {
@@ -4203,25 +4215,25 @@ struct MouseTrailMosaic: View {
             guard count > 0 else { continue }
             let raw = log1p(Double(count)) / peakLog
             // Gamma > 1 pushes quiet cells toward the floor and
-            // peaks toward the ceiling. With the floor now at
+            // peaks toward the ceiling. With the floor at
             // alpha 0 (fully transparent), gamma 1.6 makes the
             // long tail of 1- or 2-hit cells fade entirely into
             // the dark plate; only sustained dwell shows up.
             let intensity = pow(max(0.0, min(1.0, raw)), 1.6)
-            // Alpha 0 → 1 across the gamma-curved intensity. No
-            // floor: low cells are completely transparent, the
-            // dark plate carries them.
             let alpha = intensity
 
-            // Hue is coral up to ~ 75 % intensity, then lerps
-            // toward the near-white halo for the very top. The
-            // crossover threshold + lerp gives peaks a clear
-            // "this is the hottest spot" pop without forcing a
-            // multi-hue ramp through the whole range.
-            let haloT = max(0.0, min(1.0, (intensity - 0.75) / 0.25))
-            let r  = coralR + (haloR - coralR) * haloT
-            let g  = coralG + (haloG - coralG) * haloT
-            let bC = coralB + (haloB - coralB) * haloT
+            // Sample the ramp at `intensity * (count - 1)`,
+            // linear-interpolating between the two adjacent
+            // stops.
+            let scaled = intensity * Double(stops.count - 1)
+            let lower = Int(scaled.rounded(.down))
+            let upper = min(lower + 1, stops.count - 1)
+            let t = scaled - Double(lower)
+            let a = stops[lower]
+            let b = stops[upper]
+            let r = a.r + (b.r - a.r) * t
+            let g = a.g + (b.g - a.g) * t
+            let bC = a.b + (b.b - a.b) * t
 
             let off = i * 4
             pixels[off]     = UInt8((r  * alpha * 255).rounded())
