@@ -1450,19 +1450,21 @@ struct DashboardView: View {
     }
 
     private func sidebarLabel(_ section: Section) -> some View {
-        Label {
-            Text(section.titleKey, bundle: .pulse)
-        } icon: {
+        // Hand-rolled HStack instead of `Label` because the macOS
+        // sidebar `List` style was rendering `Label` icon-only
+        // even with `.labelStyle(.titleAndIcon)` set (observed
+        // dogfood A61–A62: every row showed only the SF Symbol,
+        // no caption next to it). Composing the row by hand
+        // bypasses whatever style resolution was eating the
+        // title and gives us a guaranteed "<icon> <text>" row.
+        HStack(spacing: 8) {
             Image(systemName: section.systemImage)
                 .foregroundStyle(PulseDesign.coral)
+                .frame(width: 18, alignment: .center)
+            Text(section.titleKey, bundle: .pulse)
+            Spacer(minLength: 0)
         }
-        // Force the title-and-icon presentation. Without this
-        // SwiftUI's macOS sidebar `List` style sometimes resolves
-        // to an icon-only render (observed in dogfood A61: the
-        // sidebar showed coral SF Symbols with no text next to
-        // them). `.titleAndIcon` makes the row contract explicit
-        // so the label always carries its caption.
-        .labelStyle(.titleAndIcon)
+        .contentShape(Rectangle())
         .tag(section)
     }
 
@@ -4073,18 +4075,18 @@ private struct MouseTrajectoryTile: View {
     /// than a near-invisible mosaic on a display the user only
     /// briefly visited.
     private var sparsePlaceholder: some View {
-        // The sparse caption sits on top of the dark
-        // `displaySurface` plate, so its colour can't ride
-        // `.secondary` (which is too dark on the dark plate
-        // even in light mode). A muted warm-white at 60% alpha
-        // reads on both light/dark system appearances.
+        // Sits on top of the `displaySurface` plate which is
+        // light cream in light mode and near-black in dark
+        // mode — `.secondary` adapts correctly to both, no
+        // need for the hard-coded `Color.white` we used pre-A63
+        // when the plate was always dark.
         VStack(spacing: 4) {
             Image(systemName: "scribble")
                 .font(.title3)
-                .foregroundStyle(Color.white.opacity(0.45))
+                .foregroundStyle(.secondary)
             Text("Limited movement on this display yet.", bundle: .pulse)
                 .font(.caption)
-                .foregroundStyle(Color.white.opacity(0.60))
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 12)
         }
@@ -4157,21 +4159,23 @@ struct MouseTrailMosaic: View {
     }
 
     /// Build a `cellsX × cellsY` premultiplied-RGBA `CGImage` whose
-    /// pixels encode a warm `amber → coral → halo` ramp keyed by
-    /// the log-normalised hit count. One pixel per mosaic cell —
-    /// the upscale to tile size happens in the GPU during display.
+    /// pixels encode a `coral → dark-wine` ramp keyed by the
+    /// log-normalised hit count. One pixel per mosaic cell — the
+    /// upscale to tile size happens in the GPU during display.
     ///
     /// Ramp history (kept for context — every change shipped in
     /// response to dogfood):
     ///   - A55: single coral, alpha-curved
     ///   - A57: sage → amber → coral
     ///   - A60: + near-white halo at peak
-    ///   - A61: back to single coral, transparent floor (the
-    ///     "Strava signature" minimum)
-    ///   - A62: warm sunset `amber → coral → halo` (current).
-    ///     Drops sage so the figure stays warm (no green murk),
-    ///     keeps the halo so peaks pop, keeps the transparent
-    ///     floor so low cells fade into the dark plate.
+    ///   - A61: back to single coral, transparent floor
+    ///   - A62: warm sunset `amber → coral → halo`
+    ///   - A63: `coral → dark-wine` (current). Inverts the
+    ///     "peak = lightest" reading the halo had imposed, so
+    ///     hot cells read as the darkest patches against the new
+    ///     light cream plate (`PulseDesign.displaySurface`) —
+    ///     "more usage = darker colour", the natural analytics-
+    ///     heatmap convention.
     nonisolated static func render(
         histogram: MouseDisplayHistogram,
         cellsX: Int,
@@ -4195,18 +4199,20 @@ struct MouseTrailMosaic: View {
         guard peak > 0 else { return nil }
         let peakLog = log1p(Double(peak))
 
-        // A62: warm sunset ramp — amber → coral → near-white
-        // halo — sampled by linear interpolation against the
-        // gamma-curved intensity. Three stops only (no sage),
-        // so the figure stays warm (no green murk) but is
-        // visibly multi-hued ("颜色搞得好看一些"). Floor is
-        // alpha 0: low cells fully transparent against the
-        // dark plate. The amber→coral→halo progression matches
-        // the rest of the design system's warm palette.
+        // A63: light-coral → dark-wine ramp. Inverted vs. the
+        // A60–A62 "→ near-white halo" ramps after dogfood
+        // feedback: "难道不是用的越多越深色吗" — the natural
+        // analytics-heatmap intuition is *more usage = darker
+        // colour*, but the halo at peak made hot cells the
+        // **lightest** point on the figure. Now mid-density
+        // cells are a clean coral and peaks lerp toward a
+        // deep wine red. Combined with the new light cream
+        // plate from `PulseDesign.displaySurface`, peak cells
+        // read as "where the cursor parked" because they're
+        // the darkest patches on a warm plate.
         let stops: [(r: Double, g: Double, b: Double)] = [
-            (0.898, 0.631, 0.290),  // amber 0xE5A14A (low)
-            (0.961, 0.396, 0.396),  // coral 0xF56565 (mid/high)
-            (1.000, 0.870, 0.780)   // near-white halo (peak)
+            (0.961, 0.396, 0.396),  // coral 0xF56565 (low/mid)
+            (0.55, 0.15, 0.15)      // dark wine 0x8C2626 (peak)
         ]
         let pixelCount = cellsX * cellsY
         var pixels = [UInt8](repeating: 0, count: pixelCount * 4)

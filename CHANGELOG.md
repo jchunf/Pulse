@@ -12,6 +12,32 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### A63 — Heatmap "more = darker" + sidebar labels (take 2)
+
+Three follow-ups from A62 dogfood.
+
+- **Heatmap inverted to "more = darker".** "难道不是用的越多越深色
+  吗 / 背景不然改成浅色" — A62's amber→coral→halo ramp put the
+  near-white halo at peak, which made hot cells the **lightest**
+  point on the figure — opposite of the natural analytics-
+  heatmap intuition. Inverted in three coordinated changes:
+  1. `PulseDesign.displaySurface` light-mode colour flipped from
+     near-black `0x1A1316` → warm cream `0xF6EDDF`. Dark mode
+     keeps the near-black.
+  2. Ramp dropped from 3 stops (amber → coral → halo) to 2
+     stops: **coral → dark-wine** (`0xF56565 → 0x8C2626`). Hot
+     cells now read as the darkest patches against the cream
+     plate.
+  3. Sparse-display placeholder caption switched from a
+     hard-coded `Color.white.opacity(...)` to `.secondary` so
+     the caption adapts to whichever side of the new
+     light/dark plate is showing.
+- **Sidebar labels (take 2).** A62's `.labelStyle(.titleAndIcon)`
+  didn't help — macOS sidebar `List` style was still rendering
+  rows icon-only. Replaced `Label` with a hand-rolled
+  `HStack(Image, Text)` so the title-icon contract is no longer
+  delegated to SwiftUI's macOS-sidebar style resolution.
+
 ### A62 — Heatmap ramp + sidebar labels
 
 Two follow-ups from the A61 dogfood pass.

@@ -72,16 +72,18 @@ public enum PulseDesign {
         ).opacity(opacity)
     }
 
-    /// "Display surface" — the Strava-personal-heatmap dark plate used
-    /// behind the F-04 mouse-trail bitmap so quiet regions fade into
-    /// dark and peaks lift through coral toward a near-white halo.
-    /// Roughly the same colour in light and dark mode (a near-black
-    /// with a faint warm bias) because the bitmap is the figure here
-    /// and the plate is intentionally muted; matching it to the
-    /// surrounding card surface would defeat the "this is a screen"
-    /// silhouette the visualisation depends on.
+    /// "Display surface" — the warm-paper plate behind the F-04
+    /// mouse-heatmap bitmap. A63: light mode flipped from
+    /// near-black to near-cream (`0xF6EDDF`) so high-density
+    /// cells render as **dark** coral and read as "more = darker"
+    /// against the plate — the convention every analytics-
+    /// heatmap product uses. Dark mode keeps a near-black warm
+    /// plate (`0x0E0B0E`) so the figure still pops on a dark
+    /// dashboard; the ramp's "darker = more" intuition flips for
+    /// dark-mode users (saturation does the work instead of
+    /// brightness).
     public static let displaySurface = Color.dynamic(
-        light: 0x1A1316,
+        light: 0xF6EDDF,
         dark:  0x0E0B0E
     )
 
