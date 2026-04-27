@@ -12,6 +12,33 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Dashboard polish (post-A59 sidebar)
+
+- **A60** Three follow-ups from the A59 sidebar dogfood pass:
+  1. **Heatmap contrast.** The 3-stop sage→amber→coral ramp from
+     A57 read as a flat orange wash on busy displays
+     ("还是很丑 区分度可以再大一些"). Added a 4th near-white halo
+     stop at the very top of the ramp so peaks lift visibly out of
+     the coral background. Dropped the alpha floor 0.30 → 0.15 so
+     single-hit cells fade most of the way to the dark plate
+     instead of carpeting the tile in faint sage. Added a
+     gamma-1.4 power curve on the `log1p`-normalised intensity
+     before ramp lookup — pushes quiet cells toward the floor and
+     peaks toward the ceiling.
+  2. **Sidebar empty-feel.** Grouped the 5 entries into 3
+     `Section`s (Today / Rhythm-Focus-Apps / Health) for the
+     Mail / System Settings idiom, and pinned a footer to the
+     bottom of the sidebar showing "Pulse <version> · Updated 2 m
+     ago" with a subtle heartbeat-pulsing icon. The column no
+     longer reads as a flat list with empty space below it.
+  3. **Click lag.** Added `transaction.disablesAnimations = true`
+     keyed on `selection` so the LazyVStack swap on sidebar click
+     doesn't try to crossfade the new section's cards over the old
+     ("点开侧边栏的时候会卡顿一下"). Swap is now instant.
+  4. Sidebar column min/ideal/max bumped 180/200/240 → 200/220/260
+     so the "Updated …" row in the footer doesn't truncate at
+     ideal width; window minimum bumped 1020 → 1040 to match.
+
 ### Dashboard structure
 
 - **A59** Dashboard restructured around `NavigationSplitView`. The

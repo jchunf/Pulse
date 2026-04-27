@@ -1365,16 +1365,8 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(Section.allCases, selection: $selection) { section in
-                Label {
-                    Text(section.titleKey, bundle: .pulse)
-                } icon: {
-                    Image(systemName: section.systemImage)
-                        .foregroundStyle(PulseDesign.coral)
-                }
-                .tag(section)
-            }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 240)
+            sidebar
+                .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 260)
         } detail: {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: PulseDesign.cardSpacing) {
@@ -1383,8 +1375,17 @@ struct DashboardView: View {
                 .padding(28)
             }
             .background(PulseDesign.surface)
+            // Skip the implicit content-swap animation when the
+            // sidebar selection changes. Without this the LazyVStack
+            // tries to crossfade the new section's cards over the
+            // old, which adds a perceptible "卡顿" on click — even
+            // though the actual mount work is fast. With the
+            // animation disabled the swap is instant.
+            .transaction(value: selection) { transaction in
+                transaction.disablesAnimations = true
+            }
         }
-        .frame(minWidth: 1020, minHeight: 600)
+        .frame(minWidth: 1040, minHeight: 600)
         .onAppear { model.startPolling() }
         .onDisappear { model.stopPolling() }
         .onReceive(
@@ -1410,6 +1411,80 @@ struct DashboardView: View {
             }
         }
     }
+
+    /// Sidebar layout — three Sections with a small footer pinned
+    /// to the bottom. Sections give the 5 entries semantic
+    /// grouping (the Mail / System Settings idiom) so the sidebar
+    /// reads as deliberate structure rather than a flat list with
+    /// empty space below it. The footer ("Pulse 1.2.0 · 2 m ago")
+    /// fills the bottom of the column with low-contrast meta-info
+    /// instead of leaving it visually empty.
+    private var sidebar: some View {
+        List(selection: $selection) {
+            sidebarLabel(.today)
+            SwiftUI.Section {
+                sidebarLabel(.rhythm)
+                sidebarLabel(.focus)
+                sidebarLabel(.apps)
+            }
+            SwiftUI.Section {
+                sidebarLabel(.health)
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            sidebarFooter
+        }
+    }
+
+    private func sidebarLabel(_ section: Section) -> some View {
+        Label {
+            Text(section.titleKey, bundle: .pulse)
+        } icon: {
+            Image(systemName: section.systemImage)
+                .foregroundStyle(PulseDesign.coral)
+        }
+        .tag(section)
+    }
+
+    /// Sidebar footer pinned to the bottom of the column. Shows
+    /// the heartbeat icon + the app version + the relative
+    /// last-refresh timestamp. Low-contrast type so it sits
+    /// behind the section list visually but fills the column.
+    private var sidebarFooter: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "heart.fill")
+                .font(.caption2)
+                .foregroundStyle(PulseDesign.coral.opacity(0.7))
+                .pulseHeartbeat(active: true, amplitude: .menuBar)
+            VStack(alignment: .leading, spacing: 1) {
+                // Brand + version is purely English/numeric — no
+                // localization lookup needed; `Text(verbatim:)`
+                // skips the catalog and avoids a missing-key
+                // fallback path.
+                Text(verbatim: "Pulse \(Self.appVersion)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                if let last = model.lastRefreshAt {
+                    Text("Updated \(PulseFormat.ago(from: last, to: Date()))", bundle: .pulse)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial)
+    }
+
+    private static let appVersion: String = {
+        let bundle = Bundle.main
+        let short = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        return short ?? "dev"
+    }()
 
     /// Body of the detail pane for the currently-selected sidebar
     /// section. The early-return on `model.summary == nil` mirrors
@@ -4071,32 +4146,45 @@ struct MouseTrailMosaic: View {
         guard peak > 0 else { return nil }
         let peakLog = log1p(Double(peak))
 
-        // Three-stop ramp: sage (cool, low density) → amber (mid)
-        // → coral (hot, high density). RGB values match the
+        // Four-stop ramp: sage (cool, low) → amber (mid) → coral
+        // (hot) → near-white halo (peak). RGB values match the
         // light-mode hexes used by `PulseDesign` so the heatmap
         // reads in the same visual language as the rest of the
         // app. Premultiplied below — required by the bitmap-info
         // flag in the CGImage step.
+        //
+        // A60: added the 4th near-white stop after the previous
+        // 3-stop ramp read as a flat orange wash on busy
+        // displays ("还是很丑 区分度可以再大一些"). With the
+        // halo stop at the very top, peaks now lift visibly out
+        // of the coral background — clearly "this is where the
+        // cursor parked".
         let stops: [(r: Double, g: Double, b: Double)] = [
-            (0.525, 0.764, 0.627),  // sage  0x86C3A0
-            (0.898, 0.631, 0.290),  // amber 0xE5A14A
-            (0.961, 0.396, 0.396)   // coral 0xF56565
+            (0.525, 0.764, 0.627),  // sage  0x86C3A0 (cool, low)
+            (0.898, 0.631, 0.290),  // amber 0xE5A14A (mid)
+            (0.961, 0.396, 0.396),  // coral 0xF56565 (hot)
+            (1.000, 0.870, 0.780)   // near-white halo (peak)
         ]
         let pixelCount = cellsX * cellsY
         var pixels = [UInt8](repeating: 0, count: pixelCount * 4)
         for i in 0..<pixelCount {
             let count = matrix[i]
             guard count > 0 else { continue }
-            let intensity = log1p(Double(count)) / peakLog
-            // Floor of 0.30 so even a single-hit cell is visible
-            // against the dark plate; cap of 1.00 lets hot spots
-            // ride the full coral. Higher floor than the previous
-            // single-hue path because sage at 0.20 alpha read as
-            // grey-green murk against the dark plate.
-            let alpha = 0.30 + intensity * 0.70
+            let raw = log1p(Double(count)) / peakLog
+            // Gamma > 1 pushes quiet cells toward the floor and
+            // peaks toward the ceiling — the simplest way to
+            // amplify ramp distinction without changing the
+            // colour stops. 1.4 felt right against the busy-
+            // dogfood histograms ("区分度可以再大一些").
+            let intensity = pow(max(0.0, min(1.0, raw)), 1.4)
+            // Floor 0.15 (down from 0.30) so single-hit cells
+            // fade most of the way to the dark plate instead
+            // of carpeting the tile in faint sage. Cap stays
+            // at 1.00 so peaks ride the full near-white halo.
+            let alpha = 0.15 + intensity * 0.85
 
             // Sample the ramp by linear interpolation between
-            // adjacent stops at `intensity * (count - 1)`.
+            // adjacent stops at `intensity * (stops.count - 1)`.
             let scaled = intensity * Double(stops.count - 1)
             let lower = Int(scaled.rounded(.down))
             let upper = min(lower + 1, stops.count - 1)
