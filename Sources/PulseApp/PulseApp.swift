@@ -1316,118 +1316,75 @@ struct DashboardView: View {
     @ObservedObject var healthModel: HealthModel
     @ObservedObject var crashBeacon: CrashBeacon
 
-    var body: some View {
-        ScrollView {
-            // `LazyVStack` instead of `VStack` so off-screen cards
-            // don't render or composite during scroll. The Dashboard
-            // has ~ 20 cards including six charts (week trend, hourly
-            // heatmap, focus donut, app ranking, keyboard heatmap,
-            // mouse heatmap); with an eager `VStack` every one of
-            // them was being laid out + composited on every scroll
-            // frame, and the 5-second poll was re-rendering all of
-            // them at once. Lazy materialisation drops the cost of
-            // a scroll frame to whatever fits in the viewport.
-            // Cards with `.task(id:)` re-fire when scrolled back
-            // into view; for the mouse-heatmap tile that's a 640-
-            // byte CGImage rebuild — microseconds, fine.
-            LazyVStack(alignment: .leading, spacing: PulseDesign.cardSpacing) {
-                header
-                DashboardPermissionBanner(permissions: healthModel.snapshot.permissions)
-                if crashBeacon.crashedLastSession {
-                    CrashBeaconBanner(beacon: crashBeacon)
-                }
-                if let lifetime = model.recentLifetimeAchievement {
-                    LifetimeMilestoneBanner(
-                        achievement: lifetime,
-                        onDismiss: { model.dismissLifetimeAchievement() }
-                    )
-                }
-                if let achievement = model.recentAchievement {
-                    MilestoneAchievementBanner(
-                        achievement: achievement,
-                        onDismiss: { model.dismissAchievement() }
-                    )
-                }
-                if let summary = model.summary {
-                    // ── Section 1 — Today's pulse (above the fold) ──
-                    // Goals first when intent is set, then the hero
-                    // mileage on the left + 6 summary tiles on the
-                    // right. Together this is the "30-second glance".
-                    if !model.goalProgress.isEmpty {
-                        GoalsCard(progress: model.goalProgress)
-                    }
-                    todayPulseSection(summary: summary)
+    /// Sidebar selection. Persists for the lifetime of the
+    /// window — switching sections does not change the polling
+    /// cadence or the data model. `today` is the default so a
+    /// just-launched window always opens to the "30-second
+    /// glance" (hero mileage + summary tiles + insights).
+    @State private var selection: Section = .today
 
-                    // ── Section 1b — Insights (A27) ──
-                    // Rendered inline only when a rule actually fired;
-                    // an "everything is normal" tile would add noise
-                    // for no payoff.
-                    if !model.insights.isEmpty {
-                        InsightsCard(insights: model.insights)
-                    }
+    /// Sidebar sections. Mirrors the section grouping the prior
+    /// flat-scroll layout used (`DashboardSectionHeader`) but
+    /// each one is now its own pane in `NavigationSplitView`.
+    /// Apple's macOS apps with this much content (System
+    /// Settings, Mail, Notes, Music, News, Stocks, Reminders,
+    /// Health, Fitness) all use this idiom — sidebar of
+    /// categories on the left, focused content pane on the
+    /// right.
+    enum Section: String, CaseIterable, Hashable, Identifiable {
+        case today, rhythm, focus, apps, health
 
-                    // ── Section 2 — Rhythm (trends across the week) ──
-                    DashboardSectionHeader(titleKey: "Rhythm")
-                    WeekTrendChart(points: model.trendPoints)
-                    WeekHourlyHeatmap(cells: model.heatmapCells, days: model.heatmapDays)
-                    if let comparison = model.weekOverWeek {
-                        WeekOverWeekCard(comparison: comparison)
-                    }
-                    ContinuityCard(streak: model.continuity)
-                    if model.lidOpensTrend.contains(where: { $0 > 0 }) {
-                        LidCard(
-                            todayOpens: model.lidOpensToday,
-                            trend: model.lidOpensTrend
-                        )
-                    }
+        var id: String { rawValue }
 
-                    // ── Section 3 — Focus (depth + sessions) ──
-                    DashboardSectionHeader(titleKey: "Focus")
-                    HStack(alignment: .top, spacing: PulseDesign.cardSpacing) {
-                        DeepFocusCard(segment: model.longestFocus)
-                            .frame(maxWidth: .infinity)
-                        UsagePostureCard(posture: model.sessionPosture)
-                            .frame(maxWidth: .infinity)
-                    }
-                    if model.focusDonut.totalSeconds > 0 {
-                        FocusDonutCard(donut: model.focusDonut)
-                    }
-                    KeyboardPeakCard(peak: model.keyPressPeak)
-                    RestCard(rest: model.restToday)
-                    if model.passiveToday.totalSeconds > 0 {
-                        PassiveConsumptionCard(passive: model.passiveToday)
-                    }
-
-                    // ── Section 4 — Apps ──
-                    DashboardSectionHeader(titleKey: "Apps")
-                    DayTimelineCard(timeline: model.timelineToday)
-                    AppRankingChart(rows: summary.topApps)
-                    if !model.shortcutsToday.isEmpty {
-                        ShortcutLeaderboardCard(rows: model.shortcutsToday)
-                    }
-                    KeyboardHeatmapCard(keyCodes: model.keyCodeDistribution)
-                    if !model.trajectoryTiles.isEmpty {
-                        MouseTrajectoryCard(tiles: model.trajectoryTiles)
-                    }
-
-                    // ── Section 5 — Health (diagnostics, kept last) ──
-                    DashboardSectionHeader(titleKey: "Health")
-                    DiagnosticsCard(snapshot: healthModel.snapshot)
-                } else if model.errorMessage != nil {
-                    Text(model.errorMessage ?? "")
-                        .foregroundStyle(PulseDesign.critical)
-                } else {
-                    ProgressView {
-                        Text("Loading today's data…", bundle: .pulse)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, 40)
-                }
+        var titleKey: LocalizedStringKey {
+            switch self {
+            case .today:  return "Today"
+            case .rhythm: return "Rhythm"
+            case .focus:  return "Focus"
+            case .apps:   return "Apps"
+            case .health: return "Health"
             }
-            .padding(28)
         }
-        .background(PulseDesign.surface)
-        .frame(minWidth: 820, minHeight: 540)
+
+        /// SF Symbol that anchors the sidebar row visually. Picked
+        /// to mirror each section's intent rather than each
+        /// section's data — `sun.max` for "today", `waveform.path`
+        /// for "rhythm" (the week's shape), `scope` for "focus",
+        /// `app.badge` for "apps", `stethoscope` for "health"
+        /// (collector diagnostics, not human health).
+        var systemImage: String {
+            switch self {
+            case .today:  return "sun.max"
+            case .rhythm: return "waveform.path"
+            case .focus:  return "scope"
+            case .apps:   return "app.badge"
+            case .health: return "stethoscope"
+            }
+        }
+    }
+
+    var body: some View {
+        NavigationSplitView {
+            List(Section.allCases, selection: $selection) { section in
+                Label {
+                    Text(section.titleKey, bundle: .pulse)
+                } icon: {
+                    Image(systemName: section.systemImage)
+                        .foregroundStyle(PulseDesign.coral)
+                }
+                .tag(section)
+            }
+            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 240)
+        } detail: {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: PulseDesign.cardSpacing) {
+                    detailContent
+                }
+                .padding(28)
+            }
+            .background(PulseDesign.surface)
+        }
+        .frame(minWidth: 1020, minHeight: 600)
         .onAppear { model.startPolling() }
         .onDisappear { model.stopPolling() }
         .onReceive(
@@ -1454,6 +1411,122 @@ struct DashboardView: View {
         }
     }
 
+    /// Body of the detail pane for the currently-selected sidebar
+    /// section. The early-return on `model.summary == nil` mirrors
+    /// the pre-A59 flat layout: until the first poll lands, every
+    /// section shows the same Loading / Error placeholder rather
+    /// than an empty pane.
+    @ViewBuilder
+    private var detailContent: some View {
+        if let summary = model.summary {
+            switch selection {
+            case .today:  todaySection(summary: summary)
+            case .rhythm: rhythmSection
+            case .focus:  focusSection
+            case .apps:   appsSection(summary: summary)
+            case .health: healthSection
+            }
+        } else if let error = model.errorMessage {
+            Text(error)
+                .foregroundStyle(PulseDesign.critical)
+        } else {
+            ProgressView {
+                Text("Loading today's data…", bundle: .pulse)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.top, 40)
+        }
+    }
+
+    // MARK: - Section bodies
+
+    /// "Today" — the 30-second glance. Above-the-fold banners
+    /// (permission, crash, milestone) live here because they're
+    /// "what does the user need to act on right now"; surfacing
+    /// them on Rhythm or Focus would make those panes noisier
+    /// without making the action any easier to find.
+    @ViewBuilder
+    private func todaySection(summary: TodaySummary) -> some View {
+        header
+        DashboardPermissionBanner(permissions: healthModel.snapshot.permissions)
+        if crashBeacon.crashedLastSession {
+            CrashBeaconBanner(beacon: crashBeacon)
+        }
+        if let lifetime = model.recentLifetimeAchievement {
+            LifetimeMilestoneBanner(
+                achievement: lifetime,
+                onDismiss: { model.dismissLifetimeAchievement() }
+            )
+        }
+        if let achievement = model.recentAchievement {
+            MilestoneAchievementBanner(
+                achievement: achievement,
+                onDismiss: { model.dismissAchievement() }
+            )
+        }
+        if !model.goalProgress.isEmpty {
+            GoalsCard(progress: model.goalProgress)
+        }
+        todayPulseSection(summary: summary)
+        if !model.insights.isEmpty {
+            InsightsCard(insights: model.insights)
+        }
+    }
+
+    @ViewBuilder
+    private var rhythmSection: some View {
+        WeekTrendChart(points: model.trendPoints)
+        WeekHourlyHeatmap(cells: model.heatmapCells, days: model.heatmapDays)
+        if let comparison = model.weekOverWeek {
+            WeekOverWeekCard(comparison: comparison)
+        }
+        ContinuityCard(streak: model.continuity)
+        if model.lidOpensTrend.contains(where: { $0 > 0 }) {
+            LidCard(
+                todayOpens: model.lidOpensToday,
+                trend: model.lidOpensTrend
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var focusSection: some View {
+        HStack(alignment: .top, spacing: PulseDesign.cardSpacing) {
+            DeepFocusCard(segment: model.longestFocus)
+                .frame(maxWidth: .infinity)
+            UsagePostureCard(posture: model.sessionPosture)
+                .frame(maxWidth: .infinity)
+        }
+        if model.focusDonut.totalSeconds > 0 {
+            FocusDonutCard(donut: model.focusDonut)
+        }
+        KeyboardPeakCard(peak: model.keyPressPeak)
+        RestCard(rest: model.restToday)
+        if model.passiveToday.totalSeconds > 0 {
+            PassiveConsumptionCard(passive: model.passiveToday)
+        }
+    }
+
+    @ViewBuilder
+    private func appsSection(summary: TodaySummary) -> some View {
+        DayTimelineCard(timeline: model.timelineToday)
+        AppRankingChart(rows: summary.topApps)
+        if !model.shortcutsToday.isEmpty {
+            ShortcutLeaderboardCard(rows: model.shortcutsToday)
+        }
+        KeyboardHeatmapCard(keyCodes: model.keyCodeDistribution)
+        if !model.trajectoryTiles.isEmpty {
+            MouseTrajectoryCard(tiles: model.trajectoryTiles)
+        }
+    }
+
+    @ViewBuilder
+    private var healthSection: some View {
+        DiagnosticsCard(snapshot: healthModel.snapshot)
+    }
+
+    // MARK: - Today pane subviews
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Today", bundle: .pulse)
@@ -1466,14 +1539,11 @@ struct DashboardView: View {
         }
     }
 
-    /// First section of the dashboard — the "30-second glance" the user
-    /// sees without scrolling. Mileage hero + landmark progress on the
-    /// left (the dramatic story); 6 summary tiles on the right (the
-    /// raw counters). At min window width (820pt) the two columns each
-    /// get ~390pt, comfortably fitting a 2-column tile grid on the right.
+    /// "Today's pulse" row — mileage hero on the left, summary
+    /// tiles on the right. Lives only inside `todaySection`; kept
+    /// as a helper because the HStack layout is non-trivial.
     @ViewBuilder
     private func todayPulseSection(summary: TodaySummary) -> some View {
-        DashboardSectionHeader(titleKey: "Today's pulse")
         HStack(alignment: .top, spacing: PulseDesign.cardSpacing) {
             VStack(alignment: .leading, spacing: PulseDesign.cardSpacing * 0.6) {
                 MileageHeroCard(distanceMillimeters: summary.totalMouseDistanceMillimeters)
