@@ -12,6 +12,37 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Dashboard structure
+
+- **A59** Dashboard restructured around `NavigationSplitView`. The
+  "20 cards in a single scroll" layout was the right starting
+  point but felt overwhelming once the v1.2 features had filled
+  it out ("一下子20个 card 不太好吧 还有其他好看的布局吗？苹果是
+  怎么做的"). Apple's macOS apps with this much content all use
+  the same idiom — sidebar of categories on the left, focused
+  content pane on the right (System Settings, Mail, Notes,
+  Music, News, Stocks, Reminders, Health on macOS, Fitness on
+  Mac). Pulse now does the same:
+  - Sidebar lists 5 sections — Today / Rhythm / Focus / Apps /
+    Health — each with an SF Symbol anchor (`sun.max`,
+    `waveform.path`, `scope`, `app.badge`, `stethoscope`).
+  - Each detail pane shows 1–8 cards, scrolls independently,
+    resets to the top when selected.
+  - Banners (permission, crash, milestone, lifetime
+    achievement) live on **Today** because they're "act on
+    this now" surfaces; cluttering Rhythm/Focus drill-downs
+    with them would make the layout noisier without making the
+    action any easier to find.
+  - Window minimum bumped from 820 × 540 → 1020 × 600 to
+    accommodate a 200pt sidebar plus the existing 820pt
+    content min.
+  - Toolbar refresh button + 5s polling lifecycle + activate-
+    notification refresh all unchanged — they wrap the whole
+    split view.
+  - `DashboardSectionHeader` is no longer used by `DashboardView`
+    (the sidebar is the new section header) but kept as a
+    type for now in case other windows pick it up later.
+
 ### Bug fixes (post-1.2.0 dogfood)
 
 - **A58** Dashboard scroll lag (broader fix) + heatmap density
