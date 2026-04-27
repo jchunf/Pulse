@@ -14,6 +14,27 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ### Bug fixes (post-1.2.0 dogfood)
 
+- **A58** Dashboard scroll lag (broader fix) + heatmap density
+  settle. Two things from the "改成32×20吧 45还是有点多，另外
+  为啥滑动有点卡" report:
+  1. Heatmap grid 40 × 25 → 32 × 20 — settles on the A54
+     baseline now that the multi-hue ramp from A57 does the
+     "more detail" reading the density bumps were trying (and
+     failing) to express.
+  2. Root-caused the broader Dashboard scroll lag (separate
+     from A55's heatmap-Canvas-redraw lag): `DashboardView`
+     was rendering ~ 20 cards in an eager `VStack` inside a
+     `ScrollView`. Every card stayed laid out + composited on
+     every scroll frame, and each 5-second poll was rebuilding
+     all of them at once. Switched the outer stack to
+     `LazyVStack` so off-screen cards don't render or composite
+     during scroll. Cards with `.task(id:)` re-fire when
+     scrolled back in; for the mouse-heatmap tile that's a
+     640-byte CGImage rebuild — microseconds, fine.
+  3. Wrapped the heatmap tile's ZStack (plate + image +
+     border) in `.drawingGroup()` so the three layers
+     composite as a single GPU texture during scroll.
+
 - **A57** F-04 mosaic palette + density rebalance — A56's 64 × 40
   mosaic with `.interpolation(.none)` read as visual noise once
   the bilinear smoothing was off ("有点太密 生理不适了"), and
