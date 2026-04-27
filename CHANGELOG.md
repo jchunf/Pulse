@@ -12,11 +12,18 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
-Final v1.1 slice — closes F-04 mouse trajectory visualisation, the
-last remaining row in the v1.1 queue from `docs/08-roadmap.md` §四.
-First v1.2 slice opens with F-17 — the scroll-mileage "里程表子指标"
-that has been waiting for a dramatic anchor since sec/min/hour
-`scroll_ticks` landed in B7.
+## [1.2.0] — 2026-04-27
+
+The "narrative loop" release — eight roadmap features from
+`docs/08-roadmap.md` §四 plus a long tail of A48–A55 dogfood polish
+on top of the v1.1 baseline. Headline: F-17 scroll mileage
+("里程表子指标") closes the dramatic anchor for sec/min/hour
+`scroll_ticks` from B7. Onboarding (F-23), F-04 mouse heatmap
+visualisation, in-app shortcut chord recognition (F-08 sequel),
+keystroke goal landmarks (F-26), and four supporting cards
+(F-27 / F-29 / F-31 / F-43) round out the release. Encrypted
+import/export (F-48) deferred per dogfood feedback — kept in the
+backlog. Full per-slice notes below.
 
 ### Bug fixes (v1.2 post-merge dogfood)
 
