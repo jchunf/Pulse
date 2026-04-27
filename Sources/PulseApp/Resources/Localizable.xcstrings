@@ -4803,7 +4803,7 @@
       }
     },
     "Mouse trails": {
-      "comment": "F-04 MouseTrajectoryCard — title of the density-heatmap card in the Apps section.",
+      "comment": "F-04 MouseTrajectoryCard — old card title (kept for backwards compatibility; superseded by `Mouse heatmap` after A54 user feedback that 'heatmap' is what this actually is).",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4815,6 +4815,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "鼠标轨迹"
+          }
+        }
+      }
+    },
+    "Mouse heatmap": {
+      "comment": "F-04 MouseTrajectoryCard — current card title. User feedback after A53 dogfood: '不应该叫鼠标轨迹 应该是一个什么热力图'.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mouse heatmap"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "鼠标热力图"
           }
         }
       }

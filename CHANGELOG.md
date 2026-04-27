@@ -80,19 +80,22 @@ that has been waiting for a dramatic anchor since sec/min/hour
   dithering, and the `.resizable().interpolation(.high)`
   pass on a 512² CGImage made the Dashboard scroll choppy on
   a multi-display setup. Replaced with a **16 × 10 mosaic**
-  drawn in a single SwiftUI `Canvas` + `.drawingGroup()`:
-  - Aggregates the 128² source histogram into ~160 chunky
-    cells. The mosaic reads as discrete "screen pixels" — at
-    the actual tile size, that's the highest resolution the
-    eye can resolve anyway.
-  - One `Canvas` fill per visible cell + a `.drawingGroup()`
-    rasterisation. No CGImage, no resample-on-scroll cost;
-    scroll lag gone.
-  - Same coral / dark-plate / coral-border palette from A52,
-    so the visual language is unchanged.
-  - `MouseDensityRenderer` stays in PulseCore for any future
-    consumer (e.g. weekly PDF) but the Dashboard tile no
-    longer touches it.
+  drawn in a single SwiftUI `Canvas` + `.drawingGroup()`.
+  Bumped to 32 × 20 in A54.
+- **A54** F-04 polish round 2 — two follow-ups from dogfood
+  feedback ("不应该叫鼠标轨迹 应该是一个什么热力图 / 还是太粗
+  能细节一点吗"):
+  1. Renamed the card from "Mouse trails / 鼠标轨迹" to
+     "Mouse heatmap / 鼠标热力图" — the visual is a heatmap,
+     not a trail. New xcstrings entry alongside the old one
+     so any cached UI tests stay green.
+  2. Bumped the mosaic from 16 × 10 → 32 × 20 (4× more cells)
+     and tightened the inter-cell gap from 1.5pt → 0.5pt +
+     corner radius 2pt → 1pt. Each cell is now ~ 11pt at
+     standard tile width — small enough to register as a
+     gradient surface, large enough that adjacent cells
+     blend cleanly into a single read. `.drawingGroup()`
+     keeps the larger draw count off the scroll path.
 - **A50** `MouseDensityRenderer` ramp + tile silhouette polish.
   The default ramp's first stop went from `alpha 0.0` (sage,
   fully transparent) to `alpha 0.30` (sage, faint floor) so
