@@ -3772,9 +3772,15 @@ private struct MouseTrajectoryTile: View {
     /// of the noisier "Display 1".
     let isOnlyTile: Bool
 
-    @State private var renderedImage: CGImage?
-
-    private static let renderer = MouseDensityRenderer()
+    /// Aggregation grid for the mosaic. 16 × 10 ≈ 16:10 display
+    /// aspect; on wider monitors the cells stretch horizontally,
+    /// which preserves the "screen pixels" reading without
+    /// fragmenting into noise. Earlier versions rendered a
+    /// 128 × 128 bitmap which at 320pt-wide tile size looked
+    /// like dithering noise rather than signal — see commit
+    /// message for the rationale.
+    private static let mosaicCellsX = 16
+    private static let mosaicCellsY = 10
 
     private var aspectRatio: CGFloat {
         if let snapshot = tile.snapshot, snapshot.heightPoints > 0 {
@@ -3801,10 +3807,9 @@ private struct MouseTrajectoryTile: View {
         )
     }
 
-    /// `true` when the histogram has so few hits that the rendered
-    /// hot-spots are pinpoint-sized and the tile reads as broken.
-    /// Below this we show the "limited movement" placeholder
-    /// instead.
+    /// `true` when the histogram has so few hits that the mosaic
+    /// reads as broken; below this we show the "limited movement"
+    /// placeholder instead.
     private static let sparseThreshold: Int64 = 200
 
     private var isSparse: Bool {
@@ -3824,55 +3829,32 @@ private struct MouseTrajectoryTile: View {
                     .foregroundStyle(.secondary)
             }
             ZStack {
-                // Strava-personal-heatmap style: a dark "display
-                // surface" plate behind a single-hue coral
-                // luminance bitmap. Modelled on the dataviz
-                // canon for "where did this thing live"
-                // (FlowingData house style, Strava personal
-                // heatmaps) rather than the thermal
-                // blue→red palette web-analytics products use —
-                // those only work because there's a screenshot
-                // underneath; without one, the rainbow has
-                // nothing to point at and the visual reads as a
-                // broken dashboard. See A52 commit message for
-                // the full research write-up.
                 RoundedRectangle(cornerRadius: 8)
                     .fill(PulseDesign.displaySurface)
                 if isSparse {
                     sparsePlaceholder
-                } else if let image = renderedImage {
-                    Image(decorative: image, scale: 1, orientation: .up)
-                        .resizable()
-                        .interpolation(.high)
+                } else {
+                    MouseTrailMosaic(
+                        histogram: tile.histogram,
+                        cellsX: Self.mosaicCellsX,
+                        cellsY: Self.mosaicCellsY
+                    )
+                    .padding(6)
                 }
-                // Faint coral border so the tile reads as a
-                // screen silhouette regardless of how lit the
-                // bitmap is.
+                // Faint coral border so the tile reads as a screen
+                // silhouette even when the mosaic is mostly dim.
                 RoundedRectangle(cornerRadius: 8)
                     .strokeBorder(PulseDesign.coral.opacity(0.22), lineWidth: 1)
             }
-            // Size the tile to the display's real aspect, capped at a
-            // fixed max height so the Dashboard card doesn't balloon
-            // vertically when the user has a wide display + a tall
-            // Dashboard window. `.fit` + `maxHeight` combine to pick
-            // whichever dimension hits the cap first.
             .aspectRatio(aspectRatio, contentMode: .fit)
             .frame(maxWidth: .infinity, maxHeight: Self.maxTileHeight)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-        .task(id: tile.histogram) {
-            // `.task(id:)` runs the bitmap render in a child Task
-            // off the view-update critical path; the ~10–40 ms
-            // CGImage allocation therefore doesn't stall the
-            // DashboardModel refresh. Re-runs automatically
-            // whenever the histogram changes.
-            self.renderedImage = Self.renderer.render(tile.histogram)
         }
     }
 
     /// Centred caption shown inside the tile when
     /// `tile.histogram.totalCount < sparseThreshold`. Better signal
-    /// than a near-invisible heatmap on a display the user only
+    /// than a near-invisible mosaic on a display the user only
     /// briefly visited.
     private var sparsePlaceholder: some View {
         // The sparse caption sits on top of the dark
@@ -3897,6 +3879,90 @@ private struct MouseTrajectoryTile: View {
     /// whole card to scroll when the user has multiple displays
     /// stacked.
     private static let maxTileHeight: CGFloat = 220
+}
+
+/// F-04 — chunky-mosaic redesign of the mouse-trail tile.
+///
+/// Earlier versions rendered the 128 × 128 cell histogram as a
+/// 512×512 `CGImage` heatmap. Two real-world problems with that:
+///
+/// 1. **Visually noisy.** At 320pt-wide tile size, 16 384 cells of
+///    log-normalised density read as dithering, not signal — the
+///    user sees TV-static rather than "I parked here".
+/// 2. **Scroll lag.** `Image(decorative:).resizable().interpolation(.high)`
+///    re-resamples a 512² CGImage on every scroll-layout pass, and
+///    two displays stacked vertically were enough to make the
+///    Dashboard scroll choppy.
+///
+/// Fix: drop to a 16 × 10 mosaic (~ display aspect), draw it in a
+/// single SwiftUI `Canvas`. One draw call, GPU-flat, no CGImage
+/// resample. Aggregation is a single pass over the (already
+/// non-zero-filtered) cell list, so the per-frame cost is the
+/// `Canvas` fill itself.
+struct MouseTrailMosaic: View {
+
+    let histogram: MouseDisplayHistogram
+    let cellsX: Int
+    let cellsY: Int
+
+    /// Visible gap between cells. Reads as "screen pixels"; small
+    /// enough not to dominate even at the smallest tile size.
+    private static let gap: CGFloat = 1.5
+
+    var body: some View {
+        // Pre-aggregate once per render pass. Cheap — the source
+        // cell list is already stripped of zeros at the SQL layer.
+        let matrix = aggregate()
+        let peak = max(1, matrix.flatMap { $0 }.max() ?? 1)
+        let peakLog = log1p(Double(peak))
+        Canvas { ctx, size in
+            let cellWidth = size.width / CGFloat(cellsX)
+            let cellHeight = size.height / CGFloat(cellsY)
+            for y in 0..<cellsY {
+                for x in 0..<cellsX {
+                    let count = matrix[y][x]
+                    guard count > 0 else { continue }
+                    let intensity = peakLog > 0
+                        ? log1p(Double(count)) / peakLog
+                        : 0
+                    // Floor of 0.20 so even a single-hit cell is
+                    // visible against the dark plate; cap of 0.95
+                    // so the hot spot stays clearly coral rather
+                    // than washing to flat white.
+                    let alpha = 0.20 + intensity * 0.75
+                    let rect = CGRect(
+                        x: CGFloat(x) * cellWidth + Self.gap / 2,
+                        y: CGFloat(y) * cellHeight + Self.gap / 2,
+                        width: max(0, cellWidth - Self.gap),
+                        height: max(0, cellHeight - Self.gap)
+                    )
+                    ctx.fill(
+                        Path(roundedRect: rect, cornerRadius: 2),
+                        with: .color(PulseDesign.coral.opacity(alpha))
+                    )
+                }
+            }
+        }
+        .drawingGroup()  // Rasterise the Canvas once; cheap to scroll.
+    }
+
+    /// Fold the source 128 × 128 (gridSize × gridSize) histogram
+    /// into the mosaic's `cellsY × cellsX` matrix by integer-bin
+    /// truncation. O(non-zero cells) — usually a few hundred even
+    /// over a busy 7-day window.
+    private func aggregate() -> [[Int64]] {
+        var matrix = Array(
+            repeating: Array(repeating: Int64(0), count: cellsX),
+            count: cellsY
+        )
+        let src = max(1, histogram.gridSize)
+        for cell in histogram.cells where cell.count > 0 {
+            let mx = min(cellsX - 1, cell.binX * cellsX / src)
+            let my = min(cellsY - 1, cell.binY * cellsY / src)
+            matrix[my][mx] &+= cell.count
+        }
+        return matrix
+    }
 }
 
 /// F-08 — the "键盘热力图". Renders a US-QWERTY grid with per-key

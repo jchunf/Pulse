@@ -74,6 +74,25 @@ that has been waiting for a dramatic anchor since sec/min/hour
   Plus border opacity bumped from 0.18 → 0.22 to anchor the
   tile as a screen silhouette against the dark plate. Pure-
   SwiftUI hot-spots view from A51 deleted.
+- **A53** F-04 third redesign — A52's dark-Strava bitmap was
+  the right *idiom* but the wrong *resolution*: 16 384 cells
+  rendered into a 320pt-wide tile read as TV-static
+  dithering, and the `.resizable().interpolation(.high)`
+  pass on a 512² CGImage made the Dashboard scroll choppy on
+  a multi-display setup. Replaced with a **16 × 10 mosaic**
+  drawn in a single SwiftUI `Canvas` + `.drawingGroup()`:
+  - Aggregates the 128² source histogram into ~160 chunky
+    cells. The mosaic reads as discrete "screen pixels" — at
+    the actual tile size, that's the highest resolution the
+    eye can resolve anyway.
+  - One `Canvas` fill per visible cell + a `.drawingGroup()`
+    rasterisation. No CGImage, no resample-on-scroll cost;
+    scroll lag gone.
+  - Same coral / dark-plate / coral-border palette from A52,
+    so the visual language is unchanged.
+  - `MouseDensityRenderer` stays in PulseCore for any future
+    consumer (e.g. weekly PDF) but the Dashboard tile no
+    longer touches it.
 - **A50** `MouseDensityRenderer` ramp + tile silhouette polish.
   The default ramp's first stop went from `alpha 0.0` (sage,
   fully transparent) to `alpha 0.30` (sage, faint floor) so
