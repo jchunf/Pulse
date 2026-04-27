@@ -3775,14 +3775,18 @@ private struct MouseTrajectoryTile: View {
     /// Aggregation grid for the mosaic. 16 × 10 ≈ 16:10 display
     /// aspect; on wider monitors the cells stretch horizontally,
     /// which preserves the "screen pixels" reading without
-    /// fragmenting into noise. Bumped from 16 × 10 → 32 × 20 in
-    /// A54 after user feedback ("还是太粗") — at the larger tile
-    /// sizes 16 × 10 read as Lego-blocky; 32 × 20 keeps each cell
-    /// large enough to register as a discrete tile while letting
-    /// neighbour cells blend into a smoother gradient where
-    /// densities are continuous.
-    private static let mosaicCellsX = 32
-    private static let mosaicCellsY = 20
+    /// fragmenting into noise.
+    ///
+    /// Bumps:
+    ///   - A54: 16 × 10 → 32 × 20 ("还是太粗 能细节一点吗")
+    ///   - A56: 32 × 20 → 64 × 40 ("可以再密一些") plus the
+    ///     interpolation switch from `.medium` to `.none` so each
+    ///     cell renders as a discrete rectangle rather than a
+    ///     bilinear-blurred patch — restores the "quilted" reading
+    ///     A54's Canvas had, which got lost when A55's CGImage
+    ///     pipeline introduced bilinear filtering.
+    private static let mosaicCellsX = 64
+    private static let mosaicCellsY = 40
 
     private var aspectRatio: CGFloat {
         if let snapshot = tile.snapshot, snapshot.heightPoints > 0 {
@@ -3915,9 +3919,16 @@ struct MouseTrailMosaic: View {
     var body: some View {
         Group {
             if let image {
+                // `.interpolation(.none)` — nearest-neighbor sampling
+                // so each source pixel renders as a flat coloured
+                // rectangle. Restores the "quilted" reading A54's
+                // Canvas had: clearly-bounded cells, no bilinear
+                // smudging into a continuous gradient. Switched from
+                // `.medium` in A56 after user feedback ("热力图咋还
+                // 变回去了 我感觉之前的32×20的挺好的呢").
                 Image(decorative: image, scale: 1.0)
                     .resizable()
-                    .interpolation(.medium)
+                    .interpolation(.none)
             } else {
                 // No image yet (first render or empty cells) —
                 // the dark plate from the parent shows through.
