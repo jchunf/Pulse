@@ -3780,13 +3780,17 @@ private struct MouseTrajectoryTile: View {
     /// Bumps:
     ///   - A54: 16 × 10 → 32 × 20 ("还是太粗 能细节一点吗")
     ///   - A56: 32 × 20 → 64 × 40 ("可以再密一些") plus the
-    ///     interpolation switch from `.medium` to `.none` so each
-    ///     cell renders as a discrete rectangle rather than a
-    ///     bilinear-blurred patch — restores the "quilted" reading
-    ///     A54's Canvas had, which got lost when A55's CGImage
-    ///     pipeline introduced bilinear filtering.
-    private static let mosaicCellsX = 64
-    private static let mosaicCellsY = 40
+    ///     interpolation switch from `.medium` to `.none`.
+    ///   - A57: 64 × 40 → 40 × 25 ("有点太密 生理不适了") —
+    ///     A56's 64 × 40 read as visual noise/static once the
+    ///     bilinear smoothing was off; 40 × 25 is the middle
+    ///     ground that keeps each cell large enough to register
+    ///     as a discrete tile (~ 8.8pt at standard tile width)
+    ///     while still being noticeably finer than the A54
+    ///     baseline. Multi-hue ramp introduced in the same
+    ///     slice — see `MouseTrailMosaic.render`.
+    private static let mosaicCellsX = 40
+    private static let mosaicCellsY = 25
 
     private var aspectRatio: CGFloat {
         if let snapshot = tile.snapshot, snapshot.heightPoints > 0 {
@@ -3947,9 +3951,17 @@ struct MouseTrailMosaic: View {
     }
 
     /// Build a `cellsX × cellsY` premultiplied-RGBA `CGImage` whose
-    /// pixels encode coral with a per-cell alpha derived from the
-    /// log-normalised hit count. One pixel per mosaic cell — the
-    /// upscale to tile size happens in the GPU during display.
+    /// pixels encode a sage → amber → coral ramp keyed by the
+    /// log-normalised hit count. One pixel per mosaic cell —
+    /// the upscale to tile size happens in the GPU during display.
+    ///
+    /// A57 introduced the multi-hue ramp after the previous
+    /// single-coral palette read as flat ("可以用不同颜色"). The
+    /// three stops mirror `PulseDesign.sage` / `.amber` / `.coral`
+    /// so the heatmap reads in the same visual language as the
+    /// rest of the Dashboard — calm sage where the cursor barely
+    /// visited, amber on regular work surfaces, coral on the
+    /// regions the cursor parked in.
     nonisolated static func render(
         histogram: MouseDisplayHistogram,
         cellsX: Int,
@@ -3973,25 +3985,46 @@ struct MouseTrailMosaic: View {
         guard peak > 0 else { return nil }
         let peakLog = log1p(Double(peak))
 
-        // Premultiplied coral RGBA — sRGB (0xF56565 ≈ 245,101,101).
-        // Premultiplying by alpha is required by the bitmap-info
-        // flag below; without it CoreGraphics will reject the
-        // image or render it with halos at low alpha.
-        let rBase = 0.961, gBase = 0.396, bBase = 0.396
+        // Three-stop ramp: sage (cool, low density) → amber (mid)
+        // → coral (hot, high density). RGB values match the
+        // light-mode hexes used by `PulseDesign` so the heatmap
+        // reads in the same visual language as the rest of the
+        // app. Premultiplied below — required by the bitmap-info
+        // flag in the CGImage step.
+        let stops: [(r: Double, g: Double, b: Double)] = [
+            (0.525, 0.764, 0.627),  // sage  0x86C3A0
+            (0.898, 0.631, 0.290),  // amber 0xE5A14A
+            (0.961, 0.396, 0.396)   // coral 0xF56565
+        ]
         let pixelCount = cellsX * cellsY
         var pixels = [UInt8](repeating: 0, count: pixelCount * 4)
         for i in 0..<pixelCount {
             let count = matrix[i]
             guard count > 0 else { continue }
             let intensity = log1p(Double(count)) / peakLog
-            // Floor of 0.20 so even a single-hit cell is visible
-            // against the dark plate; cap of 0.95 keeps hot spots
-            // clearly coral rather than washing to flat white.
-            let alpha = 0.20 + intensity * 0.75
+            // Floor of 0.30 so even a single-hit cell is visible
+            // against the dark plate; cap of 1.00 lets hot spots
+            // ride the full coral. Higher floor than the previous
+            // single-hue path because sage at 0.20 alpha read as
+            // grey-green murk against the dark plate.
+            let alpha = 0.30 + intensity * 0.70
+
+            // Sample the ramp by linear interpolation between
+            // adjacent stops at `intensity * (count - 1)`.
+            let scaled = intensity * Double(stops.count - 1)
+            let lower = Int(scaled.rounded(.down))
+            let upper = min(lower + 1, stops.count - 1)
+            let t = scaled - Double(lower)
+            let a = stops[lower]
+            let b = stops[upper]
+            let r = a.r + (b.r - a.r) * t
+            let g = a.g + (b.g - a.g) * t
+            let bC = a.b + (b.b - a.b) * t
+
             let off = i * 4
-            pixels[off]     = UInt8((rBase * alpha * 255).rounded())
-            pixels[off + 1] = UInt8((gBase * alpha * 255).rounded())
-            pixels[off + 2] = UInt8((bBase * alpha * 255).rounded())
+            pixels[off]     = UInt8((r  * alpha * 255).rounded())
+            pixels[off + 1] = UInt8((g  * alpha * 255).rounded())
+            pixels[off + 2] = UInt8((bC * alpha * 255).rounded())
             pixels[off + 3] = UInt8((alpha * 255).rounded())
         }
 

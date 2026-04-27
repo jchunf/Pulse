@@ -14,6 +14,23 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ### Bug fixes (post-1.2.0 dogfood)
 
+- **A57** F-04 mosaic palette + density rebalance — A56's 64 × 40
+  mosaic with `.interpolation(.none)` read as visual noise once
+  the bilinear smoothing was off ("有点太密 生理不适了"), and
+  the single-hue coral ramp had been carrying the visual on its
+  own ("可以用不同颜色"). Two changes:
+  1. Grid 64 × 40 → 40 × 25 — middle ground between A54's
+     32 × 20 baseline and A56's overshoot. Each cell ~ 8.8pt
+     at standard tile width: discrete enough to register as a
+     tile, fine enough to read as detail rather than chunk.
+  2. New three-stop ramp `sage → amber → coral` (matches
+     `PulseDesign.sage / .amber / .coral`). Cool-to-warm reading
+     for "regions you barely visited / regular work surface /
+     where the cursor parked", sampled by linear interpolation
+     against the `log1p`-normalised intensity. Alpha floor
+     bumped from 0.20 → 0.30 so single-hit sage cells don't
+     read as grey-green murk against the dark plate.
+
 - **A56** F-04 mosaic density + crispness — A55's CGImage
   pipeline shipped with `.interpolation(.medium)`, which gave
   the heatmap a bilinear-smoothed gradient look that lost the
