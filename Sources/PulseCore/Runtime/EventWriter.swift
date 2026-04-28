@@ -195,6 +195,8 @@ public actor EventWriter {
             return .systemEvent(tsMillis: ts, category: "focus_on", payload: modeName)
         case .focusExited:
             return .systemEvent(tsMillis: ts, category: "focus_off", payload: nil)
+        case .clipboardChanged:
+            return .systemEvent(tsMillis: ts, category: "clipboard_change", payload: nil)
         }
     }
 

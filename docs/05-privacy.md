@@ -56,11 +56,16 @@
 - **即使开了明文也支持"敏感关键词遮罩"**：用户配置的关键词（例如"离职"、"薪资"、"医院"）命中时，那条记录的标题改用掩码 `[REDACTED]`
 - **推荐预设遮罩规则**：邮件主题前缀（"Re:", "Fwd:"）、某些特定 App（Messages、WhatsApp、Signal、1Password）**强制**仅存 App 名不存标题
 
-### 4.3 剪贴板
+### 4.3 剪贴板（F-32）
 
+- **实现**（v1.5.0 / F-32）：`ClipboardObserver` 每 2 秒读一次
+  `NSPasteboard.general.changeCount`，发现递增就 emit 一次
+  `.clipboardChanged` 事件
 - **只读 `NSPasteboard.changeCount` 的增量** —— 这个数字递增表示剪贴板被写入过
 - **绝不调用** `readString`、`readData` 或任何读取 pasteboard 内容的 API
 - **代码防护**：整个代码库禁止 import `NSPasteboard` 的内容读取路径，lint 规则强制
+- **存储**：`system_events` 中 `clipboard_change` 类别 row，无 payload。
+  Dashboard 读侧 count 出"今日剪贴板活动次数 + 24 小时分布"
 
 ### 4.4 网络与位置（默认关闭）
 
