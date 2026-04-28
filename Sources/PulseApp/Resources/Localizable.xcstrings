@@ -5146,6 +5146,24 @@
         }
       }
     },
+    "Typing tempo · last hour": {
+      "comment": "F-19 KeyboardRhythmCard — card title.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Typing tempo · last hour" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打字节奏 · 最近一小时" } }
+      }
+    },
+    "Avg %1$.0f KPM · peak %2$lld KPM": {
+      "comment": "F-19 KeyboardRhythmCard — subtitle. %1$.0f is average KPM across active minutes, %2$lld is peak KPM.",
+      "localizations": {
+        "en": {
+          "stringUnit": { "state": "translated", "value": "Avg %1$.0f KPM · peak %2$lld KPM" }
+        },
+        "zh-Hans": {
+          "stringUnit": { "state": "translated", "value": "均速 %1$.0f KPM · 峰值 %2$lld KPM" }
+        }
+      }
+    },
     "%1$@ clicks · last %2$lld days": {
       "comment": "F-16 MouseTrajectoryCard — click-mode subtitle. %1$@ is the formatted click count, %2$lld is the user-selected window size in days.",
       "localizations": {

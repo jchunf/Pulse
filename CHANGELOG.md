@@ -12,6 +12,7 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+<<<<<<< HEAD
 ### F-42 — Activity weight curve (v2.0, zero-cost derivation)
 
 A 30-day daily active-hours line chart in the Rhythm pane. The
@@ -40,6 +41,36 @@ story no single-day card can.
   (zero-array), single-hour read-back, multi-hour summing,
   gaps-render-as-zero, windowing, and `idle_seconds > 3600`
   clamping.
+=======
+### F-19 — Typing-tempo sparkline (v2.1, zero-cost derivation)
+
+A 60-bar last-hour sparkline of presses-per-minute in the Input
+pane. The roadmap framed F-19 as inter-keystroke interval analysis,
+but `raw_key_events` is purged at rollup time so sub-second
+intervals don't survive past `rollRawToSecond`. The closest
+preserved signal — per-minute KPM — reads as a "rhythm" too, and
+it's pure derivation.
+
+- **Query** — new `EventStore.keyboardRhythm(endingAt:minutes:)` in
+  `KeyboardRhythmQueries.swift`. Pulls `(ts_minute, press_count)`
+  from `min_key` for the rolling 60-minute window; missing minutes
+  surface as zero so the sparkline shows actual gaps.
+- **Model** — `DashboardModel.keyboardRhythm: KeyboardRhythm`
+  (always 60 samples). Convenience aggregates: `peakKPM`,
+  `avgKPMActive` (averages active-only minutes — zeros don't drag
+  it down), `totalPresses`. Refresh path fetches alongside
+  chronotype + activity-weight.
+- **UI** — new `KeyboardRhythmCard` in the Input pane between
+  `KeyboardHeatmapCard` and `MouseTrajectoryCard`. Title + a
+  60-bar sparkline (each bar's alpha proportional to the minute's
+  share of the peak). Subtitle reads "Avg N KPM · peak M KPM".
+  Auto-hides when the rolling window has zero presses.
+- **xcstrings** — `Typing tempo · last hour` + `Avg %1$.0f KPM ·
+  peak %2$lld KPM` (en + zh-Hans).
+- **Tests** — `KeyboardRhythmQueriesTests` covers empty DB, 60-
+  element zero-array, populated minutes in chronological order,
+  peak tracking, active-only average, and windowing.
+>>>>>>> e347eed (feat(f-19): typing-tempo sparkline (last hour KPM curve))
 
 ### F-40 — Chronotype card (v2.1 pulled forward, zero-cost derivation)
 
