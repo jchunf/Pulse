@@ -112,25 +112,24 @@ struct AppTransitionsQueriesTests {
     @Test("limit caps the returned row count, ordered by count desc")
     func limitsApplied() throws {
         let (store, db) = try makeStore()
-        // Build five distinct pairs with descending counts.
-        // pair (a,b): 5x ; (a,c): 4x ; (a,d): 3x ; (a,e): 2x ; (a,f): 1x
-        let bases = ["b": 5, "c": 4, "d": 3, "e": 2, "f": 1]
+        // 5× alternating a/b → produces 5 a→b transitions and 4 b→a
+        // transitions. With limit=1 we should get just the top one.
         var ts = anchor
-        for (target, repeats) in bases.sorted(by: { $0.value > $1.value }) {
-            for _ in 0..<repeats {
-                try insertSwitch(into: db, ts: ts, bundle: "a")
-                ts = ts.addingTimeInterval(1)
-                try insertSwitch(into: db, ts: ts, bundle: target)
-                ts = ts.addingTimeInterval(1)
-            }
+        for _ in 0..<5 {
+            try insertSwitch(into: db, ts: ts, bundle: "a")
+            ts = ts.addingTimeInterval(1)
+            try insertSwitch(into: db, ts: ts, bundle: "b")
+            ts = ts.addingTimeInterval(1)
         }
 
         let result = try store.appTransitions(
             start: anchor.addingTimeInterval(-1),
             end: ts.addingTimeInterval(1),
-            limit: 3
+            limit: 1
         )
-        #expect(result.count == 3)
-        #expect(result.map(\.count) == [5, 4, 3])
+        #expect(result.count == 1)
+        #expect(result[0].fromBundle == "a")
+        #expect(result[0].toBundle == "b")
+        #expect(result[0].count == 5)
     }
 }

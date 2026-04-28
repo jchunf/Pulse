@@ -5059,7 +5059,11 @@ private struct SankeyNodeLabel: View {
 
 /// Geometric helpers for rendering the diagram. Stored as a value
 /// so the layout math is one read away when the Canvas runs.
-private struct SankeyFrame {
+/// `fileprivate` rather than `private` because `SankeyLayout.Ribbon`
+/// (internal) takes a `SankeyFrame` parameter — Swift access control
+/// requires the param type to be at least as accessible as the
+/// declaring entity.
+fileprivate struct SankeyFrame {
     let size: CGSize
     let labelGutter: CGFloat
     let nodeWidth: CGFloat
@@ -5113,8 +5117,9 @@ struct SankeyLayout: Equatable {
         /// Builds the ribbon path inside the supplied `SankeyFrame`.
         /// A horizontal cubic Bézier with mid-point control points;
         /// `thickness * canvasHeight` becomes the path's vertical
-        /// extent at each end.
-        func path(in frame: SankeyFrame) -> Path {
+        /// extent at each end. `fileprivate` because the parameter
+        /// type is fileprivate.
+        fileprivate func path(in frame: SankeyFrame) -> Path {
             let h = thickness * frame.canvasHeight
             let halfH = h / 2
             let xL = frame.sourceX + frame.nodeWidth / 2
