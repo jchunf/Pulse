@@ -459,6 +459,32 @@ public extension EventStore {
         }
     }
 
+    // MARK: - Single-bundle usage (F-44)
+
+    /// F-44 — total seconds the user spent in `bundleId` between
+    /// `start` and `end`, capped at `capUntil`. Used by the App Intent
+    /// "how long did I use Xcode today" so Shortcuts can answer the
+    /// question without the user opening the app.
+    ///
+    /// Walks the same hour_app + min_app + system_events layers as
+    /// `appUsageRanking`. Returns `0` for any unknown / unrecorded
+    /// bundle (no error thrown — Shortcuts treats "0 seconds" as a
+    /// valid answer to "I didn't use it").
+    func appUsageSeconds(
+        bundleId: String,
+        start: Date,
+        end: Date,
+        capUntil: Date
+    ) throws -> Int {
+        let ranking = try appUsageRanking(
+            start: start,
+            end: end,
+            capUntil: capUntil,
+            limit: Int.max
+        )
+        return ranking.first(where: { $0.bundleId == bundleId })?.secondsUsed ?? 0
+    }
+
     // MARK: - Longest focus segment (A16)
 
     /// Returns today's longest uninterrupted run of the user in a single

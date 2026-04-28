@@ -101,6 +101,27 @@
 - **不启用任何 entitlement 或权限弹窗**——这是个人 Library 文件，
   系统不需要授权读取
 
+### 4.8 Shortcuts 集成（F-44）
+
+- **数据等级**：L —— 仅暴露已采集的**聚合**数据（今日按键总数、
+  今日鼠标位移、按 bundle id 查询今日单 App 时长），**没有任何新采集**
+- **运行模式**：App Intents 在 Pulse 主进程内执行；Shortcuts /
+  Spotlight 触发时由 macOS 拉起 Pulse（若未运行）后再调用
+- **数据库访问**：`PulseIntentBackend` 只读打开
+  `~/Library/Application Support/Pulse/pulse.db`，不写入、不启动
+  collector runtime
+- **可用 intent**：
+  - `GetAppUsageTodayIntent`（参数：bundle id；返回今日秒数）
+  - `GetTodayKeystrokesIntent`（返回今日总按键数）
+  - `GetTodayMouseDistanceIntent`（返回今日鼠标位移米数）
+- **不暴露**：键码分布（D-K2）、窗口标题（D-A4 / D-A5）、
+  剪贴板内容、Focus 模式名称、应用排行榜（即使是已采集的）。
+  每暴露一个新 intent 都需走隐私 review checklist
+- **localisation**：v2.0 仅英文。后续若有中文用户主动反馈再补
+  zh-Hans 触发短语
+- **用户控制**：与其他采集项一致 —— 隐私时段 / 暂停 /
+  数据擦除全部生效（intent 读不到不存在的数据）
+
 ## 五、用户控制入口
 
 | 控制 | UI 位置 | 行为 |

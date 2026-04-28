@@ -12,6 +12,38 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### F-44 — Shortcuts integration via App Intents (v2.0 third slice)
+
+Exposes Pulse's daily aggregates to macOS Shortcuts (and Spotlight)
+through three App Intents — so a user can ask "how long did I use
+Xcode today" from a Shortcut, a Stream Deck button, or a `Get
+Variable` step in another automation, **without** opening the
+dashboard. Pure read surface over already-disclosed local data;
+no new collectors, no new permissions, no data leaving the Mac.
+
+- **Intents** — new `Sources/PulseApp/Intents/`:
+  - `GetAppUsageTodayIntent` (parameter: bundle id; returns seconds).
+  - `GetTodayKeystrokesIntent` (returns total key presses today).
+  - `GetTodayMouseDistanceIntent` (returns metres travelled today).
+- **Suggested phrases** — `PulseAppShortcuts` registers built-in
+  trigger phrases so each intent shows up in the Shortcuts library
+  and Spotlight without the user authoring a custom Shortcut.
+- **Backend** — new `PulseIntentBackend` opens
+  `~/Library/Application Support/Pulse/pulse.db` lazily, caches the
+  resulting `EventStore`, and never writes. Runs in-process with the
+  GUI app when triggered from Shortcuts.
+- **Query** — `EventStore.appUsageSeconds(bundleId:start:end:capUntil:)`
+  walks the same hour_app + min_app + system_events layers as
+  `appUsageRanking`, filtered to a single bundle. Returns 0 for
+  unknown bundles (no error — Shortcuts reads "0 seconds" as a
+  meaningful "I didn't use it").
+- **Tests** — `AppUsageQueriesTests.singleBundleQuery` covers the
+  matching-bundle, mixed-bundle, and unknown-bundle paths.
+- **Privacy** — read-only over the same SQLite the Dashboard reads
+  from. No new categories of collection. `docs/05-privacy.md` §4.8
+  notes the read-only posture and that the intent surface ships
+  English-only for v2.0 (localisation follow-up).
+
 ### F-32 — Clipboard usage frequency (v2.0 second slice)
 
 Counts how often the system pasteboard changed today + a 24-bar
