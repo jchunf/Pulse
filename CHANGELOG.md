@@ -12,6 +12,33 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### F-32 — Clipboard usage frequency (v2.0 second slice)
+
+Counts how often the system pasteboard changed today + a 24-bar
+hour-of-day sparkline. **Frequency only — no clipboard content is
+ever read.**
+
+- **Collector** — new `ClipboardObserver` in `Sources/PulsePlatform/`.
+  Polls `NSPasteboard.general.changeCount` every 2 seconds; emits
+  one `.clipboardChanged` event per increment between polls.
+- **Privacy** — `ClipboardObserver` calls **only** `.changeCount`,
+  which is an `Int`. No `string(forType:)` / `data(forType:)` /
+  `pasteboardItems` access. F-32 implements `docs/05-privacy.md` §4.3.
+- **Domain event** — `DomainEvent.clipboardChanged(at:)`. Counts as
+  user activity (just copied something) for idle detection.
+- **Storage** — new `system_events` category `clipboard_change`,
+  no payload. No migration.
+- **Query** — `EventStore.dailyClipboardChanges(on:capUntil:)` +
+  `hourlyClipboardChanges(on:capUntil:)`.
+- **Model** — `DashboardModel.clipboardChangesToday` +
+  `clipboardHourly` (24-element).
+- **UI** — new `ClipboardCard` in the Apps pane after Shortcuts.
+  Hero count + "copies / cuts" + privacy-reassurance line + 24-bar
+  hourly sparkline. Auto-hides when count == 0.
+- **xcstrings** — 3 keys (en + zh-Hans).
+- **Tests** — `ClipboardQueriesTests` covers empty DB, daily count,
+  prior-day exclusion, capUntil clamp, and hour-of-day pivot.
+
 ### F-37 — Focus Mode integration (v2.0 first slice)
 
 The first feature in the v2.0 "interaction layer" trio. Detects when

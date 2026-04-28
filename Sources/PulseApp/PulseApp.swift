@@ -175,6 +175,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let appWatcher: NSWorkspaceAppWatcher
     private let lidPowerObserver: LidPowerObserver
     private let focusObserver: FocusObserver
+    private let clipboardObserver: ClipboardObserver
     private let titleObserver: AccessibilityTitleObserver
     private var pollTask: Task<Void, Never>?
     private var wakeObserver: NSObjectProtocol?
@@ -206,6 +207,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.appWatcher = NSWorkspaceAppWatcher()
         self.lidPowerObserver = LidPowerObserver()
         self.focusObserver = FocusObserver()
+        self.clipboardObserver = ClipboardObserver()
         self.titleObserver = AccessibilityTitleObserver()
 
         self.healthModel = HealthModel(
@@ -281,6 +283,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appWatcher.stop()
         lidPowerObserver.stop()
         focusObserver.stop()
+        clipboardObserver.stop()
         titleObserver.stop()
         anomalyMonitor.stop()
         if let wakeObserver {
@@ -544,6 +547,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appWatcher.start(handler: feed)
         lidPowerObserver.start(handler: feed)
         focusObserver.start(handler: feed)
+        clipboardObserver.start(handler: feed)
         titleObserver.start(handler: feed)
     }
 
@@ -728,6 +732,11 @@ final class DashboardModel: ObservableObject {
     /// F-37 — fraction of the elapsed day spent in Focus mode.
     /// Surfaced as the headline "you've been in Focus N% of today".
     @Published private(set) var focusFractionToday: Double = 0
+    /// F-32 — clipboard-change count for today.
+    @Published private(set) var clipboardChangesToday: Int = 0
+    /// F-32 — 24-element hour-of-day distribution of clipboard changes
+    /// today. Used by `ClipboardCard`'s sparkline.
+    @Published private(set) var clipboardHourly: [Int] = Array(repeating: 0, count: 24)
     /// F-20 — last-7-day left/right keystroke balance from
     /// `day_key_codes`. `nil` until there's enough classified
     /// activity to surface a meaningful ratio.
@@ -923,6 +932,10 @@ final class DashboardModel: ObservableObject {
             // F-37 — today's Focus / DND seconds + fraction.
             let focusSeconds = (try? store.dailyFocusSeconds(on: dayStart, capUntil: now)) ?? 0
             let focusFraction = (try? store.focusFractionToday(on: dayStart, capUntil: now)) ?? 0
+            // F-32 — today's clipboard-change count + hour-of-day
+            // distribution.
+            let clipboardCount = (try? store.dailyClipboardChanges(on: dayStart, capUntil: now)) ?? 0
+            let clipboardHourly = (try? store.hourlyClipboardChanges(on: dayStart, capUntil: now)) ?? Array(repeating: 0, count: 24)
             // F-20 — left/right hand balance from the same window.
             // nil-out when classifiedTotal is too small to be a stable
             // ratio (a 30-keystroke fluke shouldn't read as "you favour
@@ -1037,6 +1050,8 @@ final class DashboardModel: ObservableObject {
             self.handBalance = handBalance
             self.focusSecondsToday = focusSeconds
             self.focusFractionToday = focusFraction
+            self.clipboardChangesToday = clipboardCount
+            self.clipboardHourly = clipboardHourly
             self.focusDonut = focusDonut
             self.weekOverWeek = weekOverWeek
             self.trajectoryTiles = trajectoryTiles
@@ -1846,6 +1861,12 @@ struct DashboardView: View {
         }
         if !model.shortcutsToday.isEmpty {
             ShortcutLeaderboardCard(rows: model.shortcutsToday)
+        }
+        if model.clipboardChangesToday > 0 {
+            ClipboardCard(
+                count: model.clipboardChangesToday,
+                hourly: model.clipboardHourly
+            )
         }
     }
 
@@ -5352,6 +5373,67 @@ struct KeyboardHeatmapKey: View {
         }
         .frame(height: 28)
         .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - F-32 — Clipboard usage frequency
+
+/// F-32 — counts how often the system pasteboard changed today + a
+/// 24-bar hour-of-day sparkline beneath. Reads
+/// `DashboardModel.clipboardChangesToday` /
+/// `DashboardModel.clipboardHourly`. **No clipboard content** is
+/// ever read — only `NSPasteboard.changeCount` increments.
+struct ClipboardCard: View {
+
+    let count: Int
+    let hourly: [Int]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "doc.on.clipboard.fill")
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(0.85)
+                Text("Clipboard activity today", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(PulseFormat.integer(count))
+                    .font(PulseDesign.heroSecondaryFont)
+                    .foregroundStyle(PulseDesign.coral)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("copies / cuts", bundle: .pulse)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Text("Frequency only — no content read.", bundle: .pulse)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            ClipboardHourlySparkline(hourly: hourly)
+                .frame(height: 44)
+        }
+        .pulseFeaturedCard()
+    }
+}
+
+private struct ClipboardHourlySparkline: View {
+    let hourly: [Int]
+
+    var body: some View {
+        let peak = max(1, hourly.max() ?? 1)
+        GeometryReader { geo in
+            HStack(alignment: .bottom, spacing: 2) {
+                ForEach(0..<24, id: \.self) { hour in
+                    let intensity = Double(hourly[hour]) / Double(peak)
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(PulseDesign.coral.opacity(0.30 + intensity * 0.55))
+                        .frame(height: max(2, intensity * geo.size.height))
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
     }
 }
 

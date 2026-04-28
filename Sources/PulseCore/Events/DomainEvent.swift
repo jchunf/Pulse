@@ -43,6 +43,10 @@ public enum DomainEvent: Sendable, Equatable {
     case focusEntered(modeName: String?, at: Date)
     /// F-37 — Focus / DND exited (back to "no Focus on").
     case focusExited(at: Date)
+    /// F-32 — pasteboard changeCount incremented (something was
+    /// copied or cut). The collector polls
+    /// `NSPasteboard.general.changeCount`; no content is ever read.
+    case clipboardChanged(at: Date)
 
     /// The timestamp this event was observed.
     public var timestamp: Date {
@@ -65,16 +69,19 @@ public enum DomainEvent: Sendable, Equatable {
              .powerChanged(_, _, let at),
              .displayConfigChanged(let at),
              .focusEntered(_, let at),
-             .focusExited(let at):
+             .focusExited(let at),
+             .clipboardChanged(let at):
             return at
         }
     }
 
     /// Whether this event represents user activity (for idle detection).
-    /// System state transitions do not count.
+    /// System state transitions do not count. Clipboard counts as user
+    /// activity (the user just copied something).
     public var isUserActivity: Bool {
         switch self {
-        case .mouseMove, .mouseClick, .mouseScroll, .keyPress, .shortcutPressed:
+        case .mouseMove, .mouseClick, .mouseScroll, .keyPress, .shortcutPressed,
+             .clipboardChanged:
             return true
         case .foregroundApp, .windowTitleHash, .idleEntered, .idleExited,
              .systemSleep, .systemWake, .screenLocked, .screenUnlocked,
