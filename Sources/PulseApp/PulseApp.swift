@@ -706,6 +706,9 @@ final class DashboardModel: ObservableObject {
     /// weight" trend curve. Always 30 elements; days with no activity
     /// surface as zero.
     @Published private(set) var activityWeight: [ActivityWeightPoint] = []
+    /// F-19 — typing-cadence sparkline (per-minute KPM over the last
+    /// 60 minutes). Always 60 elements; zero minutes preserved.
+    @Published private(set) var keyboardRhythm: KeyboardRhythm = KeyboardRhythm(samples: [])
     /// F-09 — today's time-in-category breakdown for the focus donut.
     @Published private(set) var focusDonut: FocusDonut = .empty
     /// F-08 — 7-day keycode distribution for the keyboard heatmap.
@@ -892,10 +895,10 @@ final class DashboardModel: ObservableObject {
             // window than the rest of the Apps section to give the
             // circular-mean enough sample to settle.
             let chronotype = try? store.chronotype(endingAt: now, days: 14)
-            // F-42 — 30-day daily active-hours curve. Same window as
-            // would be useful for a "month at a glance" view; the
-            // chart auto-fits whatever it gets back.
+            // F-42 — 30-day daily active-hours curve.
             let activityWeight = (try? store.activityWeight(endingAt: now, days: 30)) ?? []
+            // F-19 — last-60-minute typing-cadence sparkline.
+            let keyboardRhythm = (try? store.keyboardRhythm(endingAt: now, minutes: 60)) ?? KeyboardRhythm(samples: [])
             let keyCodes = try store.keyCodeDistribution(endingAt: now, days: 7)
             // F-09 — ask for up to 200 bundles so the "other" slice is
             // accurate. In practice a day's distinct-bundle count is
@@ -997,6 +1000,7 @@ final class DashboardModel: ObservableObject {
             self.chaoticMomentToday = chaoticMoment
             self.chronotype = chronotype
             self.activityWeight = activityWeight
+            self.keyboardRhythm = keyboardRhythm
             self.keyCodeDistribution = keyCodes
             self.focusDonut = focusDonut
             self.weekOverWeek = weekOverWeek
@@ -1811,6 +1815,9 @@ struct DashboardView: View {
     @ViewBuilder
     private var inputSection: some View {
         KeyboardHeatmapCard(keyCodes: model.keyCodeDistribution)
+        if model.keyboardRhythm.totalPresses > 0 {
+            KeyboardRhythmCard(rhythm: model.keyboardRhythm)
+        }
         if !model.trajectoryTiles.isEmpty || !model.clickTrajectoryTiles.isEmpty {
             MouseTrajectoryCard(
                 dwellTiles: model.trajectoryTiles,
@@ -4879,6 +4886,71 @@ struct MouseTrailMosaic: View {
 ///   writes the preference; the live event tap checks the same key
 ///   on every keyDown and starts folding keycodes into the buffer.
 ///   Per Q-06 / docs/05-privacy.md §4.1, capture is explicitly opt-in.
+// MARK: - F-19 — Keyboard rhythm sparkline
+
+/// F-19 — last-60-minute typing-cadence sparkline. The roadmap's
+/// inter-keystroke-interval distribution can't survive past
+/// `rollRawToSecond` (raw events are purged), so we surface the
+/// closest preserved signal: per-minute KPM over the rolling hour.
+/// Reads `DashboardModel.keyboardRhythm`; the inputSection guard
+/// hides the card whole when the window has zero presses.
+struct KeyboardRhythmCard: View {
+
+    let rhythm: KeyboardRhythm
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "metronome")
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(0.85)
+                Text("Typing tempo · last hour", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            Text(
+                String.localizedStringWithFormat(
+                    NSLocalizedString(
+                        "Avg %1$.0f KPM · peak %2$lld KPM",
+                        bundle: .pulse,
+                        comment: "F-19 KeyboardRhythmCard — subtitle. %1$.0f is average KPM across active minutes; %2$lld is peak KPM."
+                    ),
+                    rhythm.avgKPMActive,
+                    Int64(rhythm.peakKPM)
+                )
+            )
+            .font(PulseDesign.labelFont)
+            .tracking(0.3)
+            .foregroundStyle(.secondary)
+            KeyboardRhythmSparkline(samples: rhythm.samples, peak: max(1, rhythm.peakKPM))
+                .frame(height: 56)
+        }
+        .pulseFeaturedCard()
+    }
+}
+
+/// 60-bar sparkline of presses-per-minute. Heights normalised to the
+/// observed peak so even a quiet hour reads with structure (the bar
+/// alpha gives the "volume" cue separately).
+private struct KeyboardRhythmSparkline: View {
+    let samples: [KeyboardRhythm.Sample]
+    let peak: Int
+
+    var body: some View {
+        GeometryReader { geo in
+            HStack(alignment: .bottom, spacing: 1) {
+                ForEach(samples) { sample in
+                    let intensity = Double(sample.pressCount) / Double(peak)
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(PulseDesign.coral.opacity(0.30 + intensity * 0.55))
+                        .frame(height: max(2, intensity * geo.size.height))
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+}
+
 /// - **Opted in but empty**: "Typing data will start accumulating…"
 ///   Once the user has actually typed with capture on, the grid
 ///   renders. No mock / demo data ever shows here.
