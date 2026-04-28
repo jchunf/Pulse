@@ -692,6 +692,10 @@ final class DashboardModel: ObservableObject {
     /// `AppSankeyCard`. Row count is capped at 12 by the query layer
     /// so the renderer doesn't have to truncate.
     @Published private(set) var appTransitionsToday: [AppTransition] = []
+    /// F-14 — recurring app combinations ("work stacks") for the day,
+    /// used by `AppCombinationsCard`. Row count capped at 6 by the
+    /// query layer.
+    @Published private(set) var appCombinationsToday: [AppCombination] = []
     /// F-09 — today's time-in-category breakdown for the focus donut.
     @Published private(set) var focusDonut: FocusDonut = .empty
     /// F-08 — 7-day keycode distribution for the keyboard heatmap.
@@ -857,6 +861,14 @@ final class DashboardModel: ObservableObject {
             // the Sankey card is in step with the rest of the
             // Apps section's "today" framing.
             let appTransitions = (try? store.appTransitions(start: dayStart, end: now, limit: 12)) ?? []
+            // F-14 — work stacks for today, 10-minute buckets, top 6.
+            let appCombinations = (try? store.appCombinations(
+                start: dayStart,
+                end: now,
+                bucketSeconds: 600,
+                minSize: 2,
+                limit: 6
+            )) ?? []
             let keyCodes = try store.keyCodeDistribution(endingAt: now, days: 7)
             // F-09 — ask for up to 200 bundles so the "other" slice is
             // accurate. In practice a day's distinct-bundle count is
@@ -954,6 +966,7 @@ final class DashboardModel: ObservableObject {
             self.passiveToday = passive
             self.shortcutsToday = shortcuts
             self.appTransitionsToday = appTransitions
+            self.appCombinationsToday = appCombinations
             self.keyCodeDistribution = keyCodes
             self.focusDonut = focusDonut
             self.weekOverWeek = weekOverWeek
@@ -1743,6 +1756,9 @@ struct DashboardView: View {
         AppRankingChart(rows: summary.topApps)
         if !model.appTransitionsToday.isEmpty {
             AppSankeyCard(transitions: model.appTransitionsToday)
+        }
+        if !model.appCombinationsToday.isEmpty {
+            AppCombinationsCard(combinations: model.appCombinationsToday)
         }
         if !model.shortcutsToday.isEmpty {
             ShortcutLeaderboardCard(rows: model.shortcutsToday)
@@ -5250,6 +5266,194 @@ struct SankeyLayout: Equatable {
     ) -> Bool {
         if lhs.value != rhs.value { return lhs.value > rhs.value }
         return lhs.key < rhs.key
+    }
+}
+
+// MARK: - F-14 — App combination "work stacks"
+
+/// F-14 — surfaces recurring multi-app combinations from
+/// `EventStore.appCombinations(...)`. Reads a list of (sorted bundle
+/// ids, occurrence count) rows; renders each as a horizontal row of
+/// app-name pills with the bucket count + estimated time on the
+/// right. The pills wrap onto multiple lines via a hand-rolled flow
+/// `Layout` so 4-5 app stacks don't truncate into ellipses.
+///
+/// Auto-hides when no combination passes the `minSize ≥ 2` filter
+/// (fresh install / single-app days).
+struct AppCombinationsCard: View {
+
+    let combinations: [AppCombination]
+
+    /// Each occurrence is a 10-minute bucket where the set was
+    /// observed; multiplying by 10 gives an approximate "minutes
+    /// in this stack" — a rough but useful denominator for the user.
+    private static let bucketMinutes: Int = 10
+
+    private static let displayNameCache = BundleDisplayNameCache()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "square.stack.3d.up")
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(0.85)
+                Text("Work stacks today", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            Text("Apps you cycled through in the same 10-minute window.", bundle: .pulse)
+                .font(PulseDesign.labelFont)
+                .tracking(0.3)
+                .foregroundStyle(.secondary)
+            VStack(spacing: 10) {
+                ForEach(combinations) { combo in
+                    AppCombinationRow(
+                        combination: combo,
+                        bucketMinutes: Self.bucketMinutes,
+                        displayName: { Self.displayNameCache.name(for: $0) }
+                    )
+                }
+            }
+        }
+        .pulseFeaturedCard()
+    }
+}
+
+/// One row inside `AppCombinationsCard`: app pills on the left,
+/// occurrence count + estimated minutes on the right.
+private struct AppCombinationRow: View {
+
+    let combination: AppCombination
+    let bucketMinutes: Int
+    let displayName: (String) -> String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            CombinationPillFlow(bundles: combination.bundles, displayName: displayName)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(
+                    String.localizedStringWithFormat(
+                        NSLocalizedString(
+                            "≈ %lld min",
+                            bundle: .pulse,
+                            comment: "F-14 — rough time spent in a work stack, derived from bucket count × bucket size."
+                        ),
+                        Int64(combination.occurrences * bucketMinutes)
+                    )
+                )
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.primary)
+                Text(
+                    String.localizedStringWithFormat(
+                        NSLocalizedString(
+                            "%lld windows",
+                            bundle: .pulse,
+                            comment: "F-14 — number of 10-minute buckets where this stack was observed."
+                        ),
+                        Int64(combination.occurrences)
+                    )
+                )
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+            }
+            .layoutPriority(1)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+/// Flow-layout `Layout` that wraps app pills onto multiple lines
+/// when the row's width is exceeded. SwiftUI doesn't ship a flow
+/// HStack on macOS 14, so we roll a small one — same idiom Apple
+/// uses in their `Layout` documentation samples.
+private struct CombinationPillFlow: View {
+
+    let bundles: [String]
+    let displayName: (String) -> String
+
+    var body: some View {
+        FlowLayout(spacing: 6) {
+            ForEach(bundles, id: \.self) { bundle in
+                AppPill(label: displayName(bundle))
+            }
+        }
+    }
+}
+
+/// One app pill: small rounded rect + display name. Coral tint at
+/// low opacity for the fill, matches the rest of the Apps section's
+/// visual language.
+private struct AppPill: View {
+    let label: String
+
+    var body: some View {
+        Text(label)
+            .font(.caption.weight(.medium))
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(PulseDesign.coral.opacity(0.14))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(PulseDesign.coral.opacity(0.30), lineWidth: 0.5)
+            )
+            .foregroundStyle(.primary)
+    }
+}
+
+/// Minimal flow `Layout` (macOS 13+). Places children left-to-right,
+/// wrapping to a new line when the next child would exceed the
+/// available width. Used by `CombinationPillFlow`.
+private struct FlowLayout: Layout {
+
+    let spacing: CGFloat
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
+        let width = proposal.width ?? .infinity
+        return layout(in: width, subviews: subviews).size
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        let layout = layout(in: bounds.width, subviews: subviews)
+        for (idx, point) in layout.points.enumerated() {
+            subviews[idx].place(
+                at: CGPoint(x: bounds.minX + point.x, y: bounds.minY + point.y),
+                proposal: ProposedViewSize(width: nil, height: nil)
+            )
+        }
+    }
+
+    private func layout(in width: CGFloat, subviews: Subviews) -> (size: CGSize, points: [CGPoint]) {
+        var points: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var lineHeight: CGFloat = 0
+        var maxX: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0 && x + size.width > width {
+                x = 0
+                y += lineHeight + spacing
+                lineHeight = 0
+            }
+            points.append(CGPoint(x: x, y: y))
+            x += size.width + spacing
+            lineHeight = max(lineHeight, size.height)
+            maxX = max(maxX, x - spacing)
+        }
+        return (CGSize(width: maxX, height: y + lineHeight), points)
     }
 }
 
