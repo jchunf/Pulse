@@ -36,6 +36,13 @@ public enum DomainEvent: Sendable, Equatable {
     case lidOpened(at: Date)
     case powerChanged(isOnBattery: Bool, percent: Int, at: Date)
     case displayConfigChanged(at: Date)
+    /// F-37 — macOS Focus / Do-Not-Disturb mode entered. `modeName`
+    /// is the user-facing name ("Work", "Personal", "Sleep") when
+    /// observable, or `nil` for legacy DND-only signals where the
+    /// concrete mode isn't exposed.
+    case focusEntered(modeName: String?, at: Date)
+    /// F-37 — Focus / DND exited (back to "no Focus on").
+    case focusExited(at: Date)
 
     /// The timestamp this event was observed.
     public var timestamp: Date {
@@ -56,7 +63,9 @@ public enum DomainEvent: Sendable, Equatable {
              .lidClosed(let at),
              .lidOpened(let at),
              .powerChanged(_, _, let at),
-             .displayConfigChanged(let at):
+             .displayConfigChanged(let at),
+             .focusEntered(_, let at),
+             .focusExited(let at):
             return at
         }
     }
@@ -69,7 +78,8 @@ public enum DomainEvent: Sendable, Equatable {
             return true
         case .foregroundApp, .windowTitleHash, .idleEntered, .idleExited,
              .systemSleep, .systemWake, .screenLocked, .screenUnlocked,
-             .lidClosed, .lidOpened, .powerChanged, .displayConfigChanged:
+             .lidClosed, .lidOpened, .powerChanged, .displayConfigChanged,
+             .focusEntered, .focusExited:
             return false
         }
     }

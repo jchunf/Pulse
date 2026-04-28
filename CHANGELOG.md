@@ -12,6 +12,44 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### F-37 — Focus Mode integration (v2.0 first slice)
+
+The first feature in the v2.0 "interaction layer" trio. Detects when
+the user is in macOS Focus / Do-Not-Disturb mode and surfaces today's
+total Focus time on the Dashboard. **First feature with a new data
+source** — establishes the privacy-doc + collector-plumbing pattern
+that F-32 (clipboard) and F-44 (Shortcuts) will reuse.
+
+- **Collector** — new `FocusObserver` in `Sources/PulsePlatform/`.
+  Watches `~/Library/DoNotDisturb/DB/Assertions.json` via
+  `DispatchSource.makeFileSystemObjectSource`; falls back to listening
+  for `com.apple.focus.focus-mode-changed` distributed notifications.
+  No TCC permission needed (file lives in the user's own Library)
+  — no new onboarding card. JSON parser is defensive: walks the
+  tree for `assertionDetailsModeIdentifier`, falls back to
+  "non-empty assertion records ⇒ Focus on" if Apple changes schema.
+- **Domain events** — new `DomainEvent.focusEntered(modeName:)` /
+  `.focusExited`. Mode name is human-readable ("Work" / "Personal")
+  when extractable, `nil` for legacy DND signals.
+- **Storage** — two new categories in `system_events`: `focus_on`
+  (payload = mode name) / `focus_off`. No migration — the existing
+  `(ts, category, payload)` shape carries it.
+- **Query** — new `EventStore.dailyFocusSeconds(on:capUntil:)` +
+  `focusFractionToday(on:capUntil:)`. Walks paired events into
+  intervals, clamps open intervals at `capUntil`, attributes a
+  cross-day session correctly to today.
+- **Model** — `DashboardModel.focusSecondsToday` /
+  `focusFractionToday`.
+- **UI** — new `FocusModeCard` in the Focus pane between the
+  DeepFocus + UsagePosture row and the FocusDonutCard. Auto-hides
+  when `focusSecondsToday == 0`.
+- **Privacy** — `docs/05-privacy.md` §4.7 added (level L, default
+  on, never reads notification whitelists or filter rules).
+- **xcstrings** — 3 keys (en + zh-Hans).
+- **Tests** — `FocusQueriesTests` covers empty DB, basic interval,
+  multi-interval sum, open-interval clamp, cross-day attribution,
+  prior-day exclusion, zero-elapsed-window.
+
 ## [1.3.0] — 2026-04-28
 
 The "v2.0 derivations" release — opportunistic harvest of every

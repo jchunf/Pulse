@@ -191,6 +191,10 @@ public actor EventWriter {
                 pending.append(.displaySnapshot(tsMillis: ts, info: info))
             }
             return .systemEvent(tsMillis: ts, category: "display_change", payload: nil)
+        case .focusEntered(let modeName, _):
+            return .systemEvent(tsMillis: ts, category: "focus_on", payload: modeName)
+        case .focusExited:
+            return .systemEvent(tsMillis: ts, category: "focus_off", payload: nil)
         }
     }
 

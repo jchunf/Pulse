@@ -5171,6 +5171,27 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "鼠标速度 · 最近一小时" } }
       }
     },
+    "Focus mode today": {
+      "comment": "F-37 FocusModeCard — card title.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Focus mode today" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "今日专注 / DND" } }
+      }
+    },
+    "%.0f%% of today": {
+      "comment": "F-37 FocusModeCard — percentage of elapsed day spent in Focus.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%.0f%% of today" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "占今日 %.0f%%" } }
+      }
+    },
+    "DND / Work / Personal / Sleep …": {
+      "comment": "F-37 FocusModeCard — secondary descriptor of what counts as Focus.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "DND / Work / Personal / Sleep …" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "勿扰 / 工作 / 个人 / 睡眠 …" } }
+      }
+    },
     "Hand balance · last 7 days": {
       "comment": "F-20 HandBalanceCard — card title.",
       "localizations": {
