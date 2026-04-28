@@ -12,6 +12,23 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-04-28
+
+The "v2.0 derivations" release — opportunistic harvest of every
+zero-cost feature reachable from the existing collection layer
+(`system_events`, `day_key_codes`, `day_mouse_density`,
+`day_click_density`, `min_*`, `hour_summary`). Five v2.0 features
+(F-13 / F-14 / F-16 / F-21 / F-42) and four v2.1 features
+(F-15 / F-18 / F-19 / F-20 / F-40) shipped without touching the
+collector or adding new TCC permissions. Plus the Sankey label-
+collision polish (PR #123) and the Sparkle dev → stable upgrade-
+detection fix (PR #128).
+
+After v1.3.0 the v2.0 work continues into the "interaction layer"
+trio that DOES need new data sources: F-37 Focus Mode (next), F-32
+clipboard, F-44 Shortcuts integration → these three together
+trigger v2.0.0.
+
 ### F-20 — Dual-hand keystroke balance (v2.1, zero-cost derivation)
 
 A horizontal split-bar in the Input pane showing what fraction of
