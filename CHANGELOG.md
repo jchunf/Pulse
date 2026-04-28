@@ -12,6 +12,29 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-04-28
+
+The "interaction layer" milestone. Three new data sources land
+together, each with its own collector, privacy-doc disclosure, and
+Dashboard surface — plus the App Intents bridge that lets users ask
+Pulse questions from Shortcuts and Spotlight without opening the app.
+
+After v1.3.0 cleared the "zero-cost derivation" backlog (10 features
+on top of the existing collector), v2.0.0 is what the original
+roadmap reserved the v2.0 number for: feature work that requires
+**new bytes flowing through the collector**, gated by a fresh privacy
+review for each one.
+
+What's in: F-37 Focus Mode (DND/Focus seconds today), F-32 Clipboard
+frequency (count + 24-bar sparkline; **frequency only, no content**),
+F-44 Shortcuts integration (three App Intents over already-collected
+aggregates).
+
+What's deliberately not: F-30 camera/microphone occupancy (deferred
+to a later release with its own privacy narrative), and the broader
+quality-push items (a11y / l10n / DB schema clean-up) which will land
+piecewise as their own PRs against the v2.x line.
+
 ### F-44 — Shortcuts integration via App Intents (v2.0 third slice)
 
 Exposes Pulse's daily aggregates to macOS Shortcuts (and Spotlight)
