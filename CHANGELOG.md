@@ -12,6 +12,35 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### F-14 — App combination "work stacks" (v2.0 third slice)
+
+Surfaces the recurring multi-app combinations you cycled through
+during today's 10-minute windows — the canonical examples are
+`VSCode + Chrome + Terminal + Slack` (a coding session) or
+`Mail + Calendar` (a planning loop).
+
+- **Query** — new `EventStore.appCombinations(start:end:bucketSeconds:
+  minSize:limit:)` in `AppCombinationsQueries.swift`. Pulls distinct
+  `(bucket, bundle_id)` pairs from `system_events.foreground_app`,
+  groups them in Swift to count co-occurrences (SQLite's
+  `GROUP_CONCAT` doesn't sort by default, which would split
+  `{A,B}` and `{B,A}`). Singletons (`minSize < 2`) are skipped.
+- **Model** — `DashboardModel.appCombinationsToday` (top 6 by
+  occurrence count). Refresh path fetches alongside the F-13
+  Sankey transitions, same `dayStart → now` window framing.
+- **UI** — new `AppCombinationsCard` in the Apps sidebar pane,
+  between the F-13 Sankey card and the Shortcuts leaderboard. Each
+  row: app pills (display name + soft coral pill background) wrapped
+  via a hand-rolled flow `Layout`, with `≈ N min · M windows` on
+  the right. Auto-hides when no combination passes the size filter.
+- **xcstrings** — `Work stacks today` /
+  `Apps you cycled through in the same 10-minute window.` /
+  `≈ %lld min` / `%lld windows` (en + zh-Hans).
+- **Tests** — `AppCombinationsQueriesTests` covers empty window,
+  singleton filter, basic 2-app combo, set-equality summing across
+  buckets, ranking by occurrences, `limit` truncation, windowing,
+  and a 4-app stack.
+
 ### F-13 — App switching Sankey (v2.0 second slice)
 
 Adds a hand-rolled Sankey diagram that visualises today's foreground

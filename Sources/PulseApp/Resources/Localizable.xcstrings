@@ -5104,6 +5104,74 @@
           }
         }
       }
+    },
+    "Work stacks today": {
+      "comment": "F-14 AppCombinationsCard — card title.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Work stacks today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日工作组合"
+          }
+        }
+      }
+    },
+    "Apps you cycled through in the same 10-minute window.": {
+      "comment": "F-14 AppCombinationsCard — explanation subtitle for the work stacks list.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apps you cycled through in the same 10-minute window."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在同一个 10 分钟窗口里一起出现过的应用组合。"
+          }
+        }
+      }
+    },
+    "≈ %lld min": {
+      "comment": "F-14 AppCombinationsCard — approximate minutes spent in a work stack (occurrences × bucket size).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "≈ %lld min"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "约 %lld 分钟"
+          }
+        }
+      }
+    },
+    "%lld windows": {
+      "comment": "F-14 AppCombinationsCard — number of 10-minute windows where this stack was observed.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld windows"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 段时间"
+          }
+        }
+      }
     }
   }
 }
