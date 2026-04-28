@@ -12,6 +12,30 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Infrastructure — quality sprint #2: VoiceOver-friendly card grouping
+
+The previous Dashboard surfaces had only 2 explicit `.accessibility*`
+calls in 5,000 lines of `PulseApp.swift`, so VoiceOver had no way to
+tell where one card ended and the next began — every text element
+read sequentially as a flat list. This PR fixes the navigation
+problem at the lowest-impact spot in the call graph.
+
+- `pulseHeroCard()`, `pulseFeaturedCard()`, `pulsePlainCard()` in
+  `DesignSystem.swift` now end with
+  `.accessibilityElement(children: .contain)`. All 27 cards that
+  use one of the three shared modifiers automatically inherit
+  containment-style grouping — VoiceOver users can swipe into a
+  card, hear its individual sub-labels (title, value, sparkline),
+  then swipe out to the next card without the cards bleeding into
+  each other.
+- `SummaryMetricCard` (the only card with its own background instead
+  of the shared modifier) gets the same `.accessibilityElement(...)`
+  added inline so the six summary tiles also group cleanly.
+- Per-card explicit `.accessibilityLabel` / `.accessibilityValue`
+  for hero numbers (e.g. mileage hero, focus minutes) is the
+  follow-up. This PR is the structural foundation; the labels can
+  be added card-by-card without touching the modifier again.
+
 ### Infrastructure — quality sprint #1: observer test coverage
 
 Backfills unit tests for the two collectors that shipped in v2.0
