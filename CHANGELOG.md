@@ -12,6 +12,41 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Bug fixes
+
+- **Sparkle "dev → stable" upgrade detection.** User report (post
+  v1.2.0): "接受开发者构建之后为啥不能检查到稳定版本的包了". Two
+  combined causes:
+  1. Stable + dev releases both used `GITHUB_RUN_NUMBER` for
+     `CFBundleVersion` (Sparkle's `sparkle:version`). Dev builds
+     run on every main push, so a dev build's run number becomes
+     larger than the most recent stable's run number within
+     hours of any release. Sparkle's default comparator picks
+     the highest CFBundleVersion → "you're on the latest" forever
+     once a dev build leapfrogged the stable release.
+  2. The rolling dev appcast carried only the just-built dev
+     item — even if the user stayed on the dev channel, no new
+     stable release would surface as an upgrade because the dev
+     feed never referenced it.
+  Two coordinated fixes in `.github/workflows/package.yml`:
+  - Stable `CFBundleVersion` is now derived from the semver tag
+    (`10_000_000 + major × 1_000_000 + minor × 1_000 + patch`).
+    v1.2.0 → 11_002_000, well above any conceivable
+    `GITHUB_RUN_NUMBER`. Dev builds keep `run_number` (small),
+    so a stable release always wins the version comparison
+    after a channel flip.
+  - The dev-appcast generator splices the **latest stable
+    release's `<item>`** into the dev appcast every time it
+    rebuilds. Sparkle picks the highest `sparkle:version` on
+    parse, so dev-channel users now see new stable releases as
+    upgrades automatically without flipping the toggle. (When no
+    stable release exists yet, the splice is quietly skipped.)
+  Note: existing v1.2.0 was published with the old encoding
+  (`build = run_number`). Re-running the package workflow against
+  the `v1.2.0` tag (or releasing v1.2.1) re-publishes the appcast
+  with the new build number; until that happens dev users still
+  see the old number.
+
 ### F-18 — Mouse-speed sparkline (v2.1, zero-cost derivation)
 
 A 60-bar last-hour sparkline of average mouse speed (mm/s) in the
