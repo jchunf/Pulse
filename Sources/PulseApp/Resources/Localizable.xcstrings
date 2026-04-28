@@ -5172,6 +5172,57 @@
           }
         }
       }
+    },
+    "Busiest minute today": {
+      "comment": "F-21 ChaoticMomentCard — card title.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Busiest minute today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日最忙的一分钟"
+          }
+        }
+      }
+    },
+    "switches": {
+      "comment": "F-21 ChaoticMomentCard — small label under the switch count hero number.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "switches"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次切换"
+          }
+        }
+      }
+    },
+    "around %@": {
+      "comment": "F-21 ChaoticMomentCard — wall-clock time anchor for the busiest minute. %@ is a localised short-style time string.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "around %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 前后"
+          }
+        }
+      }
     }
   }
 }
