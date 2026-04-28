@@ -2561,6 +2561,7 @@ struct SummaryMetricCard: View {
             RoundedRectangle(cornerRadius: PulseDesign.cardCornerRadius * 0.75)
                 .fill(PulseDesign.warmGray(0.04))
         )
+        .accessibilityElement(children: .contain)
     }
 
     private var showSparkline: Bool {

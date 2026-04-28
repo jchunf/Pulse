@@ -206,6 +206,12 @@ extension View {
     /// tint background, large corner radius, generous padding, a subtle
     /// shadow. Reserved for the single most-important card on the
     /// Dashboard (mileage hero after A26c).
+    ///
+    /// VoiceOver: wraps the contents in a containment element so the
+    /// card surfaces as a single navigable group while preserving each
+    /// child's individual label. Cards that want a single concatenated
+    /// announcement instead can override with
+    /// `.accessibilityElement(children: .combine)` after this modifier.
     public func pulseHeroCard() -> some View {
         self
             .padding(PulseDesign.cardPadding)
@@ -219,12 +225,17 @@ extension View {
                     .strokeBorder(PulseDesign.coral.opacity(0.14), lineWidth: 0.5)
             )
             .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 6)
+            .accessibilityElement(children: .contain)
     }
 
     /// Applies the "Vital Pulse" featured-card treatment: warm-gray
     /// subtle tint, no stroke, no shadow. Used for the second tier of
     /// cards (Deep Focus, Usage Posture, Milestone History) — still a
     /// distinct container but quieter than the hero.
+    ///
+    /// VoiceOver: wraps the contents in a containment element so the
+    /// card surfaces as a single navigable group while preserving each
+    /// child's individual label.
     public func pulseFeaturedCard() -> some View {
         self
             .padding(PulseDesign.cardPadding)
@@ -233,15 +244,20 @@ extension View {
                 RoundedRectangle(cornerRadius: PulseDesign.cardCornerRadius)
                     .fill(PulseDesign.warmGray(0.05))
             )
+            .accessibilityElement(children: .contain)
     }
 
     /// Plain-card treatment: padding + spacing but no visible background
     /// at all. Used for the six summary metric cards after A26c — they
     /// separate through whitespace + typography, not through chrome.
+    ///
+    /// VoiceOver: wraps the contents in a containment element so each
+    /// metric tile reads as a single navigable group.
     public func pulsePlainCard() -> some View {
         self
             .padding(PulseDesign.cardPadding * 0.75)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .contain)
     }
 }
 
