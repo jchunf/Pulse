@@ -12,6 +12,38 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### F-13 — App switching Sankey (v2.0 second slice)
+
+Adds a hand-rolled Sankey diagram that visualises today's foreground
+app-switch flows: source apps on the left, target apps on the right,
+ribbon widths proportional to the number of `A → B` transitions
+observed.
+
+- **Query** — new `EventStore.appTransitions(start:end:limit:)` in
+  `AppTransitionsQueries.swift`. Pulls from
+  `system_events.foreground_app` (the same point-event source the
+  rest of the Apps section already uses) and uses a SQL `LEAD()`
+  window to pair each row with its successor, then `GROUP BY (from,
+  to)` to roll up. Self-transitions filtered out. No new collector,
+  no new migration.
+- **Model** — `DashboardModel.appTransitionsToday` (capped at 12
+  pairs by the query layer). Refresh fetches alongside shortcuts /
+  timeline so the card is in step with the rest of the Apps
+  section's "today" framing.
+- **UI** — new `AppSankeyCard` in the Apps sidebar pane. Lives
+  between `AppRankingChart` and `ShortcutLeaderboardCard`. Renders
+  via a SwiftUI `Canvas` (no `SankeyMark` exists in the Charts
+  framework yet) — ribbons are filled cubic-Bézier shapes with low
+  coral opacity so crossings stay legible. Source / target nodes
+  ride either side as small coral bars + a two-line label
+  (display name + total flow). Auto-hides when the day's
+  transition list is empty.
+- **xcstrings** — `App switches today` /
+  `%lld switches across %lld pairs · today` (en + zh-Hans).
+- **Tests** — `AppTransitionsQueriesTests` covers empty window,
+  single pair, summing duplicates, self-transition filter,
+  windowing, and `limit` ordering.
+
 ### F-16 — Mouse click heatmap (v2.0 first slice)
 
 Adds the click-position counterpart of F-04's cursor-dwell heatmap.

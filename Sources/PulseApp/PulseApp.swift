@@ -688,6 +688,10 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var timelineToday: DayTimeline?
     /// F-33 — top shortcuts used today, sorted by count desc.
     @Published private(set) var shortcutsToday: [ShortcutUsageRow] = []
+    /// F-13 — top app→app foreground transitions for the day, used by
+    /// `AppSankeyCard`. Row count is capped at 12 by the query layer
+    /// so the renderer doesn't have to truncate.
+    @Published private(set) var appTransitionsToday: [AppTransition] = []
     /// F-09 — today's time-in-category breakdown for the focus donut.
     @Published private(set) var focusDonut: FocusDonut = .empty
     /// F-08 — 7-day keycode distribution for the keyboard heatmap.
@@ -848,6 +852,11 @@ final class DashboardModel: ObservableObject {
             let keyPeak = try store.peakKeyPressMinute(start: dayStart, capUntil: now)
             let passive = try store.passiveConsumption(on: dayStart, capUntil: now)
             let shortcuts = try store.shortcutLeaderboard(start: dayStart, end: dayEnd, limit: 5)
+            // F-13 — top foreground app-switch pairs for today. Same
+            // window as shortcuts/timeline ("today through now") so
+            // the Sankey card is in step with the rest of the
+            // Apps section's "today" framing.
+            let appTransitions = (try? store.appTransitions(start: dayStart, end: now, limit: 12)) ?? []
             let keyCodes = try store.keyCodeDistribution(endingAt: now, days: 7)
             // F-09 — ask for up to 200 bundles so the "other" slice is
             // accurate. In practice a day's distinct-bundle count is
@@ -944,6 +953,7 @@ final class DashboardModel: ObservableObject {
             self.keyPressPeak = keyPeak
             self.passiveToday = passive
             self.shortcutsToday = shortcuts
+            self.appTransitionsToday = appTransitions
             self.keyCodeDistribution = keyCodes
             self.focusDonut = focusDonut
             self.weekOverWeek = weekOverWeek
@@ -1731,6 +1741,9 @@ struct DashboardView: View {
     private func appsSection(summary: TodaySummary) -> some View {
         DayTimelineCard(timeline: model.timelineToday)
         AppRankingChart(rows: summary.topApps)
+        if !model.appTransitionsToday.isEmpty {
+            AppSankeyCard(transitions: model.appTransitionsToday)
+        }
         if !model.shortcutsToday.isEmpty {
             ShortcutLeaderboardCard(rows: model.shortcutsToday)
         }
@@ -4846,6 +4859,397 @@ struct AppRankingChart: View {
 
     private func displayName(for bundleId: String) -> String {
         Self.displayNameCache.name(for: bundleId)
+    }
+}
+
+// MARK: - F-13 — App switching Sankey
+
+/// F-13 — visualises today's foreground app switches as a Sankey
+/// ribbon diagram: source apps (left column) → target apps (right
+/// column), ribbon width proportional to the number of `A → B`
+/// transitions observed. Source data comes from
+/// `EventStore.appTransitions(start:end:limit:)`, populated on the
+/// dashboard refresh path; the card auto-hides when no transitions
+/// land in the window (fresh install / minutes after launch).
+///
+/// The renderer is a hand-rolled SwiftUI `Canvas` because SwiftUI
+/// Charts has no built-in `SankeyMark`; ribbons are stroked cubic
+/// Béziers with thickness proportional to count + low opacity so
+/// crossings stay legible. App names ride either side via plain
+/// `Text` overlays, keyed off `BundleDisplayNameCache` so the
+/// resolution path matches `AppRankingChart`.
+struct AppSankeyCard: View {
+
+    let transitions: [AppTransition]
+
+    private static let displayNameCache = BundleDisplayNameCache()
+    fileprivate static let nodeWidth: CGFloat = 6
+    fileprivate static let nodePadding: CGFloat = 4
+    fileprivate static let labelGutter: CGFloat = 110
+
+    private var totalSwitches: Int {
+        transitions.reduce(0) { $0 + $1.count }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "arrow.left.arrow.right")
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(0.85)
+                Text("App switches today", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            subtitle
+            SankeyDiagram(
+                layout: makeLayout(),
+                displayName: { Self.displayNameCache.name(for: $0) }
+            )
+            .frame(height: max(220, CGFloat(uniqueSourceCount + uniqueTargetCount) * 14))
+        }
+        .pulseFeaturedCard()
+    }
+
+    @ViewBuilder
+    private var subtitle: some View {
+        if totalSwitches > 0 {
+            Text(
+                String.localizedStringWithFormat(
+                    NSLocalizedString(
+                        "%lld switches across %lld pairs · today",
+                        bundle: .pulse,
+                        comment: "F-13 AppSankeyCard — subtitle. %1$lld is the number of transitions counted, %2$lld is the number of unique (from→to) pairs."
+                    ),
+                    Int64(totalSwitches),
+                    Int64(transitions.count)
+                )
+            )
+            .font(PulseDesign.labelFont)
+            .tracking(0.3)
+            .foregroundStyle(.secondary)
+        } else {
+            EmptyView()
+        }
+    }
+
+    private var uniqueSourceCount: Int {
+        Set(transitions.map(\.fromBundle)).count
+    }
+
+    private var uniqueTargetCount: Int {
+        Set(transitions.map(\.toBundle)).count
+    }
+
+    /// Pre-computes node positions + ribbon attach points based on the
+    /// transition data. Pure data — the Canvas just renders what
+    /// comes out of here, which keeps the renderer easy to dogfood
+    /// against alternate layouts later.
+    private func makeLayout() -> SankeyLayout {
+        SankeyLayout.compute(
+            transitions: transitions,
+            nodeWidth: Self.nodeWidth,
+            nodePadding: Self.nodePadding
+        )
+    }
+}
+
+/// Hand-rolled Sankey layout + render — `Canvas` underneath, `Text`
+/// overlays for the per-node labels. Kept separate from
+/// `AppSankeyCard` so the layout math is testable in isolation.
+private struct SankeyDiagram: View {
+    let layout: SankeyLayout
+    let displayName: (String) -> String
+
+    var body: some View {
+        GeometryReader { geo in
+            let frame = SankeyFrame(
+                size: geo.size,
+                labelGutter: AppSankeyCard.labelGutter,
+                nodeWidth: AppSankeyCard.nodeWidth
+            )
+            ZStack(alignment: .topLeading) {
+                // Ribbons — drawn first so labels sit on top.
+                Canvas { ctx, _ in
+                    for ribbon in layout.ribbons {
+                        let path = ribbon.path(in: frame)
+                        ctx.fill(
+                            path,
+                            with: .color(PulseDesign.coral.opacity(0.18))
+                        )
+                    }
+                }
+                // Source nodes + labels (right-anchored so they sit
+                // hard against the ribbon column).
+                ForEach(layout.sources) { node in
+                    SankeyNodeLabel(
+                        text: displayName(node.id),
+                        total: node.total,
+                        side: .leading
+                    )
+                    .frame(width: frame.labelGutter, alignment: .trailing)
+                    .position(
+                        x: frame.labelGutter / 2,
+                        y: frame.sourceColumnY(for: node)
+                    )
+                    Rectangle()
+                        .fill(PulseDesign.coral.opacity(0.85))
+                        .frame(
+                            width: AppSankeyCard.nodeWidth,
+                            height: max(2, frame.heightOf(node: node))
+                        )
+                        .position(
+                            x: frame.sourceX,
+                            y: frame.sourceColumnY(for: node)
+                        )
+                }
+                // Target nodes + labels (left-anchored on the right
+                // side of the diagram).
+                ForEach(layout.targets) { node in
+                    SankeyNodeLabel(
+                        text: displayName(node.id),
+                        total: node.total,
+                        side: .trailing
+                    )
+                    .frame(width: frame.labelGutter, alignment: .leading)
+                    .position(
+                        x: frame.size.width - frame.labelGutter / 2,
+                        y: frame.targetColumnY(for: node)
+                    )
+                    Rectangle()
+                        .fill(PulseDesign.coral.opacity(0.85))
+                        .frame(
+                            width: AppSankeyCard.nodeWidth,
+                            height: max(2, frame.heightOf(node: node))
+                        )
+                        .position(
+                            x: frame.targetX,
+                            y: frame.targetColumnY(for: node)
+                        )
+                }
+            }
+        }
+    }
+}
+
+/// Per-node label. `.leading` side flips the text alignment so source
+/// labels read right-aligned (toward the ribbon column) and target
+/// labels read left-aligned. Both show the bundle's display name on
+/// the first line and its total flow on the second.
+private struct SankeyNodeLabel: View {
+    enum Side { case leading, trailing }
+
+    let text: String
+    let total: Int
+    let side: Side
+
+    var body: some View {
+        VStack(alignment: side == .leading ? .trailing : .leading, spacing: 1) {
+            Text(text)
+                .font(.caption.weight(.medium))
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Text(PulseFormat.integer(total))
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: side == .leading ? .trailing : .leading)
+        .padding(.horizontal, 6)
+    }
+}
+
+/// Geometric helpers for rendering the diagram. Stored as a value
+/// so the layout math is one read away when the Canvas runs.
+/// `fileprivate` rather than `private` because `SankeyLayout.Ribbon`
+/// (internal) takes a `SankeyFrame` parameter — Swift access control
+/// requires the param type to be at least as accessible as the
+/// declaring entity.
+fileprivate struct SankeyFrame {
+    let size: CGSize
+    let labelGutter: CGFloat
+    let nodeWidth: CGFloat
+
+    /// X coordinate of the source-side node bar (right edge of the
+    /// source label gutter).
+    var sourceX: CGFloat { labelGutter + nodeWidth / 2 }
+
+    /// X coordinate of the target-side node bar (left edge of the
+    /// target label gutter).
+    var targetX: CGFloat { size.width - labelGutter - nodeWidth / 2 }
+
+    /// Height of the area available for stacked nodes / ribbons.
+    var canvasHeight: CGFloat { size.height }
+
+    func sourceColumnY(for node: SankeyLayout.Node) -> CGFloat {
+        node.yStart * canvasHeight + heightOf(node: node) / 2
+    }
+
+    func targetColumnY(for node: SankeyLayout.Node) -> CGFloat {
+        node.yStart * canvasHeight + heightOf(node: node) / 2
+    }
+
+    func heightOf(node: SankeyLayout.Node) -> CGFloat {
+        max(2, (node.yEnd - node.yStart) * canvasHeight)
+    }
+}
+
+/// Pure layout data structure consumed by `SankeyDiagram`. All
+/// vertical positions are normalised `[0, 1]` so the diagram
+/// scales cleanly with whatever frame the parent gives it.
+struct SankeyLayout: Equatable {
+
+    struct Node: Equatable, Identifiable {
+        let id: String
+        let total: Int
+        let yStart: Double
+        let yEnd: Double
+    }
+
+    struct Ribbon: Equatable, Identifiable {
+        let id: String
+        let count: Int
+        /// Vertical center of the ribbon's slice on the source node, normalised.
+        let fromYCenter: Double
+        /// Same on the target side.
+        let toYCenter: Double
+        /// Ribbon thickness, normalised to canvas height.
+        let thickness: Double
+
+        /// Builds the ribbon path inside the supplied `SankeyFrame`.
+        /// A horizontal cubic Bézier with mid-point control points;
+        /// `thickness * canvasHeight` becomes the path's vertical
+        /// extent at each end. `fileprivate` because the parameter
+        /// type is fileprivate.
+        fileprivate func path(in frame: SankeyFrame) -> Path {
+            let h = thickness * frame.canvasHeight
+            let halfH = h / 2
+            let xL = frame.sourceX + frame.nodeWidth / 2
+            let xR = frame.targetX - frame.nodeWidth / 2
+            let yL = fromYCenter * frame.canvasHeight
+            let yR = toYCenter * frame.canvasHeight
+            let cx1 = xL + (xR - xL) * 0.5
+            let cx2 = xL + (xR - xL) * 0.5
+            var p = Path()
+            // Top edge — left to right via a horizontal cubic.
+            p.move(to: CGPoint(x: xL, y: yL - halfH))
+            p.addCurve(
+                to: CGPoint(x: xR, y: yR - halfH),
+                control1: CGPoint(x: cx1, y: yL - halfH),
+                control2: CGPoint(x: cx2, y: yR - halfH)
+            )
+            // Right edge — straight down.
+            p.addLine(to: CGPoint(x: xR, y: yR + halfH))
+            // Bottom edge — right to left via a horizontal cubic.
+            p.addCurve(
+                to: CGPoint(x: xL, y: yL + halfH),
+                control1: CGPoint(x: cx2, y: yR + halfH),
+                control2: CGPoint(x: cx1, y: yL + halfH)
+            )
+            // Left edge closes the shape.
+            p.closeSubpath()
+            return p
+        }
+    }
+
+    let sources: [Node]
+    let targets: [Node]
+    let ribbons: [Ribbon]
+
+    /// Pure transformation: a sorted list of `AppTransition`s into a
+    /// laid-out Sankey. Source nodes stack vertically by descending
+    /// outflow, target nodes by descending inflow, padding is in
+    /// canvas-normalised units so the result composes inside any
+    /// frame size.
+    static func compute(
+        transitions: [AppTransition],
+        nodeWidth: CGFloat,
+        nodePadding: CGFloat
+    ) -> SankeyLayout {
+        guard !transitions.isEmpty else {
+            return SankeyLayout(sources: [], targets: [], ribbons: [])
+        }
+
+        // Aggregate side totals.
+        var sourceTotals: [String: Int] = [:]
+        var targetTotals: [String: Int] = [:]
+        for t in transitions {
+            sourceTotals[t.fromBundle, default: 0] += t.count
+            targetTotals[t.toBundle, default: 0] += t.count
+        }
+        let totalFlow = transitions.reduce(0) { $0 + $1.count }
+
+        // Pad each node by ~ 1.5 % of canvas height between rows; if
+        // the column packs more than ~ 30 nodes the padding shrinks
+        // automatically because totals dominate.
+        let sourcePad = min(0.015, 0.4 / Double(max(1, sourceTotals.count)))
+        let targetPad = min(0.015, 0.4 / Double(max(1, targetTotals.count)))
+        let sourceFlowFraction = max(0.001, 1.0 - sourcePad * Double(sourceTotals.count - 1))
+        let targetFlowFraction = max(0.001, 1.0 - targetPad * Double(targetTotals.count - 1))
+
+        // Build sorted source nodes.
+        var sourceNodes: [Node] = []
+        var sourceIndex: [String: Int] = [:]
+        var y: Double = 0
+        for (bundle, total) in sourceTotals.sorted(by: nodeOrdering) {
+            let h = Double(total) / Double(totalFlow) * sourceFlowFraction
+            sourceNodes.append(Node(id: bundle, total: total, yStart: y, yEnd: y + h))
+            sourceIndex[bundle] = sourceNodes.count - 1
+            y += h + sourcePad
+        }
+        // Build sorted target nodes.
+        var targetNodes: [Node] = []
+        var targetIndex: [String: Int] = [:]
+        y = 0
+        for (bundle, total) in targetTotals.sorted(by: nodeOrdering) {
+            let h = Double(total) / Double(totalFlow) * targetFlowFraction
+            targetNodes.append(Node(id: bundle, total: total, yStart: y, yEnd: y + h))
+            targetIndex[bundle] = targetNodes.count - 1
+            y += h + targetPad
+        }
+
+        // Stack ribbons within each node by deterministic order
+        // (source bundle asc, then count desc, then target bundle asc).
+        let sortedTransitions = transitions.sorted { lhs, rhs in
+            if lhs.fromBundle != rhs.fromBundle { return lhs.fromBundle < rhs.fromBundle }
+            if lhs.count != rhs.count { return lhs.count > rhs.count }
+            return lhs.toBundle < rhs.toBundle
+        }
+        var sourceUsed: [String: Double] = [:]
+        var targetUsed: [String: Double] = [:]
+        var ribbons: [Ribbon] = []
+        ribbons.reserveCapacity(sortedTransitions.count)
+        for t in sortedTransitions {
+            guard
+                let sIdx = sourceIndex[t.fromBundle],
+                let tIdx = targetIndex[t.toBundle]
+            else { continue }
+            let thickness = Double(t.count) / Double(totalFlow) * sourceFlowFraction
+            let sNode = sourceNodes[sIdx]
+            let tNode = targetNodes[tIdx]
+            let fromTop = sNode.yStart + (sourceUsed[t.fromBundle] ?? 0)
+            let toTop = tNode.yStart + (targetUsed[t.toBundle] ?? 0)
+            ribbons.append(
+                Ribbon(
+                    id: "\(t.fromBundle)→\(t.toBundle)",
+                    count: t.count,
+                    fromYCenter: fromTop + thickness / 2,
+                    toYCenter: toTop + thickness / 2,
+                    thickness: thickness
+                )
+            )
+            sourceUsed[t.fromBundle, default: 0] += thickness
+            targetUsed[t.toBundle, default: 0] += thickness
+        }
+
+        return SankeyLayout(sources: sourceNodes, targets: targetNodes, ribbons: ribbons)
+    }
+
+    /// Larger total first, then bundle id for tie-break determinism.
+    private static func nodeOrdering(
+        _ lhs: (key: String, value: Int),
+        _ rhs: (key: String, value: Int)
+    ) -> Bool {
+        if lhs.value != rhs.value { return lhs.value > rhs.value }
+        return lhs.key < rhs.key
     }
 }
 
