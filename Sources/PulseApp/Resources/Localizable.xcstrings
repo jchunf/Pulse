@@ -5070,6 +5070,40 @@
           }
         }
       }
+    },
+    "App switches today": {
+      "comment": "F-13 AppSankeyCard — card title.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App switches today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日应用切换"
+          }
+        }
+      }
+    },
+    "%lld switches across %lld pairs · today": {
+      "comment": "F-13 AppSankeyCard — subtitle showing total transitions and unique pair count for today.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld switches across %2$lld pairs · today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日共 %1$lld 次切换 · 涉及 %2$lld 组路径"
+          }
+        }
+      }
     }
   }
 }
