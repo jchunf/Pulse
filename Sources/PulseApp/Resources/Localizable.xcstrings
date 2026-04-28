@@ -5171,7 +5171,6 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "鼠标速度 · 最近一小时" } }
       }
     },
-<<<<<<< HEAD
     "Focus mode today": {
       "comment": "F-37 FocusModeCard — card title.",
       "localizations": {
@@ -5191,7 +5190,8 @@
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "DND / Work / Personal / Sleep …" } },
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "勿扰 / 工作 / 个人 / 睡眠 …" } }
-=======
+      }
+    },
     "Clipboard activity today": {
       "comment": "F-32 ClipboardCard — card title.",
       "localizations": {
@@ -5211,7 +5211,6 @@
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Frequency only — no content read." } },
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "仅记录频率，从不读取内容" } }
->>>>>>> d9715ac (feat(f-32): clipboard usage frequency (v2.0 second slice))
       }
     },
     "Hand balance · last 7 days": {

@@ -174,11 +174,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let systemEventEmitter: SystemEventEmitter
     private let appWatcher: NSWorkspaceAppWatcher
     private let lidPowerObserver: LidPowerObserver
-<<<<<<< HEAD
     private let focusObserver: FocusObserver
-=======
     private let clipboardObserver: ClipboardObserver
->>>>>>> d9715ac (feat(f-32): clipboard usage frequency (v2.0 second slice))
     private let titleObserver: AccessibilityTitleObserver
     private var pollTask: Task<Void, Never>?
     private var wakeObserver: NSObjectProtocol?
@@ -209,11 +206,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.systemEventEmitter = SystemEventEmitter()
         self.appWatcher = NSWorkspaceAppWatcher()
         self.lidPowerObserver = LidPowerObserver()
-<<<<<<< HEAD
         self.focusObserver = FocusObserver()
-=======
         self.clipboardObserver = ClipboardObserver()
->>>>>>> d9715ac (feat(f-32): clipboard usage frequency (v2.0 second slice))
         self.titleObserver = AccessibilityTitleObserver()
 
         self.healthModel = HealthModel(
@@ -288,11 +282,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         systemEventEmitter.stop()
         appWatcher.stop()
         lidPowerObserver.stop()
-<<<<<<< HEAD
         focusObserver.stop()
-=======
         clipboardObserver.stop()
->>>>>>> d9715ac (feat(f-32): clipboard usage frequency (v2.0 second slice))
         titleObserver.stop()
         anomalyMonitor.stop()
         if let wakeObserver {
@@ -555,11 +546,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         systemEventEmitter.start(handler: feed)
         appWatcher.start(handler: feed)
         lidPowerObserver.start(handler: feed)
-<<<<<<< HEAD
         focusObserver.start(handler: feed)
-=======
         clipboardObserver.start(handler: feed)
->>>>>>> d9715ac (feat(f-32): clipboard usage frequency (v2.0 second slice))
         titleObserver.start(handler: feed)
     }
 
@@ -737,7 +725,6 @@ final class DashboardModel: ObservableObject {
     /// F-08 — 7-day keycode distribution for the keyboard heatmap.
     /// Empty until the user opts into D-K2 capture.
     @Published private(set) var keyCodeDistribution: [KeyCodeCount] = []
-<<<<<<< HEAD
     /// F-37 — today's seconds spent in macOS Focus / DND mode.
     /// `0` when no Focus events have been recorded today (which is
     /// also the legitimate "user never enabled Focus" reading).
@@ -745,13 +732,11 @@ final class DashboardModel: ObservableObject {
     /// F-37 — fraction of the elapsed day spent in Focus mode.
     /// Surfaced as the headline "you've been in Focus N% of today".
     @Published private(set) var focusFractionToday: Double = 0
-=======
     /// F-32 — clipboard-change count for today.
     @Published private(set) var clipboardChangesToday: Int = 0
     /// F-32 — 24-element hour-of-day distribution of clipboard changes
     /// today. Used by `ClipboardCard`'s sparkline.
     @Published private(set) var clipboardHourly: [Int] = Array(repeating: 0, count: 24)
->>>>>>> d9715ac (feat(f-32): clipboard usage frequency (v2.0 second slice))
     /// F-20 — last-7-day left/right keystroke balance from
     /// `day_key_codes`. `nil` until there's enough classified
     /// activity to surface a meaningful ratio.
@@ -944,16 +929,13 @@ final class DashboardModel: ObservableObject {
             // F-18 — last-60-minute mouse-speed sparkline.
             let mouseSpeedRhythm = (try? store.mouseSpeed(endingAt: now, minutes: 60)) ?? MouseSpeedRhythm(samples: [])
             let keyCodes = try store.keyCodeDistribution(endingAt: now, days: 7)
-<<<<<<< HEAD
             // F-37 — today's Focus / DND seconds + fraction.
             let focusSeconds = (try? store.dailyFocusSeconds(on: dayStart, capUntil: now)) ?? 0
             let focusFraction = (try? store.focusFractionToday(on: dayStart, capUntil: now)) ?? 0
-=======
             // F-32 — today's clipboard-change count + hour-of-day
             // distribution.
             let clipboardCount = (try? store.dailyClipboardChanges(on: dayStart, capUntil: now)) ?? 0
             let clipboardHourly = (try? store.hourlyClipboardChanges(on: dayStart, capUntil: now)) ?? Array(repeating: 0, count: 24)
->>>>>>> d9715ac (feat(f-32): clipboard usage frequency (v2.0 second slice))
             // F-20 — left/right hand balance from the same window.
             // nil-out when classifiedTotal is too small to be a stable
             // ratio (a 30-keystroke fluke shouldn't read as "you favour
@@ -1066,13 +1048,10 @@ final class DashboardModel: ObservableObject {
             self.mouseSpeedRhythm = mouseSpeedRhythm
             self.keyCodeDistribution = keyCodes
             self.handBalance = handBalance
-<<<<<<< HEAD
             self.focusSecondsToday = focusSeconds
             self.focusFractionToday = focusFraction
-=======
             self.clipboardChangesToday = clipboardCount
             self.clipboardHourly = clipboardHourly
->>>>>>> d9715ac (feat(f-32): clipboard usage frequency (v2.0 second slice))
             self.focusDonut = focusDonut
             self.weekOverWeek = weekOverWeek
             self.trajectoryTiles = trajectoryTiles
