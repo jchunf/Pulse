@@ -12,7 +12,29 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
-<<<<<<< HEAD
+### F-18 — Mouse-speed sparkline (v2.1, zero-cost derivation)
+
+A 60-bar last-hour sparkline of average mouse speed (mm/s) in the
+Input pane, mirroring F-19's typing-tempo card. Pulled straight
+from `min_mouse.distance_mm` divided by 60 → per-minute speed; no
+new collector or migration.
+
+- **Query** — new `EventStore.mouseSpeed(endingAt:minutes:)` in
+  `MouseSpeedQueries.swift`. Returns `MouseSpeedRhythm` (60
+  samples). Average is over the whole minute, not "during the
+  moves only" — the user perceives "I was browsing slowly" as
+  low average speed, not "my few burst gestures were fast".
+- **Model** — `DashboardModel.mouseSpeedRhythm: MouseSpeedRhythm`.
+  Refresh fetches alongside `keyboardRhythm`.
+- **UI** — new `MouseSpeedCard` in the Input pane, after the mouse
+  heatmap. Title + 60-bar sparkline + "Avg N.N mm/s · peak M.M
+  mm/s" subtitle. Auto-hides when the window has zero move events.
+- **xcstrings** — `Mouse speed · last hour` + `Avg %1$.1f mm/s ·
+  peak %2$.1f mm/s` (en + zh-Hans).
+- **Tests** — `MouseSpeedQueriesTests` covers empty DB, basic
+  60mm-in-a-minute = 1mm/s, chronological ordering, peak tracking,
+  active-only average, and windowing.
+
 ### F-42 — Activity weight curve (v2.0, zero-cost derivation)
 
 A 30-day daily active-hours line chart in the Rhythm pane. The
@@ -41,7 +63,7 @@ story no single-day card can.
   (zero-array), single-hour read-back, multi-hour summing,
   gaps-render-as-zero, windowing, and `idle_seconds > 3600`
   clamping.
-=======
+
 ### F-19 — Typing-tempo sparkline (v2.1, zero-cost derivation)
 
 A 60-bar last-hour sparkline of presses-per-minute in the Input
@@ -70,7 +92,6 @@ it's pure derivation.
 - **Tests** — `KeyboardRhythmQueriesTests` covers empty DB, 60-
   element zero-array, populated minutes in chronological order,
   peak tracking, active-only average, and windowing.
->>>>>>> e347eed (feat(f-19): typing-tempo sparkline (last hour KPM curve))
 
 ### F-40 — Chronotype card (v2.1 pulled forward, zero-cost derivation)
 

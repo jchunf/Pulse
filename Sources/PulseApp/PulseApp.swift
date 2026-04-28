@@ -709,6 +709,9 @@ final class DashboardModel: ObservableObject {
     /// F-19 — typing-cadence sparkline (per-minute KPM over the last
     /// 60 minutes). Always 60 elements; zero minutes preserved.
     @Published private(set) var keyboardRhythm: KeyboardRhythm = KeyboardRhythm(samples: [])
+    /// F-18 — per-minute mouse speed (mm/s) over the last hour.
+    /// Always 60 samples. Same shape as `keyboardRhythm` for symmetry.
+    @Published private(set) var mouseSpeedRhythm: MouseSpeedRhythm = MouseSpeedRhythm(samples: [])
     /// F-09 — today's time-in-category breakdown for the focus donut.
     @Published private(set) var focusDonut: FocusDonut = .empty
     /// F-08 — 7-day keycode distribution for the keyboard heatmap.
@@ -899,6 +902,8 @@ final class DashboardModel: ObservableObject {
             let activityWeight = (try? store.activityWeight(endingAt: now, days: 30)) ?? []
             // F-19 — last-60-minute typing-cadence sparkline.
             let keyboardRhythm = (try? store.keyboardRhythm(endingAt: now, minutes: 60)) ?? KeyboardRhythm(samples: [])
+            // F-18 — last-60-minute mouse-speed sparkline.
+            let mouseSpeedRhythm = (try? store.mouseSpeed(endingAt: now, minutes: 60)) ?? MouseSpeedRhythm(samples: [])
             let keyCodes = try store.keyCodeDistribution(endingAt: now, days: 7)
             // F-09 — ask for up to 200 bundles so the "other" slice is
             // accurate. In practice a day's distinct-bundle count is
@@ -1001,6 +1006,7 @@ final class DashboardModel: ObservableObject {
             self.chronotype = chronotype
             self.activityWeight = activityWeight
             self.keyboardRhythm = keyboardRhythm
+            self.mouseSpeedRhythm = mouseSpeedRhythm
             self.keyCodeDistribution = keyCodes
             self.focusDonut = focusDonut
             self.weekOverWeek = weekOverWeek
@@ -1825,6 +1831,9 @@ struct DashboardView: View {
                 days: $model.trajectoryDays,
                 mode: $model.trajectoryMode
             )
+        }
+        if model.mouseSpeedRhythm.totalMoveEvents > 0 {
+            MouseSpeedCard(rhythm: model.mouseSpeedRhythm)
         }
     }
 
@@ -4940,6 +4949,65 @@ private struct KeyboardRhythmSparkline: View {
             HStack(alignment: .bottom, spacing: 1) {
                 ForEach(samples) { sample in
                     let intensity = Double(sample.pressCount) / Double(peak)
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(PulseDesign.coral.opacity(0.30 + intensity * 0.55))
+                        .frame(height: max(2, intensity * geo.size.height))
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - F-18 — Mouse-speed sparkline
+
+/// F-18 — last-60-minute mouse-speed sparkline. Reads
+/// `DashboardModel.mouseSpeedRhythm`; the input-section guard hides
+/// the card whole when the window has zero move events.
+struct MouseSpeedCard: View {
+
+    let rhythm: MouseSpeedRhythm
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "speedometer")
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(0.85)
+                Text("Mouse speed · last hour", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            Text(
+                String.localizedStringWithFormat(
+                    NSLocalizedString(
+                        "Avg %1$.1f mm/s · peak %2$.1f mm/s",
+                        bundle: .pulse,
+                        comment: "F-18 MouseSpeedCard — subtitle. %1$.1f is average mm/s across active minutes; %2$.1f is peak mm/s."
+                    ),
+                    rhythm.avgMmPerSecondActive,
+                    rhythm.peakMmPerSecond
+                )
+            )
+            .font(PulseDesign.labelFont)
+            .tracking(0.3)
+            .foregroundStyle(.secondary)
+            MouseSpeedSparkline(samples: rhythm.samples, peak: max(0.1, rhythm.peakMmPerSecond))
+                .frame(height: 56)
+        }
+        .pulseFeaturedCard()
+    }
+}
+
+private struct MouseSpeedSparkline: View {
+    let samples: [MouseSpeedRhythm.Sample]
+    let peak: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            HStack(alignment: .bottom, spacing: 1) {
+                ForEach(samples) { sample in
+                    let intensity = sample.mmPerSecond / peak
                     RoundedRectangle(cornerRadius: 1.5)
                         .fill(PulseDesign.coral.opacity(0.30 + intensity * 0.55))
                         .frame(height: max(2, intensity * geo.size.height))
