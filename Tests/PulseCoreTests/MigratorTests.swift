@@ -28,10 +28,10 @@ struct MigratorTests {
         }
     }
 
-    @Test("bundled migrator loads up to V6")
+    @Test("bundled migrator loads up to V7")
     func bundledMigratorLoads() throws {
         let migrator = try Migrator.bundled()
-        #expect(migrator.targetVersion == 6)
+        #expect(migrator.targetVersion == 7)
     }
 
     @Test("in-memory database migrated to head has core tables")
@@ -41,6 +41,7 @@ struct MigratorTests {
             try String.fetchAll(db, sql: "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         }
         let required = [
+            "day_click_density",
             "day_mouse_density",
             "display_snapshots",
             "hour_app",
@@ -73,7 +74,7 @@ struct MigratorTests {
         let version: Int? = try db.queue.read { db in
             try Int.fetchOne(db, sql: "PRAGMA user_version")
         }
-        #expect(version == 6)
+        #expect(version == 7)
     }
 
     @Test("re-running migrator on an up-to-date DB is a no-op")
@@ -81,7 +82,7 @@ struct MigratorTests {
         let db = try PulseDatabase.inMemory()
         let migrator = try Migrator.bundled()
         let version = try migrator.migrate(db.queue)
-        #expect(version == 6)
+        #expect(version == 7)
     }
 
     @Test("V3 adds scroll_ticks to hour_summary")
@@ -137,6 +138,18 @@ struct MigratorTests {
             )
         }
         #expect(columns == ["day", "key_code", "count"])
+    }
+
+    @Test("V7 creates day_click_density with expected shape (mirrors V4)")
+    func v7CreatesDayClickDensity() throws {
+        let db = try PulseDatabase.inMemory()
+        let columns: [String] = try db.queue.read { db in
+            try String.fetchAll(
+                db,
+                sql: "SELECT name FROM pragma_table_info('day_click_density') ORDER BY cid"
+            )
+        }
+        #expect(columns == ["day", "display_id", "bin_x", "bin_y", "count"])
     }
 
     @Test("raw_mouse_moves has expected column shape")
