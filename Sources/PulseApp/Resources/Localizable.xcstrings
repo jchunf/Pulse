@@ -5128,6 +5128,24 @@
         }
       }
     },
+    "Activity weight": {
+      "comment": "F-42 ActivityWeightCard — card title. Metaphor: daily attention has a 'weight' you can track over time.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Activity weight" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "活动量曲线" } }
+      }
+    },
+    "Avg %1$.1f h/day · peak %2$.1f h on %3$@": {
+      "comment": "F-42 ActivityWeightCard — subtitle. %1$.1f average daily active hours, %2$.1f peak day's hours, %3$@ short date for the peak day.",
+      "localizations": {
+        "en": {
+          "stringUnit": { "state": "translated", "value": "Avg %1$.1f h/day · peak %2$.1f h on %3$@" }
+        },
+        "zh-Hans": {
+          "stringUnit": { "state": "translated", "value": "日均 %1$.1f 小时 · 峰值 %2$.1f 小时（%3$@）" }
+        }
+      }
+    },
     "%1$@ clicks · last %2$lld days": {
       "comment": "F-16 MouseTrajectoryCard — click-mode subtitle. %1$@ is the formatted click count, %2$lld is the user-selected window size in days.",
       "localizations": {

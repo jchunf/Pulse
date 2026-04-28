@@ -12,6 +12,35 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### F-42 — Activity weight curve (v2.0, zero-cost derivation)
+
+A 30-day daily active-hours line chart in the Rhythm pane. The
+"digital weight" metaphor: your attention has a daily total like
+body weight has a daily measurement, and seeing the trend tells a
+story no single-day card can.
+
+- **Query** — new `EventStore.activityWeight(endingAt:days:)` in
+  `ActivityWeightQueries.swift`. Per-day sum of `(3600 −
+  idle_seconds)` from the existing `hour_summary` table, divided
+  by 3600 → daily active hours. Uses the same local-midnight
+  bucketing as the rollup so a row recorded at 23:30 lands in the
+  day the user perceives. Days with no activity surface as zero
+  (preserves chart gaps rather than silently dropping). No new
+  collector, no migration.
+- **Model** — `DashboardModel.activityWeight: [ActivityWeightPoint]`
+  (always 30 elements). Refresh path fetches alongside chronotype.
+- **UI** — new `ActivityWeightCard` in the Rhythm pane between
+  `ChronotypeCard` and `ContinuityCard`. SwiftUI Charts
+  area-plus-line in coral; subtitle reads "Avg N.N h/day · peak
+  N.N h on <date>". Auto-hides when every day in the window is
+  zero.
+- **xcstrings** — `Activity weight` + `Avg %1$.1f h/day · peak
+  %2$.1f h on %3$@` (en + zh-Hans).
+- **Tests** — `ActivityWeightQueriesTests` covers empty DB
+  (zero-array), single-hour read-back, multi-hour summing,
+  gaps-render-as-zero, windowing, and `idle_seconds > 3600`
+  clamping.
+
 ### F-40 — Chronotype card (v2.1 pulled forward, zero-cost derivation)
 
 Surfaces the user's chronotype label ("morning person / afternoon
