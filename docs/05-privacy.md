@@ -80,6 +80,22 @@
 - 用系统 API 能拿到的是相对受限的计数（避免 private API 风险）
 - 只记"被打断次数"，不记通知来源 App 或内容
 
+### 4.7 Focus / 专注模式（F-37）
+
+- **数据等级**：L —— 仅"是否在专注中"+ 模式名（"Work" / "Personal"
+  / "Sleep" 等）。**不读取**任何通知白名单 / 应用屏蔽列表 / 或
+  Focus 内部的过滤规则
+- **来源**：监听 `~/Library/DoNotDisturb/DB/Assertions.json`（用户
+  自己 Library 目录下，无需 TCC 权限）+ defensive 监听
+  `com.apple.focus.focus-mode-changed` distributed notification
+- **存储**：`system_events` 中两类 row：`focus_on`（payload = 模式
+  名 or 空）/ `focus_off`（无 payload）。读侧把这些 event 配对成
+  时间区间，sum 出"今日专注秒数"
+- **用户控制**：默认开启。可在 Preferences 单独关闭采集（不影响
+  其他数据源）
+- **不启用任何 entitlement 或权限弹窗**——这是个人 Library 文件，
+  系统不需要授权读取
+
 ## 五、用户控制入口
 
 | 控制 | UI 位置 | 行为 |

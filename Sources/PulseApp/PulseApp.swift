@@ -174,6 +174,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let systemEventEmitter: SystemEventEmitter
     private let appWatcher: NSWorkspaceAppWatcher
     private let lidPowerObserver: LidPowerObserver
+    private let focusObserver: FocusObserver
     private let titleObserver: AccessibilityTitleObserver
     private var pollTask: Task<Void, Never>?
     private var wakeObserver: NSObjectProtocol?
@@ -204,6 +205,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.systemEventEmitter = SystemEventEmitter()
         self.appWatcher = NSWorkspaceAppWatcher()
         self.lidPowerObserver = LidPowerObserver()
+        self.focusObserver = FocusObserver()
         self.titleObserver = AccessibilityTitleObserver()
 
         self.healthModel = HealthModel(
@@ -278,6 +280,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         systemEventEmitter.stop()
         appWatcher.stop()
         lidPowerObserver.stop()
+        focusObserver.stop()
         titleObserver.stop()
         anomalyMonitor.stop()
         if let wakeObserver {
@@ -540,6 +543,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         systemEventEmitter.start(handler: feed)
         appWatcher.start(handler: feed)
         lidPowerObserver.start(handler: feed)
+        focusObserver.start(handler: feed)
         titleObserver.start(handler: feed)
     }
 
@@ -717,6 +721,13 @@ final class DashboardModel: ObservableObject {
     /// F-08 — 7-day keycode distribution for the keyboard heatmap.
     /// Empty until the user opts into D-K2 capture.
     @Published private(set) var keyCodeDistribution: [KeyCodeCount] = []
+    /// F-37 — today's seconds spent in macOS Focus / DND mode.
+    /// `0` when no Focus events have been recorded today (which is
+    /// also the legitimate "user never enabled Focus" reading).
+    @Published private(set) var focusSecondsToday: Int = 0
+    /// F-37 — fraction of the elapsed day spent in Focus mode.
+    /// Surfaced as the headline "you've been in Focus N% of today".
+    @Published private(set) var focusFractionToday: Double = 0
     /// F-20 — last-7-day left/right keystroke balance from
     /// `day_key_codes`. `nil` until there's enough classified
     /// activity to surface a meaningful ratio.
@@ -909,6 +920,9 @@ final class DashboardModel: ObservableObject {
             // F-18 — last-60-minute mouse-speed sparkline.
             let mouseSpeedRhythm = (try? store.mouseSpeed(endingAt: now, minutes: 60)) ?? MouseSpeedRhythm(samples: [])
             let keyCodes = try store.keyCodeDistribution(endingAt: now, days: 7)
+            // F-37 — today's Focus / DND seconds + fraction.
+            let focusSeconds = (try? store.dailyFocusSeconds(on: dayStart, capUntil: now)) ?? 0
+            let focusFraction = (try? store.focusFractionToday(on: dayStart, capUntil: now)) ?? 0
             // F-20 — left/right hand balance from the same window.
             // nil-out when classifiedTotal is too small to be a stable
             // ratio (a 30-keystroke fluke shouldn't read as "you favour
@@ -1021,6 +1035,8 @@ final class DashboardModel: ObservableObject {
             self.mouseSpeedRhythm = mouseSpeedRhythm
             self.keyCodeDistribution = keyCodes
             self.handBalance = handBalance
+            self.focusSecondsToday = focusSeconds
+            self.focusFractionToday = focusFraction
             self.focusDonut = focusDonut
             self.weekOverWeek = weekOverWeek
             self.trajectoryTiles = trajectoryTiles
@@ -1798,6 +1814,12 @@ struct DashboardView: View {
                 .frame(maxWidth: .infinity)
             UsagePostureCard(posture: model.sessionPosture)
                 .frame(maxWidth: .infinity)
+        }
+        if model.focusSecondsToday > 0 {
+            FocusModeCard(
+                secondsToday: model.focusSecondsToday,
+                fractionToday: model.focusFractionToday
+            )
         }
         if model.focusDonut.totalSeconds > 0 {
             FocusDonutCard(donut: model.focusDonut)
@@ -3208,6 +3230,52 @@ struct InsightsCard: View {
                 Int64(hoursToQualify)
             )
         }
+    }
+}
+
+// MARK: - F-37 — Focus Mode card
+
+/// F-37 — surfaces today's macOS Focus / Do-Not-Disturb time. Reads
+/// `DashboardModel.focusSecondsToday / focusFractionToday`. Auto-
+/// hides until at least one Focus event has fired (the upstream
+/// guard in `focusSection`).
+struct FocusModeCard: View {
+
+    let secondsToday: Int
+    let fractionToday: Double
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "moon.zzz.fill")
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(0.85)
+                Text("Focus mode today", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(PulseFormat.duration(seconds: secondsToday))
+                    .font(PulseDesign.heroSecondaryFont)
+                    .foregroundStyle(PulseDesign.coral)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(
+                        String.localizedStringWithFormat(
+                            NSLocalizedString(
+                                "%.0f%% of today",
+                                bundle: .pulse,
+                                comment: "F-37 FocusModeCard — fraction of elapsed day spent in Focus mode."
+                            ),
+                            fractionToday * 100
+                        )
+                    )
+                    .font(.footnote.monospacedDigit())
+                    Text("DND / Work / Personal / Sleep …", bundle: .pulse)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .pulseFeaturedCard()
     }
 }
 
