@@ -4065,18 +4065,21 @@ struct MouseTrajectoryTileData: Equatable {
 /// `.task(id:)` so the main actor keeps moving while the CGImage is
 /// produced. The card is omitted entirely when no display has cells
 /// (see the `trajectoryTiles.isEmpty` guard in `DashboardView`).
-/// F-04 dwell vs F-16 click toggle on `MouseTrajectoryCard`. Stored
-/// on `DashboardModel.trajectoryMode`; flipping it is instant (both
-/// histograms are kept warm in the model so no refresh round-trip).
+/// F-04 dwell vs F-16 click vs F-15 dead-zones toggle on
+/// `MouseTrajectoryCard`. Stored on `DashboardModel.trajectoryMode`;
+/// flipping it is instant (the dwell + click histograms are kept warm
+/// in the model so no refresh round-trip; dead zones derive from the
+/// dwell histogram in the renderer).
 enum MouseTrajectoryMode: String, Hashable, CaseIterable, Identifiable {
-    case dwell, click
+    case dwell, click, deadZones
 
     var id: String { rawValue }
 
     var titleKey: LocalizedStringKey {
         switch self {
-        case .dwell: return "Dwell"
-        case .click: return "Clicks"
+        case .dwell:     return "Dwell"
+        case .click:     return "Clicks"
+        case .deadZones: return "Untouched"
         }
     }
 }
@@ -4101,13 +4104,14 @@ struct MouseTrajectoryCard: View {
     /// stories most users want to see for a cursor heatmap.
     private static let dayOptions = [1, 3, 7, 30]
 
-    /// Tiles for the currently-selected mode. The card otherwise
-    /// behaves identically — same renderer, same per-tile shape,
-    /// same per-display labelling.
+    /// Tiles for the currently-selected mode. Dead-zones is derived
+    /// from the dwell histogram (cells the cursor never touched), so
+    /// it shares the dwell tile set; only the renderer's per-cell
+    /// colour math flips.
     private var tiles: [MouseTrajectoryTileData] {
         switch mode {
-        case .dwell: return dwellTiles
-        case .click: return clickTiles
+        case .dwell, .deadZones: return dwellTiles
+        case .click:             return clickTiles
         }
     }
 
@@ -4147,7 +4151,8 @@ struct MouseTrajectoryCard: View {
                     MouseTrajectoryTile(
                         tile: tile,
                         ordinal: index + 1,
-                        isOnlyTile: tiles.count == 1
+                        isOnlyTile: tiles.count == 1,
+                        mode: mode
                     )
                 }
             }
@@ -4157,7 +4162,26 @@ struct MouseTrajectoryCard: View {
 
     @ViewBuilder
     private var subtitle: some View {
-        if totalMoves > 0 {
+        if mode == .deadZones {
+            // Dead-zones derives from the dwell histogram, but the
+            // "interesting" stat is what % of the screen the cursor
+            // never visited — totalMoves doesn't speak to that.
+            // Fall back to a static description anchored to the
+            // current window.
+            Text(
+                String.localizedStringWithFormat(
+                    NSLocalizedString(
+                        "Untouched regions · last %lld days",
+                        bundle: .pulse,
+                        comment: "F-15 MouseTrajectoryCard — dead-zones subtitle."
+                    ),
+                    Int64(days)
+                )
+            )
+            .font(PulseDesign.labelFont)
+            .tracking(0.3)
+            .foregroundStyle(.secondary)
+        } else if totalMoves > 0 {
             let formatted = totalMoves.formatted(.number)
             let template: String = {
                 switch mode {
@@ -4173,6 +4197,8 @@ struct MouseTrajectoryCard: View {
                         bundle: .pulse,
                         comment: "F-16 MouseTrajectoryCard — click-mode subtitle."
                     )
+                case .deadZones:
+                    return ""  // unreachable — handled above.
                 }
             }()
             Text(
@@ -4270,6 +4296,10 @@ private struct MouseTrajectoryTile: View {
     /// the card keep its concise "Primary display" label instead
     /// of the noisier "Display 1".
     let isOnlyTile: Bool
+    /// Currently-selected card mode. The tile passes it through to
+    /// `MouseTrailMosaic.render` which switches its per-cell colour
+    /// math accordingly (dwell / click / dead-zones).
+    let mode: MouseTrajectoryMode
 
     /// Aggregation grid for the mosaic. 16 × 10 ≈ 16:10 display
     /// aspect; on wider monitors the cells stretch horizontally,
@@ -4345,7 +4375,8 @@ private struct MouseTrajectoryTile: View {
                     MouseTrailMosaic(
                         histogram: tile.histogram,
                         cellsX: Self.mosaicCellsX,
-                        cellsY: Self.mosaicCellsY
+                        cellsY: Self.mosaicCellsY,
+                        mode: mode
                     )
                     .padding(6)
                 }
@@ -4415,40 +4446,52 @@ private struct MouseTrajectoryTile: View {
 /// .interpolation(.medium)`. SwiftUI/CoreGraphics resamples the
 /// tiny image up to whatever the tile measures during scroll —
 /// effectively free, no redraw work in the view body.
+/// Composite identity for `MouseTrailMosaic`'s `.task(id:)`. Re-renders
+/// whenever EITHER the histogram or the active mode changes — flipping
+/// the dwell/click/dead-zones toggle re-runs the render with the same
+/// data but different per-cell colour math.
+struct TrajectoryRenderKey: Hashable {
+    let histogram: MouseDisplayHistogram
+    let mode: MouseTrajectoryMode
+}
+
 struct MouseTrailMosaic: View {
 
     let histogram: MouseDisplayHistogram
     let cellsX: Int
     let cellsY: Int
+    /// Render mode. `.dwell` and `.click` both produce the standard
+    /// sage → coral heatmap (sourced from whichever histogram the
+    /// parent supplies). `.deadZones` inverts: cells with NO activity
+    /// in `histogram` get tinted, cells with activity stay
+    /// transparent — "where you've never been on this screen".
+    let mode: MouseTrajectoryMode
 
     @State private var image: CGImage?
 
     var body: some View {
         Group {
             if let image {
-                // A62: back to `.interpolation(.none)` after the
-                // A61 bilinear-smoothed render read as a smoky
-                // blur ("还是分块显示吧 颜色搞得好看一些"). With
-                // discrete cells + the new amber→coral→halo warm
-                // ramp the figure reads as a tiled mosaic again
-                // — but the colours now lerp through a sunset-
-                // gradient, not the flat single-hue of A60.
                 Image(decorative: image, scale: 1.0)
                     .resizable()
                     .interpolation(.none)
             } else {
                 // No image yet (first render or empty cells) —
-                // the dark plate from the parent shows through.
+                // the plate from the parent shows through.
                 Color.clear
             }
         }
-        .task(id: histogram) {
+        // Re-render whenever EITHER the histogram or the mode
+        // changes. Mode-only changes are the toggle flip
+        // (instant, just re-renders with different colour math
+        // against the same matrix).
+        .task(id: TrajectoryRenderKey(histogram: histogram, mode: mode)) {
             let rendered = Self.render(
                 histogram: histogram,
                 cellsX: cellsX,
-                cellsY: cellsY
+                cellsY: cellsY,
+                mode: mode
             )
-            // Hop back to the main actor for @State assignment.
             await MainActor.run { self.image = rendered }
         }
     }
@@ -4473,7 +4516,8 @@ struct MouseTrailMosaic: View {
     nonisolated static func render(
         histogram: MouseDisplayHistogram,
         cellsX: Int,
-        cellsY: Int
+        cellsY: Int,
+        mode: MouseTrajectoryMode = .dwell
     ) -> CGImage? {
         guard cellsX > 0, cellsY > 0 else { return nil }
 
@@ -4490,6 +4534,31 @@ struct MouseTrailMosaic: View {
             matrix[idx] &+= cell.count
             if matrix[idx] > peak { peak = matrix[idx] }
         }
+
+        let pixelCount = cellsX * cellsY
+        var pixels = [UInt8](repeating: 0, count: pixelCount * 4)
+
+        // F-15 dead-zones: invert the matrix. Cells with NO activity
+        // get tinted (the user has never been here on this screen);
+        // cells with activity stay transparent so the plate shows
+        // through. Sage tint at α 0.55 — clearly distinct from the
+        // dwell/click sage→coral palette so a quick glance can tell
+        // "I'm in dead-zones mode" without reading the toggle.
+        if mode == .deadZones {
+            for i in 0..<pixelCount where matrix[i] == 0 {
+                let off = i * 4
+                let alpha = 0.55
+                let r = 0.55, g = 0.70, b = 0.55  // sage 0x86C3A0-ish
+                pixels[off]     = UInt8((r * alpha * 255).rounded())
+                pixels[off + 1] = UInt8((g * alpha * 255).rounded())
+                pixels[off + 2] = UInt8((b * alpha * 255).rounded())
+                pixels[off + 3] = UInt8((alpha * 255).rounded())
+            }
+            // Build the CGImage even when every cell is dead — that
+            // IS the story to tell ("nothing on this screen yet").
+            return Self.makeImage(pixels: pixels, cellsX: cellsX, cellsY: cellsY)
+        }
+
         guard peak > 0 else { return nil }
         let peakLog = log1p(Double(peak))
 
@@ -4509,8 +4578,6 @@ struct MouseTrailMosaic: View {
         // is heavily skewed (one or two hot regions dominate
         // the long tail), but feed the resulting `intensity`
         // into the same RGB lerp.
-        let pixelCount = cellsX * cellsY
-        var pixels = [UInt8](repeating: 0, count: pixelCount * 4)
         for i in 0..<pixelCount {
             let count = matrix[i]
             guard count > 0 else { continue }
@@ -4537,6 +4604,17 @@ struct MouseTrailMosaic: View {
             pixels[off + 3] = UInt8((alpha * 255).rounded())
         }
 
+        return Self.makeImage(pixels: pixels, cellsX: cellsX, cellsY: cellsY)
+    }
+
+    /// Builds a premultiplied-RGBA `CGImage` from the supplied pixel
+    /// buffer. Factored out so dwell/click and dead-zones modes share
+    /// the same final step.
+    nonisolated private static func makeImage(
+        pixels: [UInt8],
+        cellsX: Int,
+        cellsY: Int
+    ) -> CGImage? {
         let bytesPerRow = cellsX * 4
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)

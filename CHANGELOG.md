@@ -12,6 +12,39 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### F-15 — Dead-zone map (v2.1 pulled forward as third heatmap toggle)
+
+Adds a third "Untouched" mode to `MouseTrajectoryCard`'s segmented
+toggle. Inverts the F-04 dwell histogram: cells the cursor *never*
+visited in the window get tinted, cells with any activity stay
+transparent. The result is a screen-shape silhouette of "places I
+never go" — useful for noticing entire regions you've ignored
+(secondary monitors, far corners, an underutilised side panel).
+
+- **Data** — pure derivation. Reuses the existing
+  `EventStore.mouseDensity(...)` query + the dwell histogram already
+  cached on `DashboardModel.trajectoryTiles`. No new query, no new
+  migration, no new collector.
+- **Renderer** — `MouseTrailMosaic.render(...)` gains a
+  `mode: MouseTrajectoryMode = .dwell` parameter. In `.deadZones`
+  mode the per-cell math flips: cells with `count == 0` get a sage
+  tint at α 0.55, cells with `count > 0` stay transparent. The
+  pixel-buffer → `CGImage` step is factored out into a private
+  `makeImage` helper shared by both branches.
+- **UI** — `MouseTrajectoryMode` gains a `.deadZones` case; the
+  segmented picker on the heatmap card now offers `Dwell / Clicks /
+  Untouched`. Subtitle copy switches to "Untouched regions · last N
+  days" in dead-zones mode (the `%@ moves` count doesn't speak to the
+  same story).
+- **Render perf** — `.task(id:)` re-fires only when the histogram or
+  mode changes; flipping the toggle re-renders the same matrix with
+  different colour math (microseconds).
+- **`MouseDisplayHistogram` + `MouseDensityCell` are now `Hashable`**
+  so the new `TrajectoryRenderKey` (histogram, mode) composite can
+  drive `.task(id:)`.
+- **xcstrings** — `Untouched` / `Untouched regions · last %lld days`
+  (en + zh-Hans).
+
 ### F-21 — Most chaotic multitasking minute (v2.0 fourth slice)
 
 A small derived call-out: today's single 60-second window with the

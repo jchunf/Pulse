@@ -178,7 +178,7 @@ public enum MouseTrajectoryGrid {
 
 /// One non-zero cell of the binned density grid for a given display.
 /// `binX` / `binY` are 0-based integers in `[0, MouseTrajectoryGrid.size)`.
-public struct MouseDensityCell: Sendable, Equatable {
+public struct MouseDensityCell: Sendable, Equatable, Hashable {
     public let binX: Int
     public let binY: Int
     public let count: Int64
@@ -193,7 +193,7 @@ public struct MouseDensityCell: Sendable, Equatable {
 /// All activity recorded for one display inside the queried window.
 /// Callers iterate `cells` to render; `totalCount` is cached for the
 /// card header ("N moves recorded across this display").
-public struct MouseDisplayHistogram: Sendable, Equatable {
+public struct MouseDisplayHistogram: Sendable, Equatable, Hashable {
     public let displayId: UInt32
     public let gridSize: Int
     public let totalCount: Int64
