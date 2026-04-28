@@ -717,6 +717,10 @@ final class DashboardModel: ObservableObject {
     /// F-08 — 7-day keycode distribution for the keyboard heatmap.
     /// Empty until the user opts into D-K2 capture.
     @Published private(set) var keyCodeDistribution: [KeyCodeCount] = []
+    /// F-20 — last-7-day left/right keystroke balance from
+    /// `day_key_codes`. `nil` until there's enough classified
+    /// activity to surface a meaningful ratio.
+    @Published private(set) var handBalance: HandBalance?
     /// F-22 — today's passive consumption summary (foreground + idle
     /// + screen-on time attributed by bundle). `.empty` until the day
     /// has at least one qualifying window.
@@ -905,6 +909,14 @@ final class DashboardModel: ObservableObject {
             // F-18 — last-60-minute mouse-speed sparkline.
             let mouseSpeedRhythm = (try? store.mouseSpeed(endingAt: now, minutes: 60)) ?? MouseSpeedRhythm(samples: [])
             let keyCodes = try store.keyCodeDistribution(endingAt: now, days: 7)
+            // F-20 — left/right hand balance from the same window.
+            // nil-out when classifiedTotal is too small to be a stable
+            // ratio (a 30-keystroke fluke shouldn't read as "you favour
+            // right hand 80%").
+            let handBalance: HandBalance? = {
+                guard let raw = try? store.handBalance(endingAt: now, days: 7) else { return nil }
+                return raw.classifiedTotal >= 200 ? raw : nil
+            }()
             // F-09 — ask for up to 200 bundles so the "other" slice is
             // accurate. In practice a day's distinct-bundle count is
             // well under 50, so 200 is pure headroom.
@@ -1008,6 +1020,7 @@ final class DashboardModel: ObservableObject {
             self.keyboardRhythm = keyboardRhythm
             self.mouseSpeedRhythm = mouseSpeedRhythm
             self.keyCodeDistribution = keyCodes
+            self.handBalance = handBalance
             self.focusDonut = focusDonut
             self.weekOverWeek = weekOverWeek
             self.trajectoryTiles = trajectoryTiles
@@ -1821,6 +1834,9 @@ struct DashboardView: View {
     @ViewBuilder
     private var inputSection: some View {
         KeyboardHeatmapCard(keyCodes: model.keyCodeDistribution)
+        if let balance = model.handBalance {
+            HandBalanceCard(balance: balance)
+        }
         if model.keyboardRhythm.totalPresses > 0 {
             KeyboardRhythmCard(rhythm: model.keyboardRhythm)
         }
@@ -4896,6 +4912,84 @@ struct MouseTrailMosaic: View {
 ///   on every keyDown and starts folding keycodes into the buffer.
 ///   Per Q-06 / docs/05-privacy.md §4.1, capture is explicitly opt-in.
 // MARK: - F-19 — Keyboard rhythm sparkline
+
+// MARK: - F-20 — Dual-hand keystroke balance
+
+/// F-20 — split bar showing what fraction of your keystrokes were hit
+/// by which hand over the last 7 days. Reads
+/// `DashboardModel.handBalance`; the model nil-outs below the
+/// classified-total threshold so a low-data-day fluke doesn't read as
+/// "you favour right hand 100%".
+struct HandBalanceCard: View {
+
+    let balance: HandBalance
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "hand.raised.fill")
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(0.85)
+                Text("Hand balance · last 7 days", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            Text(
+                String.localizedStringWithFormat(
+                    NSLocalizedString(
+                        "Left %1$.0f%% · Right %2$.0f%% · %3$lld classified keystrokes",
+                        bundle: .pulse,
+                        comment: "F-20 HandBalanceCard — subtitle. %1$.0f and %2$.0f are percentages summing to 100; %3$lld is the count of classified keystrokes."
+                    ),
+                    balance.leftFraction * 100,
+                    balance.rightFraction * 100,
+                    balance.classifiedTotal
+                )
+            )
+            .font(PulseDesign.labelFont)
+            .tracking(0.3)
+            .foregroundStyle(.secondary)
+            HandBalanceBar(balance: balance)
+                .frame(height: 18)
+        }
+        .pulseFeaturedCard()
+    }
+}
+
+/// Horizontal split bar — sage left / coral right. Width proportional
+/// to the classified fraction of each hand. A thin centerline stays
+/// visible at the 50% mark to make the deviation read.
+private struct HandBalanceBar: View {
+    let balance: HandBalance
+
+    private static let sageLeft = Color(
+        red: 0.55, green: 0.70, blue: 0.55  // sage 0x86C3A0-ish
+    )
+
+    var body: some View {
+        GeometryReader { geo in
+            let leftWidth = CGFloat(balance.leftFraction) * geo.size.width
+            let rightWidth = CGFloat(balance.rightFraction) * geo.size.width
+            ZStack(alignment: .leading) {
+                // Left hand fill (sage).
+                Rectangle()
+                    .fill(Self.sageLeft.opacity(0.85))
+                    .frame(width: leftWidth)
+                // Right hand fill (coral), positioned after left.
+                Rectangle()
+                    .fill(PulseDesign.coral.opacity(0.85))
+                    .frame(width: rightWidth)
+                    .offset(x: leftWidth)
+                // Centerline at 50% — gives the eye a deviation
+                // anchor without needing a separate gridline.
+                Rectangle()
+                    .fill(Color.primary.opacity(0.18))
+                    .frame(width: 1)
+                    .offset(x: geo.size.width / 2 - 0.5)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
+    }
+}
 
 /// F-19 — last-60-minute typing-cadence sparkline. The roadmap's
 /// inter-keystroke-interval distribution can't survive past

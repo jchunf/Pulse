@@ -5171,6 +5171,24 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "鼠标速度 · 最近一小时" } }
       }
     },
+    "Hand balance · last 7 days": {
+      "comment": "F-20 HandBalanceCard — card title.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Hand balance · last 7 days" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "双手均衡度 · 最近 7 天" } }
+      }
+    },
+    "Left %1$.0f%% · Right %2$.0f%% · %3$lld classified keystrokes": {
+      "comment": "F-20 HandBalanceCard — subtitle. %1$.0f and %2$.0f are percentages summing to 100; %3$lld is classified keystrokes.",
+      "localizations": {
+        "en": {
+          "stringUnit": { "state": "translated", "value": "Left %1$.0f%% · Right %2$.0f%% · %3$lld classified keystrokes" }
+        },
+        "zh-Hans": {
+          "stringUnit": { "state": "translated", "value": "左手 %1$.0f%% · 右手 %2$.0f%% · 共 %3$lld 次可分类按键" }
+        }
+      }
+    },
     "Avg %1$.1f mm/s · peak %2$.1f mm/s": {
       "comment": "F-18 MouseSpeedCard — subtitle. %1$.1f is average mm/s across active minutes, %2$.1f is peak mm/s.",
       "localizations": {
