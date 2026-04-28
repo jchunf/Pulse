@@ -696,6 +696,9 @@ final class DashboardModel: ObservableObject {
     /// used by `AppCombinationsCard`. Row count capped at 6 by the
     /// query layer.
     @Published private(set) var appCombinationsToday: [AppCombination] = []
+    /// F-21 — today's busiest 60-second window of foreground switches,
+    /// `nil` when no minute crossed the threshold (default 3).
+    @Published private(set) var chaoticMomentToday: ChaoticMoment?
     /// F-09 — today's time-in-category breakdown for the focus donut.
     @Published private(set) var focusDonut: FocusDonut = .empty
     /// F-08 — 7-day keycode distribution for the keyboard heatmap.
@@ -869,6 +872,15 @@ final class DashboardModel: ObservableObject {
                 minSize: 2,
                 limit: 6
             )) ?? []
+            // F-21 — today's busiest 60-second window. Threshold 3
+            // means we only call out a "moment" when the user
+            // genuinely flipped between apps multiple times in a
+            // minute, not the steady-state cmd-tab cadence.
+            let chaoticMoment = try? store.busiestMultitaskingMinute(
+                start: dayStart,
+                end: now,
+                minSwitches: 3
+            )
             let keyCodes = try store.keyCodeDistribution(endingAt: now, days: 7)
             // F-09 — ask for up to 200 bundles so the "other" slice is
             // accurate. In practice a day's distinct-bundle count is
@@ -967,6 +979,7 @@ final class DashboardModel: ObservableObject {
             self.shortcutsToday = shortcuts
             self.appTransitionsToday = appTransitions
             self.appCombinationsToday = appCombinations
+            self.chaoticMomentToday = chaoticMoment
             self.keyCodeDistribution = keyCodes
             self.focusDonut = focusDonut
             self.weekOverWeek = weekOverWeek
@@ -1759,6 +1772,9 @@ struct DashboardView: View {
         }
         if !model.appCombinationsToday.isEmpty {
             AppCombinationsCard(combinations: model.appCombinationsToday)
+        }
+        if let moment = model.chaoticMomentToday {
+            ChaoticMomentCard(moment: moment)
         }
         if !model.shortcutsToday.isEmpty {
             ShortcutLeaderboardCard(rows: model.shortcutsToday)
@@ -5454,6 +5470,65 @@ private struct FlowLayout: Layout {
             maxX = max(maxX, x - spacing)
         }
         return (CGSize(width: maxX, height: y + lineHeight), points)
+    }
+}
+
+// MARK: - F-21 — Most chaotic multitasking minute
+
+/// F-21 — single-line "your busiest minute" call-out. Surfaces today's
+/// peak app-switch density: a hero number (`N switches`), the wall-
+/// clock time of the minute, and the apps involved as a wrapping pill
+/// row (reuses `AppPill` from F-14). Auto-hides at the model layer
+/// when no minute crosses the threshold.
+struct ChaoticMomentCard: View {
+
+    let moment: ChaoticMoment
+
+    private static let displayNameCache = BundleDisplayNameCache()
+
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.timeStyle = .short
+        f.dateStyle = .none
+        return f
+    }()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "tornado")
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(0.85)
+                Text("Busiest minute today", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(PulseFormat.integer(moment.switchCount))
+                    .font(PulseDesign.heroSecondaryFont)
+                    .foregroundStyle(PulseDesign.coral)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("switches", bundle: .pulse)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Text(
+                        String.localizedStringWithFormat(
+                            NSLocalizedString(
+                                "around %@",
+                                bundle: .pulse,
+                                comment: "F-21 — wall-clock time anchor for the busiest minute, e.g. \"around 14:32\"."
+                            ),
+                            Self.timeFormatter.string(from: moment.minuteStart)
+                        )
+                    )
+                    .font(.footnote.monospacedDigit())
+                }
+            }
+            CombinationPillFlow(
+                bundles: moment.bundles,
+                displayName: { Self.displayNameCache.name(for: $0) }
+            )
+        }
+        .pulseFeaturedCard()
     }
 }
 

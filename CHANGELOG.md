@@ -12,6 +12,32 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### F-21 — Most chaotic multitasking minute (v2.0 fourth slice)
+
+A small derived call-out: today's single 60-second window with the
+most foreground-app switches, plus the apps involved.
+
+- **Query** — new `EventStore.busiestMultitaskingMinute(start:end:
+  minSwitches:)` in `ChaoticMomentQueries.swift`. Groups
+  `system_events.foreground_app` by minute (`ts / 60_000`), picks the
+  row with the highest count (ties broken by latest minute so the
+  surfaced moment is the most recent), then a second pass collects
+  the distinct apps for that minute.
+- **Threshold** — defaults to 3 switches; below that no card
+  surfaces (steady-state `cmd-tab` cadence isn't "chaotic").
+- **Model** — `DashboardModel.chaoticMomentToday: ChaoticMoment?`,
+  populated alongside the F-13 / F-14 pulls on the same refresh path.
+- **UI** — new `ChaoticMomentCard` in the Apps sidebar pane between
+  `AppCombinationsCard` and the Shortcuts leaderboard. Hero number
+  on the left (`N switches`), wall-clock anchor on the right
+  (`around HH:MM`), then a wrapping pill row of the apps involved
+  (reuses the `AppPill` + `FlowLayout` from F-14).
+- **xcstrings** — `Busiest minute today` / `switches` /
+  `around %@` (en + zh-Hans).
+- **Tests** — `ChaoticMomentQueriesTests` covers empty DB, below-
+  threshold, peak-pick across multiple minutes, self-repeat handling,
+  and the latest-minute tie-break.
+
 ### F-14 — App combination "work stacks" (v2.0 third slice)
 
 Surfaces the recurring multi-app combinations you cycled through
