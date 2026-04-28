@@ -12,6 +12,23 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Infrastructure — quality sprint #1: observer test coverage
+
+Backfills unit tests for the two collectors that shipped in v2.0
+without their own test file.
+
+- `FocusObserverTests` exercises the `Assertions.json` JSON parser
+  through six shapes: empty dict, top-level mode identifier, nested
+  `storeAssertionRecords`, record-without-mode-name (returns the
+  `""` sentinel), empty `storeAssertionRecords` array, and
+  mixed-array shapes. Also covers `humanReadableMode` capitalisation.
+- `ClipboardObserverTests` confirms `simulateChangeCount(from:to:)`
+  emits exactly one event per increment, no events on a no-op
+  delta, and that `stop()` detaches the handler.
+- `FocusObserver.findModeIdentifier` and `humanReadableMode` were
+  promoted from `private` to `internal` so `@testable import
+  PulsePlatform` can reach them. Public API surface unchanged.
+
 ## [2.0.0] — 2026-04-28
 
 The "interaction layer" milestone. Three new data sources land
