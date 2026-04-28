@@ -207,6 +207,41 @@ struct AppUsageQueriesTests {
         #expect(rows.first?.secondsUsed == 600)
     }
 
+    @Test("appUsageSeconds returns the matching bundle's seconds")
+    func singleBundleQuery() async throws {
+        let (store, db) = try makeStore()
+        let day = Date(timeIntervalSince1970: 1_700_000_000)
+        try insertSwitch(into: db, ts: day, bundle: "com.apple.Safari")
+        try insertSwitch(into: db, ts: day.addingTimeInterval(60), bundle: "com.apple.dt.Xcode")
+        try insertSwitch(into: db, ts: day.addingTimeInterval(60 + 300), bundle: "com.apple.Safari")
+        let cap = day.addingTimeInterval(60 + 300 + 90)
+
+        let xcode = try store.appUsageSeconds(
+            bundleId: "com.apple.dt.Xcode",
+            start: day,
+            end: day.addingTimeInterval(3600),
+            capUntil: cap
+        )
+        #expect(xcode == 300)
+
+        let safari = try store.appUsageSeconds(
+            bundleId: "com.apple.Safari",
+            start: day,
+            end: day.addingTimeInterval(3600),
+            capUntil: cap
+        )
+        #expect(safari == 60 + 90)
+
+        // Bundle never seen → 0, not an error.
+        let unknown = try store.appUsageSeconds(
+            bundleId: "com.example.nonexistent",
+            start: day,
+            end: day.addingTimeInterval(3600),
+            capUntil: cap
+        )
+        #expect(unknown == 0)
+    }
+
     @Test("ranking respects the limit")
     func limitRespected() async throws {
         let (store, db) = try makeStore()
