@@ -12,6 +12,37 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### F-40 — Chronotype card (v2.1 pulled forward, zero-cost derivation)
+
+Surfaces the user's chronotype label ("morning person / afternoon
+worker / night owl / late-night / early bird") with a 24-hour
+sparkline beneath. Lives in the Rhythm pane, between
+`WeekOverWeekCard` and `ContinuityCard`.
+
+- **Query** — new `EventStore.chronotype(endingAt:days:
+  minActiveSecondsForClassification:)` in `ChronotypeQueries.swift`.
+  Pulls per-hour active seconds from the existing `hour_summary`
+  (using `3600 − idle_seconds`), pivots into a 24-element
+  hour-of-day vector, then computes the **activity-weighted
+  circular-mean hour** (handles the 23 → 0 wrap-around correctly —
+  a linear mean would put a late-night worker at "afternoon").
+  No new collector, no migration. Default 14-day window.
+- **Classification** — `ChronotypeLabel.classify(centerHour:)` maps
+  the centre hour to one of 5 labels: `lateNight` ∈ [0, 5),
+  `earlyBird` ∈ [5, 9), `morning` ∈ [9, 13), `afternoon` ∈ [13,
+  18), `evening` ∈ [18, 24).
+- **UI** — new `ChronotypeCard` with the label as a coral hero,
+  "Most active around H:00 · last N days" subtitle, and a 24-bar
+  sparkline (alpha proportional to that hour's share of total).
+  Each label gets a distinct SF Symbol (`moon.stars.fill` /
+  `sunrise.fill` / `sun.max.fill` / `sun.haze.fill` / `moon.fill`).
+- **xcstrings** — `Chronotype` + 5 label keys + the subtitle
+  template, all en + zh-Hans.
+- **Tests** — `ChronotypeQueriesTests` covers empty DB, sub-
+  threshold activity, morning / late-night (verifies wrap-around)
+  / evening labels, hourly distribution preservation, and label
+  boundary cases.
+
 ### F-13 polish — Sankey label collision avoidance
 
 User feedback: "应用切换的有文字重合" — the long tail of small

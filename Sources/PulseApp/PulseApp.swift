@@ -699,6 +699,9 @@ final class DashboardModel: ObservableObject {
     /// F-21 — today's busiest 60-second window of foreground switches,
     /// `nil` when no minute crossed the threshold (default 3).
     @Published private(set) var chaoticMomentToday: ChaoticMoment?
+    /// F-40 — chronotype label + 24-hour activity profile across the
+    /// past 14 days. `nil` until enough activity is recorded.
+    @Published private(set) var chronotype: Chronotype?
     /// F-09 — today's time-in-category breakdown for the focus donut.
     @Published private(set) var focusDonut: FocusDonut = .empty
     /// F-08 — 7-day keycode distribution for the keyboard heatmap.
@@ -881,6 +884,10 @@ final class DashboardModel: ObservableObject {
                 end: now,
                 minSwitches: 3
             )
+            // F-40 — chronotype across the past 14 days. Longer
+            // window than the rest of the Apps section to give the
+            // circular-mean enough sample to settle.
+            let chronotype = try? store.chronotype(endingAt: now, days: 14)
             let keyCodes = try store.keyCodeDistribution(endingAt: now, days: 7)
             // F-09 — ask for up to 200 bundles so the "other" slice is
             // accurate. In practice a day's distinct-bundle count is
@@ -980,6 +987,7 @@ final class DashboardModel: ObservableObject {
             self.appTransitionsToday = appTransitions
             self.appCombinationsToday = appCombinations
             self.chaoticMomentToday = chaoticMoment
+            self.chronotype = chronotype
             self.keyCodeDistribution = keyCodes
             self.focusDonut = focusDonut
             self.weekOverWeek = weekOverWeek
@@ -1735,6 +1743,9 @@ struct DashboardView: View {
         WeekHourlyHeatmap(cells: model.heatmapCells, days: model.heatmapDays)
         if let comparison = model.weekOverWeek {
             WeekOverWeekCard(comparison: comparison)
+        }
+        if let chronotype = model.chronotype {
+            ChronotypeCard(chronotype: chronotype)
         }
         ContinuityCard(streak: model.continuity)
         if model.lidOpensTrend.contains(where: { $0 > 0 }) {
@@ -3784,6 +3795,118 @@ struct PassiveConsumptionCard: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .pulseFeaturedCard()
+    }
+}
+
+// MARK: - F-40 — Chronotype card
+
+/// F-40 — surfaces the user's chronotype label ("morning person /
+/// night owl") with a small 24-hour activity sparkline beneath. Reads
+/// `DashboardModel.chronotype`, which the model populates from
+/// `EventStore.chronotype(...)` on the same refresh path. Auto-hides
+/// upstream when there's not enough activity to classify.
+struct ChronotypeCard: View {
+
+    let chronotype: Chronotype
+
+    /// Hour-formatter (`HH:00` style) shared across the card so both
+    /// the centre-hour and the peak-hour annotations match.
+    private static let hourFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = .current
+        f.dateFormat = "HH"
+        return f
+    }()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: chronotype.label.systemImage)
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(0.85)
+                Text("Chronotype", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(chronotype.label.titleKey, bundle: .pulse)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(PulseDesign.coral)
+                Text(
+                    String.localizedStringWithFormat(
+                        NSLocalizedString(
+                            "Most active around %lld:00 · last %lld days",
+                            bundle: .pulse,
+                            comment: "F-40 ChronotypeCard — subtitle anchoring the label to the hour-of-day peak."
+                        ),
+                        Int64(chronotype.peakHour),
+                        Int64(chronotype.windowDays)
+                    )
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+            ChronotypeSparkline(hourly: chronotype.hourlyActiveSeconds)
+                .frame(height: 56)
+        }
+        .pulseFeaturedCard()
+    }
+}
+
+/// 24-bar sparkline of activity-by-hour. Bars use coral with alpha
+/// proportional to the hour's share of the window's total activity.
+private struct ChronotypeSparkline: View {
+    let hourly: [Int]
+
+    var body: some View {
+        let peak = max(1, hourly.max() ?? 1)
+        GeometryReader { geo in
+            HStack(alignment: .bottom, spacing: 2) {
+                ForEach(0..<24, id: \.self) { hour in
+                    let intensity = Double(hourly[hour]) / Double(peak)
+                    VStack(spacing: 2) {
+                        RoundedRectangle(cornerRadius: 1.5)
+                            .fill(PulseDesign.coral.opacity(0.30 + intensity * 0.55))
+                            .frame(height: max(2, intensity * (geo.size.height - 12)))
+                            .frame(maxHeight: .infinity, alignment: .bottom)
+                        // Show every 6th hour as a tick label so the
+                        // axis is readable but not crowded.
+                        if hour % 6 == 0 {
+                            Text("\(hour)")
+                                .font(.system(size: 9).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text(" ")
+                                .font(.system(size: 9))
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+}
+
+extension ChronotypeLabel {
+    var titleKey: LocalizedStringKey {
+        switch self {
+        case .lateNight: return "Late-night worker"
+        case .earlyBird: return "Early bird"
+        case .morning:   return "Morning person"
+        case .afternoon: return "Afternoon worker"
+        case .evening:   return "Evening / night owl"
+        }
+    }
+
+    /// SF Symbol that rides the card title alongside the verbal
+    /// label. Picked so each chronotype has a distinct shape.
+    var systemImage: String {
+        switch self {
+        case .lateNight: return "moon.stars.fill"
+        case .earlyBird: return "sunrise.fill"
+        case .morning:   return "sun.max.fill"
+        case .afternoon: return "sun.haze.fill"
+        case .evening:   return "moon.fill"
+        }
     }
 }
 
