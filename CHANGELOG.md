@@ -12,6 +12,36 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### F-20 — Dual-hand keystroke balance (v2.1, zero-cost derivation)
+
+A horizontal split-bar in the Input pane showing what fraction of
+your keystrokes were hit by which hand over the last 7 days. Pure
+derivation from `day_key_codes` (V6, opt-in via D-K2); no new
+collector or migration. Auto-hides for users who haven't opted into
+keycode capture or whose 7-day classified count is below 200
+keystrokes (avoids reading a fluke as a strong-handedness signal).
+
+- **Query** — new `EventStore.handBalance(endingAt:days:)` in
+  `HandBalanceQueries.swift`. Buckets each keycode against the
+  US-QWERTY touch-typing convention: top + ASDFG + ZXCVB letter
+  keys go to the matching hand, plus number row split, plus
+  `Tab` left / `[]\⏎'` right. Space (49) classified as right
+  thumb. Modifiers / function keys / numpad / arrows are
+  unclassified — kept in a separate bucket so the visible ratio
+  is computed only over keys with unambiguous handedness.
+- **Model** — `DashboardModel.handBalance: HandBalance?`. `nil` when
+  classified total < 200 keystrokes/week.
+- **UI** — new `HandBalanceCard` between `KeyboardHeatmapCard` and
+  `KeyboardRhythmCard` in the Input pane. Sage / coral split bar
+  with a thin centerline at 50% so deviation reads at a glance.
+  Subtitle: "Left N% · Right M% · X classified keystrokes".
+- **xcstrings** — `Hand balance · last 7 days` + the subtitle
+  template (en + zh-Hans).
+- **Tests** — `HandBalanceQueriesTests` covers empty DB, basic L/R
+  split (F + J), space-as-right, unclassified bucket (F1 keycode),
+  multi-day summation, windowing, and a coverage check that every
+  letter keycode is classified to exactly one hand.
+
 ### Bug fixes
 
 - **Sparkle "dev → stable" upgrade detection.** User report (post
