@@ -5164,6 +5164,24 @@
         }
       }
     },
+    "Mouse speed · last hour": {
+      "comment": "F-18 MouseSpeedCard — card title.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Mouse speed · last hour" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "鼠标速度 · 最近一小时" } }
+      }
+    },
+    "Avg %1$.1f mm/s · peak %2$.1f mm/s": {
+      "comment": "F-18 MouseSpeedCard — subtitle. %1$.1f is average mm/s across active minutes, %2$.1f is peak mm/s.",
+      "localizations": {
+        "en": {
+          "stringUnit": { "state": "translated", "value": "Avg %1$.1f mm/s · peak %2$.1f mm/s" }
+        },
+        "zh-Hans": {
+          "stringUnit": { "state": "translated", "value": "均速 %1$.1f 毫米/秒 · 峰值 %2$.1f 毫米/秒" }
+        }
+      }
+    },
     "%1$@ clicks · last %2$lld days": {
       "comment": "F-16 MouseTrajectoryCard — click-mode subtitle. %1$@ is the formatted click count, %2$lld is the user-selected window size in days.",
       "localizations": {
