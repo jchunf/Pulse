@@ -702,6 +702,10 @@ final class DashboardModel: ObservableObject {
     /// F-40 — chronotype label + 24-hour activity profile across the
     /// past 14 days. `nil` until enough activity is recorded.
     @Published private(set) var chronotype: Chronotype?
+    /// F-42 — daily active-hours over the past 30 days. The "digital
+    /// weight" trend curve. Always 30 elements; days with no activity
+    /// surface as zero.
+    @Published private(set) var activityWeight: [ActivityWeightPoint] = []
     /// F-09 — today's time-in-category breakdown for the focus donut.
     @Published private(set) var focusDonut: FocusDonut = .empty
     /// F-08 — 7-day keycode distribution for the keyboard heatmap.
@@ -888,6 +892,10 @@ final class DashboardModel: ObservableObject {
             // window than the rest of the Apps section to give the
             // circular-mean enough sample to settle.
             let chronotype = try? store.chronotype(endingAt: now, days: 14)
+            // F-42 — 30-day daily active-hours curve. Same window as
+            // would be useful for a "month at a glance" view; the
+            // chart auto-fits whatever it gets back.
+            let activityWeight = (try? store.activityWeight(endingAt: now, days: 30)) ?? []
             let keyCodes = try store.keyCodeDistribution(endingAt: now, days: 7)
             // F-09 — ask for up to 200 bundles so the "other" slice is
             // accurate. In practice a day's distinct-bundle count is
@@ -988,6 +996,7 @@ final class DashboardModel: ObservableObject {
             self.appCombinationsToday = appCombinations
             self.chaoticMomentToday = chaoticMoment
             self.chronotype = chronotype
+            self.activityWeight = activityWeight
             self.keyCodeDistribution = keyCodes
             self.focusDonut = focusDonut
             self.weekOverWeek = weekOverWeek
@@ -1746,6 +1755,9 @@ struct DashboardView: View {
         }
         if let chronotype = model.chronotype {
             ChronotypeCard(chronotype: chronotype)
+        }
+        if model.activityWeight.contains(where: { $0.activeHours > 0 }) {
+            ActivityWeightCard(points: model.activityWeight)
         }
         ContinuityCard(streak: model.continuity)
         if model.lidOpensTrend.contains(where: { $0 > 0 }) {
@@ -3908,6 +3920,106 @@ extension ChronotypeLabel {
         case .evening:   return "moon.fill"
         }
     }
+}
+
+// MARK: - F-42 — Activity weight curve
+
+/// F-42 — daily active-hours curve over 30 days. The "digital weight"
+/// metaphor: the user's daily attention has a measurable total like
+/// body weight, and seeing the trend tells a story no single-day card
+/// can. Reads `DashboardModel.activityWeight` (always 30 elements; the
+/// pre-section guard hides this whole card if every value is zero).
+struct ActivityWeightCard: View {
+
+    let points: [ActivityWeightPoint]
+
+    private var avgHours: Double {
+        let nonzero = points.filter { $0.activeHours > 0 }
+        guard !nonzero.isEmpty else { return 0 }
+        return nonzero.reduce(0) { $0 + $1.activeHours } / Double(nonzero.count)
+    }
+
+    private var peak: ActivityWeightPoint? {
+        points.max(by: { $0.activeHours < $1.activeHours })
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .foregroundStyle(PulseDesign.coral)
+                    .opacity(0.85)
+                Text("Activity weight", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+            }
+            subtitle
+            Chart(points) { point in
+                AreaMark(
+                    x: .value("Day", point.day, unit: .day),
+                    y: .value("Hours", point.activeHours)
+                )
+                .interpolationMethod(.monotone)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [
+                            PulseDesign.coral.opacity(0.22),
+                            PulseDesign.coral.opacity(0.02)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                LineMark(
+                    x: .value("Day", point.day, unit: .day),
+                    y: .value("Hours", point.activeHours)
+                )
+                .interpolationMethod(.monotone)
+                .foregroundStyle(PulseDesign.coral)
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading) { mark in
+                    AxisValueLabel()
+                    AxisGridLine().foregroundStyle(PulseDesign.warmGray(0.10))
+                }
+            }
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .day, count: 7)) { _ in
+                    AxisValueLabel(format: .dateTime.day().month(.abbreviated))
+                }
+            }
+            .frame(height: 140)
+        }
+        .pulseFeaturedCard()
+    }
+
+    @ViewBuilder
+    private var subtitle: some View {
+        if let peak, avgHours > 0 {
+            Text(
+                String.localizedStringWithFormat(
+                    NSLocalizedString(
+                        "Avg %1$.1f h/day · peak %2$.1f h on %3$@",
+                        bundle: .pulse,
+                        comment: "F-42 ActivityWeightCard — subtitle. %1$.1f is the average daily active hours, %2$.1f is the peak day's hours, %3$@ is a localized short date for the peak day."
+                    ),
+                    avgHours,
+                    peak.activeHours,
+                    Self.peakDateFormatter.string(from: peak.day)
+                )
+            )
+            .font(PulseDesign.labelFont)
+            .tracking(0.3)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private static let peakDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = .current
+        f.dateStyle = .short
+        f.timeStyle = .none
+        return f
+    }()
 }
 
 /// F-27 — how many times the MacBook lid has been opened today,
