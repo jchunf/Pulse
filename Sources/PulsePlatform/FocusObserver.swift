@@ -253,7 +253,7 @@ public final class FocusObserver: @unchecked Sendable {
     /// Returns the mode identifier if present, an empty string if
     /// an assertion was found but no mode name, or `nil` if no
     /// assertions exist (= Focus inactive).
-    private static func findModeIdentifier(in node: Any) -> String? {
+    static func findModeIdentifier(in node: Any) -> String? {
         if let dict = node as? [String: Any] {
             // Common shape: a dict containing
             // "assertionDetailsModeIdentifier".
@@ -286,7 +286,7 @@ public final class FocusObserver: @unchecked Sendable {
     /// Strips the bundle-id-style prefix off a Focus mode identifier
     /// so the dashboard surfaces a friendly label.
     /// `"com.apple.donotdisturb.mode.work"` → `"Work"`.
-    private static func humanReadableMode(from identifier: String) -> String {
+    static func humanReadableMode(from identifier: String) -> String {
         let last = identifier.split(separator: ".").last.map(String.init) ?? identifier
         return last.prefix(1).uppercased() + last.dropFirst()
     }
