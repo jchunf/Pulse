@@ -12,6 +12,30 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### F-13 polish — Sankey label collision avoidance
+
+User feedback: "应用切换的有文字重合" — the long tail of small
+source/target nodes (`loginwindow`, `终端`, `Pulse` etc. with
+2–4 transitions out of ~ 600/day) had bars too thin to host their
+two-line "name + total" labels, so labels stacked on top of each
+other.
+
+Added `SankeyLayout.resolveLabelPositions(nodes:canvasHeight:
+labelHeight:)`: a single-pass top-to-bottom resolver that:
+
+- Anchors each label at its node's vertical centre by default.
+- Pushes the label down if it would overlap the previous one (min
+  vertical spacing = label height).
+- **Drops** the label entirely if pushing it down would push it
+  past the canvas bottom — but keeps the bar drawn at the node's
+  true centre, so the long-tail data points stay visually present
+  without unlabelled noise overlap.
+
+The result: top nodes (Chrome / 大象 / Ghostty in the dogfood
+sample) keep their labels at their true centre; the 2–3 tail nodes
+that would have collided fall off as bar-only. Information density
+preserved, overlap gone.
+
 ### F-15 — Dead-zone map (v2.1 pulled forward as third heatmap toggle)
 
 Adds a third "Untouched" mode to `MouseTrajectoryCard`'s segmented

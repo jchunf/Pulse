@@ -5070,12 +5070,33 @@ private struct SankeyDiagram: View {
     let layout: SankeyLayout
     let displayName: (String) -> String
 
+    /// Two-line `SankeyNodeLabel` (display name + total) wants ~ 26pt
+    /// of vertical space. Used as the min-spacing constraint when
+    /// resolving label positions to avoid the long-tail collisions
+    /// observed in dogfood ("应用切换的有文字重合").
+    private static let labelHeight: CGFloat = 26
+
     var body: some View {
         GeometryReader { geo in
             let frame = SankeyFrame(
                 size: geo.size,
                 labelGutter: AppSankeyCard.labelGutter,
                 nodeWidth: AppSankeyCard.nodeWidth
+            )
+            // Resolve label Y positions per column with a min-spacing
+            // pass — tail nodes that can't fit a label drop their
+            // text but keep their bar (so the data point is still
+            // visible, just unlabelled). The bar Y stays anchored at
+            // its true node center; only the label moves.
+            let sourceLabelY = SankeyLayout.resolveLabelPositions(
+                nodes: layout.sources,
+                canvasHeight: frame.canvasHeight,
+                labelHeight: Self.labelHeight
+            )
+            let targetLabelY = SankeyLayout.resolveLabelPositions(
+                nodes: layout.targets,
+                canvasHeight: frame.canvasHeight,
+                labelHeight: Self.labelHeight
             )
             ZStack(alignment: .topLeading) {
                 // Ribbons — drawn first so labels sit on top.
@@ -5088,19 +5109,18 @@ private struct SankeyDiagram: View {
                         )
                     }
                 }
-                // Source nodes + labels (right-anchored so they sit
-                // hard against the ribbon column).
+                // Source bars (always drawn) + labels (drawn only if
+                // the resolver found space for them).
                 ForEach(layout.sources) { node in
-                    SankeyNodeLabel(
-                        text: displayName(node.id),
-                        total: node.total,
-                        side: .leading
-                    )
-                    .frame(width: frame.labelGutter, alignment: .trailing)
-                    .position(
-                        x: frame.labelGutter / 2,
-                        y: frame.sourceColumnY(for: node)
-                    )
+                    if let labelY = sourceLabelY[node.id] {
+                        SankeyNodeLabel(
+                            text: displayName(node.id),
+                            total: node.total,
+                            side: .leading
+                        )
+                        .frame(width: frame.labelGutter, alignment: .trailing)
+                        .position(x: frame.labelGutter / 2, y: labelY)
+                    }
                     Rectangle()
                         .fill(PulseDesign.coral.opacity(0.85))
                         .frame(
@@ -5112,19 +5132,20 @@ private struct SankeyDiagram: View {
                             y: frame.sourceColumnY(for: node)
                         )
                 }
-                // Target nodes + labels (left-anchored on the right
-                // side of the diagram).
+                // Target bars + (resolved) labels.
                 ForEach(layout.targets) { node in
-                    SankeyNodeLabel(
-                        text: displayName(node.id),
-                        total: node.total,
-                        side: .trailing
-                    )
-                    .frame(width: frame.labelGutter, alignment: .leading)
-                    .position(
-                        x: frame.size.width - frame.labelGutter / 2,
-                        y: frame.targetColumnY(for: node)
-                    )
+                    if let labelY = targetLabelY[node.id] {
+                        SankeyNodeLabel(
+                            text: displayName(node.id),
+                            total: node.total,
+                            side: .trailing
+                        )
+                        .frame(width: frame.labelGutter, alignment: .leading)
+                        .position(
+                            x: frame.size.width - frame.labelGutter / 2,
+                            y: labelY
+                        )
+                    }
                     Rectangle()
                         .fill(PulseDesign.coral.opacity(0.85))
                         .frame(
@@ -5360,6 +5381,46 @@ struct SankeyLayout: Equatable {
     ) -> Bool {
         if lhs.value != rhs.value { return lhs.value > rhs.value }
         return lhs.key < rhs.key
+    }
+
+    /// Single-pass label collision avoidance for one Sankey column.
+    /// Walks nodes top-to-bottom; each label's centre starts at its
+    /// node centre but is pushed down whenever the previous label's
+    /// bottom edge exceeds the new label's top edge. Labels that
+    /// would push past the bottom of the canvas are dropped from the
+    /// returned dictionary — the caller renders the corresponding
+    /// node's bar without a label, preserving the data point's
+    /// visual presence without overlapping text.
+    ///
+    /// Why one-pass-from-top instead of a balanced two-pass: in the
+    /// observed dogfood data the long tail is a few tiny nodes at the
+    /// bottom of each column. Pushing them down past the visible
+    /// area is exactly the right behaviour — the user sees the top
+    /// labels intact, the long tail's bars without labels. A
+    /// balanced pass would steal vertical space from the well-fit
+    /// large nodes for no real benefit.
+    static func resolveLabelPositions(
+        nodes: [Node],
+        canvasHeight: CGFloat,
+        labelHeight: CGFloat
+    ) -> [String: CGFloat] {
+        var resolved: [String: CGFloat] = [:]
+        var lastLabelBottom: CGFloat = 0
+        for node in nodes.sorted(by: { $0.yStart < $1.yStart }) {
+            let nodeCenter = ((node.yStart + node.yEnd) / 2) * canvasHeight
+            let desiredTop = nodeCenter - labelHeight / 2
+            let actualTop = max(desiredTop, lastLabelBottom)
+            let actualBottom = actualTop + labelHeight
+            // Drop the label if it doesn't fit inside the canvas at
+            // all. Returning early keeps subsequent labels'
+            // `lastLabelBottom` un-advanced, which prevents one
+            // suppressed tail node from cascading suppression to
+            // nothing if the canvas barely overflowed.
+            if actualBottom > canvasHeight { continue }
+            resolved[node.id] = actualTop + labelHeight / 2
+            lastLabelBottom = actualBottom
+        }
+        return resolved
     }
 }
 
