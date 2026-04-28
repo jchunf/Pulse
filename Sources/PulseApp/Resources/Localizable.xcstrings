@@ -5037,6 +5037,40 @@
         }
       }
     },
+    "Untouched": {
+      "comment": "F-15 MouseTrajectoryCard — dwell/click/dead-zones toggle, dead-zones side (regions the cursor never visited).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Untouched"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未访问"
+          }
+        }
+      }
+    },
+    "Untouched regions · last %lld days": {
+      "comment": "F-15 MouseTrajectoryCard — dead-zones-mode subtitle. %lld is the user-selected window size in days.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Untouched regions · last %lld days"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未访问的区域 · 最近 %lld 天"
+          }
+        }
+      }
+    },
     "%1$@ clicks · last %2$lld days": {
       "comment": "F-16 MouseTrajectoryCard — click-mode subtitle. %1$@ is the formatted click count, %2$lld is the user-selected window size in days.",
       "localizations": {
