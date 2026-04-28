@@ -66,7 +66,28 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             raw="${GITHUB_REF#refs/tags/v}"
             echo "version=$raw" >> "$GITHUB_OUTPUT"
-            echo "build=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+            # Stable `CFBundleVersion` (= Sparkle's `sparkle:version`)
+            # must dwarf any conceivable `GITHUB_RUN_NUMBER` so a dev
+            # build (which uses run_number) can never numerically
+            # outrank a stable release. Sparkle's default comparator
+            # picks the highest CFBundleVersion across the appcast +
+            # the installed app; before this change a dev build with
+            # run_number > stable_release_run_number reported "you're
+            # on the latest" even though the user had flipped the
+            # channel toggle back to stable.
+            #
+            # Encoding: 10_000_000 + (major × 1_000_000) +
+            # (minor × 1_000) + patch. v1.2.0 → 11_002_000;
+            # v9.999.999 still fits inside Int32. Pre-release tags
+            # (v1.2.0-rc1) get the same number — pre-release
+            # semantics are carried by the version *string*, not
+            # the build number.
+            semver="${raw%%-*}"
+            major=$(echo "$semver" | cut -d. -f1)
+            minor=$(echo "$semver" | cut -d. -f2)
+            patch=$(echo "$semver" | cut -d. -f3)
+            build=$(( 10000000 + major * 1000000 + minor * 1000 + patch ))
+            echo "build=${build}" >> "$GITHUB_OUTPUT"
             echo "artifact=Pulse-$raw" >> "$GITHUB_OUTPUT"
           else
             short="$(git rev-parse --short HEAD)"
@@ -83,6 +104,10 @@ jobs:
               echo "version=0.0.0-ci.${GITHUB_RUN_NUMBER}+${short}" >> "$GITHUB_OUTPUT"
               echo "artifact=Pulse-ci-${short}" >> "$GITHUB_OUTPUT"
             fi
+            # Dev / CI BUILD stays as the run number — small relative
+            # to any stable BUILD, so a stable release always wins
+            # the version comparison if the user flips the channel
+            # toggle back to stable.
             echo "build=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
           fi
 
@@ -336,6 +361,33 @@ jobs:
           rm -rf "$work_dir"
           mkdir -p "$work_dir"
           bash scripts/generate_appcast.sh > "$work_dir/appcast.xml"
+
+          # Splice the latest stable release's <item> into the dev
+          # appcast so dev-channel users see a new stable release as
+          # an upgrade. Without this the rolling dev appcast contains
+          # only the just-built dev item; a user on dev who flips the
+          # toggle back to stable would still hit the dev feed once
+          # before the next refresh and silently miss the stable
+          # release. Sparkle picks the highest `sparkle:version` on
+          # parse, so combining the two items produces the right
+          # answer with no client-side change. If no stable release
+          # exists yet (or `releases/latest` 404s), the splice is
+          # quietly skipped and the dev appcast stays single-item.
+          stable_url="https://github.com/${REPO}/releases/latest/download/appcast.xml"
+          if curl -fsSL "$stable_url" -o "$work_dir/stable-appcast.xml" 2>/dev/null; then
+              stable_item="$(awk '/<item>/,/<\/item>/' "$work_dir/stable-appcast.xml")"
+              if [[ -n "$stable_item" ]]; then
+                  awk -v item="$stable_item" '
+                      /<\/channel>/ { print item }
+                      { print }
+                  ' "$work_dir/appcast.xml" > "$work_dir/appcast-merged.xml"
+                  mv "$work_dir/appcast-merged.xml" "$work_dir/appcast.xml"
+                  echo "==> spliced latest stable item into dev appcast"
+              fi
+          else
+              echo "==> no stable appcast found at $stable_url (first-release case) — skipping splice"
+          fi
+
           echo "----- dev appcast -----"
           cat "$work_dir/appcast.xml"
           echo "-----------------------"
