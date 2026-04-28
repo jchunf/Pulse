@@ -33,7 +33,12 @@ public struct Migrator: Sendable {
         case versionConflict(current: Int, requested: Int)
     }
 
-    private let steps: [Step]
+    /// The migration steps this migrator will apply, sorted ascending
+    /// by version. Exposed at module-internal scope so test targets
+    /// using `@testable import PulseCore` can construct partial-upgrade
+    /// migrators (e.g. "stop at V3, then run the rest separately") to
+    /// verify cross-version migration sequencing.
+    let steps: [Step]
 
     /// Construct a Migrator with an explicit (sorted) list of steps. Prefer
     /// `Migrator.bundled()` in production code.
