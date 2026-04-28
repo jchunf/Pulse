@@ -12,6 +12,38 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Infrastructure — quality sprint #3: migration coverage + partial-upgrade test
+
+The existing `MigratorTests` covered V3-V7 column shapes and the V0
+→ head fresh-install path, but had two gaps that shipped without
+the safety net for over a year:
+
+- V2 (`rollup_watermarks`) had no shape test of its own; it was only
+  visible indirectly through the "in-memory has core tables" union
+  assertion. A column or PK regression in V2 would have slipped past
+  CI.
+- No test exercised the **partial upgrade** path — i.e. a returning
+  user on Pulse 1.1 (V3 schema) installing the latest build, who
+  receives V4-V7 incrementally instead of V0 → V7. A migration that
+  worked on a fresh DB but broke on a partially-migrated DB would
+  have shipped silently.
+
+This PR closes both gaps.
+
+- New `v2CreatesRollupWatermarks` asserts the column list and that
+  `job` is the primary key.
+- New `partialUpgradeMatchesFreshUpgrade` runs the migrator twice
+  (V0 → V3, then V3 → head, vs V0 → head in one shot) and asserts
+  the resulting `sqlite_master` table list is identical — the two
+  upgrade paths must converge on the same schema.
+- New `partialUpgradePreservesData` confirms a `system_events` row
+  inserted at V2 survives the subsequent V3-V7 migrations
+  unmodified — protects against a future migration accidentally
+  truncating data on upgrade.
+- `Migrator.steps` promoted from `private` to module-internal so
+  `@testable import PulseCore` can construct partial-upgrade
+  migrators. Public API surface unchanged.
+
 ### Infrastructure — quality sprint #2: VoiceOver-friendly card grouping
 
 The previous Dashboard surfaces had only 2 explicit `.accessibility*`

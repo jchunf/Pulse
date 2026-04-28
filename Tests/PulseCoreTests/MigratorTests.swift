@@ -85,6 +85,91 @@ struct MigratorTests {
         #expect(version == 7)
     }
 
+    @Test("V2 creates rollup_watermarks with the expected shape")
+    func v2CreatesRollupWatermarks() throws {
+        let db = try PulseDatabase.inMemory()
+        let columns: [String] = try db.queue.read { db in
+            try String.fetchAll(
+                db,
+                sql: "SELECT name FROM pragma_table_info('rollup_watermarks') ORDER BY cid"
+            )
+        }
+        #expect(columns == ["job", "last_processed_ms"])
+        // Primary key should be `job` so two writers can't insert
+        // duplicate watermarks for the same rollup.
+        let pk: [String] = try db.queue.read { db in
+            try String.fetchAll(
+                db,
+                sql: "SELECT name FROM pragma_table_info('rollup_watermarks') WHERE pk = 1"
+            )
+        }
+        #expect(pk == ["job"])
+    }
+
+    @Test("partial upgrade: V0 → V3, then V3 → head, lands at the same shape as V0 → head")
+    func partialUpgradeMatchesFreshUpgrade() throws {
+        // First DB: stop at V3, then upgrade the remainder. This is what
+        // a returning user on Pulse 1.1 (V3 schema) experiences when
+        // they install the latest build.
+        let bundled = try Migrator.bundled()
+        let throughV3Steps = bundled.steps.filter { $0.version <= 3 }
+        let throughV3 = Migrator(steps: throughV3Steps)
+        #expect(throughV3.targetVersion == 3)
+        let stagedDb = try PulseDatabase.inMemory(migrator: throughV3)
+        let interimVersion: Int? = try stagedDb.queue.read { db in
+            try Int.fetchOne(db, sql: "PRAGMA user_version")
+        }
+        #expect(interimVersion == 3)
+        // Now apply the rest.
+        _ = try bundled.migrate(stagedDb.queue)
+        let finalVersion: Int? = try stagedDb.queue.read { db in
+            try Int.fetchOne(db, sql: "PRAGMA user_version")
+        }
+        #expect(finalVersion == bundled.targetVersion)
+
+        // Second DB: fresh install, V0 → head in one go.
+        let freshDb = try PulseDatabase.inMemory()
+        let freshTables: [String] = try freshDb.queue.read { db in
+            try String.fetchAll(db, sql: "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+        }
+        let stagedTables: [String] = try stagedDb.queue.read { db in
+            try String.fetchAll(db, sql: "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+        }
+        // The two upgrade paths must converge on the same schema —
+        // otherwise a user upgrading from an older Pulse build would
+        // end up with a subtly different DB than a fresh install.
+        #expect(stagedTables == freshTables)
+    }
+
+    @Test("partial upgrade preserves data inserted at the interim version")
+    func partialUpgradePreservesData() throws {
+        let bundled = try Migrator.bundled()
+        let throughV2Steps = bundled.steps.filter { $0.version <= 2 }
+        let throughV2 = Migrator(steps: throughV2Steps)
+        let db = try PulseDatabase.inMemory(migrator: throughV2)
+
+        // Insert a system_events row at V2 — this represents a real
+        // user's data captured before they upgrade.
+        try db.queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO system_events (ts, category, payload) VALUES (?, ?, ?)",
+                arguments: [Int64(1_700_000_000_000), "foreground_app", "com.example.legacy"]
+            )
+        }
+
+        // Apply remaining migrations.
+        _ = try bundled.migrate(db.queue)
+
+        // The pre-existing row should still be there after V3-V7 ran.
+        let payload: String? = try db.queue.read { db in
+            try String.fetchOne(
+                db,
+                sql: "SELECT payload FROM system_events WHERE category = 'foreground_app'"
+            )
+        }
+        #expect(payload == "com.example.legacy")
+    }
+
     @Test("V3 adds scroll_ticks to hour_summary")
     func v3AddsScrollTicksColumn() throws {
         let db = try PulseDatabase.inMemory()
