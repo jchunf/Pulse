@@ -12,6 +12,40 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Fix — dev appcast splice no longer kills the upload
+
+The "Generate + upload dev appcast" step in `package.yml` failed on
+the first post-merge `main` push after #137 (run #230, sha
+`29204aa`). Symptom: `dev-latest` GitHub Release got the .dmg / .zip
+assets but **no `appcast.xml`**, so Sparkle's "Check for updates…"
+on the dev channel returned a "couldn't fetch update info" error
+to every dev-channel user.
+
+Two compounding causes from PR #128:
+
+1. The splice was awk-based with `awk -v item="$stable_item"`. The
+   spliced item contains an EdSignature with `+`, `/`, `=`
+   characters that BSD awk on macOS 15 runners interprets
+   inconsistently in `-v` value escaping. Sometimes the awk command
+   exited non-zero.
+2. The splice block ran under `set -e`, so a splice failure killed
+   the rest of the step — including the actual `gh release upload
+   dev-latest appcast.xml` call. Splice failure (degraded mode:
+   dev users miss seeing the latest stable in their feed) was being
+   conflated with upload failure (broken mode: dev users can't
+   check for updates at all).
+
+The fix:
+
+- Moved splice logic to `scripts/splice_stable_into_dev_appcast.py`
+  using Python's stdlib regex. Multi-line content with arbitrary
+  base64 characters is bulletproof here — no awk-flavour variation
+  to worry about.
+- Wrapped the script in an `if … then … else …` so a non-zero exit
+  is logged and absorbed; the unspliced (still-valid) dev appcast
+  uploads regardless. The dev channel always works; the splice is
+  cosmetic enrichment that's allowed to fail.
+
 ### Infrastructure — quality sprint #3: migration coverage + partial-upgrade test
 
 The existing `MigratorTests` covered V3-V7 column shapes and the V0
