@@ -12,20 +12,30 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
-### Fix — channel toggle no longer prompts to "install" the same version
+### i18n — F-44 App Intents now ship with zh-Hans
 
-Follow-up to PR #143. A user on stable `2.0.1` who toggled dev → stable
-saw Sparkle prompt them to install `2.0.1` again, even though `2.0.1`
-was already installed. The `AlwaysNewerComparator` returned
-`.orderedAscending` unconditionally, so even when the candidate's
-version string was byte-for-byte identical to current, Sparkle
-treated it as "newer" and offered the install.
+The original v2.0.0 cut shipped F-44 (Shortcuts integration) with
+hard-coded English strings as a deliberate trade-off — the intent
+surface is power-user territory and full i18n looked fiddly under
+SPM-built bundles. With v2.0 stable for a few days now and the
+xcstrings catalog at 100% en + zh-Hans coverage everywhere else,
+backfilling the intent strings closes the gap.
 
-`AlwaysNewerComparator.compareVersion(_:to:)` now returns
-`.orderedSame` when the strings match exactly. Toggling to a channel
-where the user is already on the latest build is a no-op (no prompt,
-no install). Cross-channel BUILD-encoding asymmetry is still bridged
-when the candidate genuinely differs.
+- `PulseAppIntents.swift` — every static `LocalizedStringResource`
+  (intent titles, descriptions, parameter title + description, the
+  three `AppShortcut.shortTitle` entries) now routes through
+  `bundle: .atURL(Bundle.pulse.bundleURL)` so the same xcstrings
+  catalog the Dashboard reads serves the Shortcuts.app library too.
+- 9 new keys added to `Localizable.xcstrings` (en + zh-Hans):
+  intent titles, descriptions, parameter labels, short titles.
+- Spoken / shown dialog strings (`.result(value:, dialog: …)`)
+  stay English. The dialog format strings carry runtime values
+  (`%lld min in %@ today`) and adding format-string entries to
+  cover both languages doubles the catalog churn for low
+  per-user value — the dialog runs after a Shortcut completes,
+  not in the library/edit screen where the user spends time.
+- Siri trigger phrases (`AppShortcut.phrases`) also stay
+  English; full Siri voice localisation can come as a follow-up.
 
 ### Fix — toggling the dev-builds switch actually switches you
 

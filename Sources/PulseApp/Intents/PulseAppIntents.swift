@@ -20,21 +20,41 @@ import PulseCore
 // rest of Pulse: data never leaves the device, and the intent only
 // answers questions the user could already answer by opening the app.
 //
-// Strings here are intentionally unlocalised (English only). Shortcuts
-// authoring is a power-user surface; the localisation push for these
-// titles can come as a follow-up once the underlying schema is stable.
+// Localisation: titles, descriptions, parameter labels, and short
+// titles are routed through `Localizable.xcstrings` via
+// `bundle: .atURL(Bundle.pulse.bundleURL)`. Spoken / shown dialog
+// after the action completes stays English (the spoken response is
+// a power-user surface and the format strings carry runtime values
+// — adding format-string entries doubles the catalog churn for low
+// per-user value).
+//
+// Siri trigger phrases (`AppShortcut.phrases`) also stay English; they
+// drive English-only Siri voice and Spotlight matching. Full Siri
+// localisation can come as a follow-up if there's user demand.
 
 struct GetAppUsageTodayIntent: AppIntent {
 
-    static let title: LocalizedStringResource = "How long did I use…"
+    static let title = LocalizedStringResource(
+        "How long did I use…",
+        bundle: .atURL(Bundle.pulse.bundleURL)
+    )
     static let description = IntentDescription(
-        "Returns the seconds you've spent in a given app today, read from Pulse's local data only."
+        LocalizedStringResource(
+            "Returns the seconds you've spent in a given app today, read from Pulse's local data only.",
+            bundle: .atURL(Bundle.pulse.bundleURL)
+        )
     )
     static let openAppWhenRun: Bool = false
 
     @Parameter(
-        title: "Bundle ID",
-        description: "The bundle identifier of the app (e.g. com.apple.dt.Xcode for Xcode)."
+        title: LocalizedStringResource(
+            "Bundle ID",
+            bundle: .atURL(Bundle.pulse.bundleURL)
+        ),
+        description: LocalizedStringResource(
+            "The bundle identifier of the app (e.g. com.apple.dt.Xcode for Xcode).",
+            bundle: .atURL(Bundle.pulse.bundleURL)
+        )
     )
     var bundleId: String
 
@@ -59,9 +79,15 @@ struct GetAppUsageTodayIntent: AppIntent {
 
 struct GetTodayKeystrokesIntent: AppIntent {
 
-    static let title: LocalizedStringResource = "Keystrokes today"
+    static let title = LocalizedStringResource(
+        "Keystrokes today",
+        bundle: .atURL(Bundle.pulse.bundleURL)
+    )
     static let description = IntentDescription(
-        "Total key presses Pulse recorded for you today."
+        LocalizedStringResource(
+            "Total key presses Pulse recorded for you today.",
+            bundle: .atURL(Bundle.pulse.bundleURL)
+        )
     )
     static let openAppWhenRun: Bool = false
 
@@ -83,9 +109,15 @@ struct GetTodayKeystrokesIntent: AppIntent {
 
 struct GetTodayMouseDistanceIntent: AppIntent {
 
-    static let title: LocalizedStringResource = "Mouse distance today"
+    static let title = LocalizedStringResource(
+        "Mouse distance today",
+        bundle: .atURL(Bundle.pulse.bundleURL)
+    )
     static let description = IntentDescription(
-        "How far your cursor has travelled today, in metres."
+        LocalizedStringResource(
+            "How far your cursor has travelled today, in metres.",
+            bundle: .atURL(Bundle.pulse.bundleURL)
+        )
     )
     static let openAppWhenRun: Bool = false
 
@@ -118,7 +150,10 @@ struct PulseAppShortcuts: AppShortcutsProvider {
                 "How many keystrokes today on \(.applicationName)",
                 "\(.applicationName) keystrokes today"
             ],
-            shortTitle: "Keystrokes today",
+            shortTitle: LocalizedStringResource(
+                "Keystrokes today",
+                bundle: .atURL(Bundle.pulse.bundleURL)
+            ),
             systemImageName: "keyboard"
         )
         AppShortcut(
@@ -127,7 +162,10 @@ struct PulseAppShortcuts: AppShortcutsProvider {
                 "How far did my mouse travel today on \(.applicationName)",
                 "\(.applicationName) mouse distance today"
             ],
-            shortTitle: "Mouse distance today",
+            shortTitle: LocalizedStringResource(
+                "Mouse distance today",
+                bundle: .atURL(Bundle.pulse.bundleURL)
+            ),
             systemImageName: "computermouse"
         )
         AppShortcut(
@@ -136,7 +174,10 @@ struct PulseAppShortcuts: AppShortcutsProvider {
                 "How long did I use an app today on \(.applicationName)",
                 "\(.applicationName) app usage today"
             ],
-            shortTitle: "App usage today",
+            shortTitle: LocalizedStringResource(
+                "App usage today",
+                bundle: .atURL(Bundle.pulse.bundleURL)
+            ),
             systemImageName: "app.dashed"
         )
     }
