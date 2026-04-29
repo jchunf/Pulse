@@ -12,6 +12,38 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Perf — Dashboard refresh no longer blocks scroll
+
+`DashboardModel` is `@MainActor`, and its `refresh()` ran ~25 SQLite
+queries (today's summary + heatmap + trends + 30-day curves +
+trajectory histograms + per-card slices) all on the main actor every
+5 seconds. Each tick stalled the main thread for 50-150 ms while the
+queries ran, which manifested as a periodic stutter while scrolling
+the Dashboard.
+
+- New private `RawSnapshot` struct + `nonisolated static
+  gatherRawSnapshot(...)` helper that performs every DB read with
+  no `MainActor` isolation. All input types are `Sendable` value
+  types and `EventStore` itself declares `Sendable`, so the helper
+  is safe to invoke from a detached task.
+- `refresh()` now extracts the few main-actor-bound config values
+  (heatmap days, trajectory days, trend / continuity / week-over-week
+  spans, current calendar), calls `Task.detached(priority:
+  .userInitiated)` to gather the snapshot off-main, then hops back
+  to MainActor to derive UI state (`PeriodComparisonBuilder`,
+  `FocusDonutBuilder`, `GoalEvaluator`, `InsightEngine`,
+  `ThresholdAlertsController`) and apply the `@Published`
+  properties.
+- The trajectory tile assembly + `pastLongestFocus` per-day loop +
+  `lifetimeMouseDistanceMillimeters` lookup also moved into the
+  detached helper — they were previously sequenced inside the
+  refresh, on main, with nested `try? store.…` calls per display.
+- `MouseTrajectoryTileData` gains `Sendable` conformance so the
+  detached result can ride back through the actor boundary.
+- Behaviour-preserving — exact same data flows into the same
+  `@Published` properties, just no longer pinned to the main thread
+  while the SQLite reads run.
+
 ### Fix — dev channel and stable channel are mutually exclusive
 
 A user testing the dev channel surfaced the actual bug PR #128's

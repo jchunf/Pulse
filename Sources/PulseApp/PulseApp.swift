@@ -867,230 +867,332 @@ final class DashboardModel: ObservableObject {
         refreshTask = nil
     }
 
+    /// All raw query results from a single refresh tick. `Sendable` so
+    /// it can be produced on a detached cooperative task and handed
+    /// back to the main actor for application — keeps the ~25 SQLite
+    /// reads off the main thread, which previously hitched scrolling
+    /// every 5 seconds while the refresh loop ran. Pure data; the
+    /// derived values (focus donut, week-over-week split, goal
+    /// progress, insights, alerts) are still computed back on main
+    /// where they need access to MainActor-bound dependencies
+    /// (`goalsStore`, `insightEngine`, `alertsController`).
+    private struct RawSnapshot: Sendable {
+        var summary: TodaySummary
+        var heatmap: [HeatmapCell]
+        var trend: [DailyTrendPoint]
+        var comparisonTrend: [DailyTrendPoint]
+        var focus: FocusSegment?
+        var posture: SessionPosture
+        var switches: Int
+        var continuity: ContinuityStreak
+        var lidToday: Int
+        var lidTrend: [Int]
+        var restDay: RestDay
+        var timeline: DayTimeline
+        var keyPeak: KeyPressPeakMinute?
+        var passive: PassiveConsumption
+        var shortcuts: [ShortcutUsageRow]
+        var appTransitions: [AppTransition]
+        var appCombinations: [AppCombination]
+        var chaoticMoment: ChaoticMoment?
+        var chronotype: Chronotype?
+        var activityWeight: [ActivityWeightPoint]
+        var keyboardRhythm: KeyboardRhythm
+        var mouseSpeedRhythm: MouseSpeedRhythm
+        var keyCodes: [KeyCodeCount]
+        var focusSeconds: Int
+        var focusFraction: Double
+        var clipboardCount: Int
+        var clipboardHourly: [Int]
+        var handBalance: HandBalance?
+        var allAppsToday: [AppUsageRow]
+        var trajectoryTiles: [MouseTrajectoryTileData]
+        var clickTiles: [MouseTrajectoryTileData]
+        var pastLongestFocus: [Int]
+        var lifetimeMm: Double
+    }
+
+    /// Run every DB read for a single refresh tick. Called from a
+    /// detached cooperative task in `refresh()` so the SQLite layer
+    /// doesn't block the main actor while a tick is in flight. All
+    /// inputs are `Sendable` value types (or `EventStore`, which
+    /// declares `Sendable`).
+    private nonisolated static func gatherRawSnapshot(
+        store: EventStore,
+        now: Date,
+        dayStart: Date,
+        dayEnd: Date,
+        heatmapDays: Int,
+        trajectoryDays: Int,
+        trendDays: Int,
+        continuityDays: Int,
+        weekOverWeekDays: Int,
+        calendar: Calendar
+    ) throws -> RawSnapshot {
+        let summary = try store.todaySummary(start: dayStart, end: dayEnd, capUntil: now)
+        let heatmap = try store.hourlyHeatmap(endingAt: now, days: heatmapDays)
+        let trend = try store.dailyTrend(endingAt: now, days: trendDays)
+        let comparisonTrend = try store.dailyTrend(endingAt: now, days: weekOverWeekDays)
+        let focus = try store.longestFocusSegment(on: dayStart, now: now)
+        let posture = try store.sessionPosture(on: dayStart, now: now)
+        let switches = try store.appSwitchCount(on: dayStart, capUntil: now)
+        let continuity = try store.continuityStreak(endingAt: now, days: continuityDays)
+        let lidToday = try store.dailyLidOpens(on: dayStart, capUntil: now)
+        let lidTrend = try store.lidOpensTrend(endingAt: now, days: trendDays)
+        let restDay = try store.restSegments(on: dayStart, capUntil: now)
+        let timeline = try store.dayTimeline(on: dayStart, capUntil: now)
+        let keyPeak = try store.peakKeyPressMinute(start: dayStart, capUntil: now)
+        let passive = try store.passiveConsumption(on: dayStart, capUntil: now)
+        let shortcuts = try store.shortcutLeaderboard(start: dayStart, end: dayEnd, limit: 5)
+        // F-13 — top foreground app-switch pairs for today. Same
+        // window as shortcuts/timeline ("today through now").
+        let appTransitions = (try? store.appTransitions(start: dayStart, end: now, limit: 12)) ?? []
+        // F-14 — work stacks for today, 10-minute buckets, top 6.
+        let appCombinations = (try? store.appCombinations(
+            start: dayStart,
+            end: now,
+            bucketSeconds: 600,
+            minSize: 2,
+            limit: 6
+        )) ?? []
+        // F-21 — today's busiest 60-second window. Threshold 3 so
+        // we only call out a "moment" when the user genuinely flipped
+        // between apps multiple times in a minute.
+        let chaoticMoment = try? store.busiestMultitaskingMinute(
+            start: dayStart,
+            end: now,
+            minSwitches: 3
+        )
+        // F-40 — chronotype across the past 14 days.
+        let chronotype = try? store.chronotype(endingAt: now, days: 14)
+        // F-42 — 30-day daily active-hours curve.
+        let activityWeight = (try? store.activityWeight(endingAt: now, days: 30)) ?? []
+        // F-19 — last-60-minute typing-cadence sparkline.
+        let keyboardRhythm = (try? store.keyboardRhythm(endingAt: now, minutes: 60)) ?? KeyboardRhythm(samples: [])
+        // F-18 — last-60-minute mouse-speed sparkline.
+        let mouseSpeedRhythm = (try? store.mouseSpeed(endingAt: now, minutes: 60)) ?? MouseSpeedRhythm(samples: [])
+        let keyCodes = try store.keyCodeDistribution(endingAt: now, days: 7)
+        // F-37 — today's Focus / DND seconds + fraction.
+        let focusSeconds = (try? store.dailyFocusSeconds(on: dayStart, capUntil: now)) ?? 0
+        let focusFraction = (try? store.focusFractionToday(on: dayStart, capUntil: now)) ?? 0
+        // F-32 — today's clipboard-change count + hour-of-day distribution.
+        let clipboardCount = (try? store.dailyClipboardChanges(on: dayStart, capUntil: now)) ?? 0
+        let clipboardHourly = (try? store.hourlyClipboardChanges(on: dayStart, capUntil: now)) ?? Array(repeating: 0, count: 24)
+        // F-20 — left/right hand balance. Nil-out when classifiedTotal is
+        // too small (a 30-keystroke fluke shouldn't read as "right 80%").
+        let handBalance: HandBalance? = {
+            guard let raw = try? store.handBalance(endingAt: now, days: 7) else { return nil }
+            return raw.classifiedTotal >= 200 ? raw : nil
+        }()
+        // F-09 — limit 200 so the "other" slice is accurate.
+        let allAppsToday = try store.appUsageRanking(
+            start: dayStart,
+            end: dayEnd,
+            capUntil: now,
+            limit: 200
+        )
+        // F-04 / F-16 — pre-binned density tables, one PK lookup per
+        // tile for the display snapshot.
+        let trajectoryHistograms = try store.mouseDensity(endingAt: now, days: trajectoryDays)
+        var trajectoryTiles: [MouseTrajectoryTileData] = []
+        trajectoryTiles.reserveCapacity(trajectoryHistograms.count)
+        for histogram in trajectoryHistograms {
+            let snapshot = try? store.latestDisplaySnapshot(displayId: histogram.displayId)
+            trajectoryTiles.append(MouseTrajectoryTileData(histogram: histogram, snapshot: snapshot))
+        }
+        let clickHistograms = try store.mouseClickDensity(endingAt: now, days: trajectoryDays)
+        var clickTiles: [MouseTrajectoryTileData] = []
+        clickTiles.reserveCapacity(clickHistograms.count)
+        for histogram in clickHistograms {
+            let snapshot = try? store.latestDisplaySnapshot(displayId: histogram.displayId)
+            clickTiles.append(MouseTrajectoryTileData(histogram: histogram, snapshot: snapshot))
+        }
+        // A27 — past-days longest-focus history for the deep-focus
+        // insight rule. `try?` so a single-day miss reduces the
+        // history rather than blanking the whole insights row.
+        let pastLongestFocus: [Int] = (1...(trendDays - 1)).compactMap { offset in
+            guard let day = calendar.date(byAdding: .day, value: -offset, to: dayStart),
+                  let segment = try? store.longestFocusSegment(on: day, now: now)
+            else {
+                return nil
+            }
+            return segment.durationSeconds
+        }
+        let lifetimeMm = (try? store.lifetimeMouseDistanceMillimeters()) ?? 0
+
+        return RawSnapshot(
+            summary: summary,
+            heatmap: heatmap,
+            trend: trend,
+            comparisonTrend: comparisonTrend,
+            focus: focus,
+            posture: posture,
+            switches: switches,
+            continuity: continuity,
+            lidToday: lidToday,
+            lidTrend: lidTrend,
+            restDay: restDay,
+            timeline: timeline,
+            keyPeak: keyPeak,
+            passive: passive,
+            shortcuts: shortcuts,
+            appTransitions: appTransitions,
+            appCombinations: appCombinations,
+            chaoticMoment: chaoticMoment,
+            chronotype: chronotype,
+            activityWeight: activityWeight,
+            keyboardRhythm: keyboardRhythm,
+            mouseSpeedRhythm: mouseSpeedRhythm,
+            keyCodes: keyCodes,
+            focusSeconds: focusSeconds,
+            focusFraction: focusFraction,
+            clipboardCount: clipboardCount,
+            clipboardHourly: clipboardHourly,
+            handBalance: handBalance,
+            allAppsToday: allAppsToday,
+            trajectoryTiles: trajectoryTiles,
+            clickTiles: clickTiles,
+            pastLongestFocus: pastLongestFocus,
+            lifetimeMm: lifetimeMm
+        )
+    }
+
     func refresh() async {
         guard let store else {
             errorMessage = String(localized: "Database not available.", bundle: .pulse)
             return
         }
         let now = Date()
-        let dayStart = Calendar.current.startOfDay(for: now)
+        let calendar = Calendar.current
+        let dayStart = calendar.startOfDay(for: now)
         let dayEnd = dayStart.addingTimeInterval(86_400)
         let days = Self.resolvedHeatmapDays()
-        do {
-            let summary = try store.todaySummary(start: dayStart, end: dayEnd, capUntil: now)
-            let heatmap = try store.hourlyHeatmap(endingAt: now, days: days)
-            let trend = try store.dailyTrend(endingAt: now, days: Self.trendDays)
-            let comparisonTrend = try store.dailyTrend(
-                endingAt: now,
-                days: Self.weekOverWeekDays
-            )
-            let weekOverWeek = PeriodComparisonBuilder.split(from: comparisonTrend)
-            let focus = try store.longestFocusSegment(on: dayStart, now: now)
-            let posture = try store.sessionPosture(on: dayStart, now: now)
-            let switches = try store.appSwitchCount(on: dayStart, capUntil: now)
-            let continuity = try store.continuityStreak(endingAt: now, days: Self.continuityDays)
-            let lidToday = try store.dailyLidOpens(on: dayStart, capUntil: now)
-            let lidTrend = try store.lidOpensTrend(endingAt: now, days: Self.trendDays)
-            let restDay = try store.restSegments(on: dayStart, capUntil: now)
-            let timeline = try store.dayTimeline(on: dayStart, capUntil: now)
-            let keyPeak = try store.peakKeyPressMinute(start: dayStart, capUntil: now)
-            let passive = try store.passiveConsumption(on: dayStart, capUntil: now)
-            let shortcuts = try store.shortcutLeaderboard(start: dayStart, end: dayEnd, limit: 5)
-            // F-13 — top foreground app-switch pairs for today. Same
-            // window as shortcuts/timeline ("today through now") so
-            // the Sankey card is in step with the rest of the
-            // Apps section's "today" framing.
-            let appTransitions = (try? store.appTransitions(start: dayStart, end: now, limit: 12)) ?? []
-            // F-14 — work stacks for today, 10-minute buckets, top 6.
-            let appCombinations = (try? store.appCombinations(
-                start: dayStart,
-                end: now,
-                bucketSeconds: 600,
-                minSize: 2,
-                limit: 6
-            )) ?? []
-            // F-21 — today's busiest 60-second window. Threshold 3
-            // means we only call out a "moment" when the user
-            // genuinely flipped between apps multiple times in a
-            // minute, not the steady-state cmd-tab cadence.
-            let chaoticMoment = try? store.busiestMultitaskingMinute(
-                start: dayStart,
-                end: now,
-                minSwitches: 3
-            )
-            // F-40 — chronotype across the past 14 days. Longer
-            // window than the rest of the Apps section to give the
-            // circular-mean enough sample to settle.
-            let chronotype = try? store.chronotype(endingAt: now, days: 14)
-            // F-42 — 30-day daily active-hours curve.
-            let activityWeight = (try? store.activityWeight(endingAt: now, days: 30)) ?? []
-            // F-19 — last-60-minute typing-cadence sparkline.
-            let keyboardRhythm = (try? store.keyboardRhythm(endingAt: now, minutes: 60)) ?? KeyboardRhythm(samples: [])
-            // F-18 — last-60-minute mouse-speed sparkline.
-            let mouseSpeedRhythm = (try? store.mouseSpeed(endingAt: now, minutes: 60)) ?? MouseSpeedRhythm(samples: [])
-            let keyCodes = try store.keyCodeDistribution(endingAt: now, days: 7)
-            // F-37 — today's Focus / DND seconds + fraction.
-            let focusSeconds = (try? store.dailyFocusSeconds(on: dayStart, capUntil: now)) ?? 0
-            let focusFraction = (try? store.focusFractionToday(on: dayStart, capUntil: now)) ?? 0
-            // F-32 — today's clipboard-change count + hour-of-day
-            // distribution.
-            let clipboardCount = (try? store.dailyClipboardChanges(on: dayStart, capUntil: now)) ?? 0
-            let clipboardHourly = (try? store.hourlyClipboardChanges(on: dayStart, capUntil: now)) ?? Array(repeating: 0, count: 24)
-            // F-20 — left/right hand balance from the same window.
-            // nil-out when classifiedTotal is too small to be a stable
-            // ratio (a 30-keystroke fluke shouldn't read as "you favour
-            // right hand 80%").
-            let handBalance: HandBalance? = {
-                guard let raw = try? store.handBalance(endingAt: now, days: 7) else { return nil }
-                return raw.classifiedTotal >= 200 ? raw : nil
-            }()
-            // F-09 — ask for up to 200 bundles so the "other" slice is
-            // accurate. In practice a day's distinct-bundle count is
-            // well under 50, so 200 is pure headroom.
-            let allAppsToday = try store.appUsageRanking(
-                start: dayStart,
-                end: dayEnd,
-                capUntil: now,
-                limit: 200
-            )
-            let focusDonut = FocusDonutBuilder.build(from: allAppsToday)
-            // F-04 — `mouseDensity` reads from the pre-binned
-            // `day_mouse_density` table (B9) so this is a lightweight
-            // grouped scan even over 7 days. `latestDisplaySnapshot`
-            // is one extra PK-lookup per display — fine inside the
-            // refresh loop.
-            let trajectoryHistograms = try store.mouseDensity(
-                endingAt: now,
-                days: self.trajectoryDays
-            )
-            var trajectoryTiles: [MouseTrajectoryTileData] = []
-            trajectoryTiles.reserveCapacity(trajectoryHistograms.count)
-            for histogram in trajectoryHistograms {
-                let snapshot = try? store.latestDisplaySnapshot(displayId: histogram.displayId)
-                trajectoryTiles.append(
-                    MouseTrajectoryTileData(
-                        histogram: histogram,
-                        snapshot: snapshot
-                    )
+        let trajectoryDays = self.trajectoryDays
+        let trendDays = Self.trendDays
+        let continuityDays = Self.continuityDays
+        let weekOverWeekDays = Self.weekOverWeekDays
+
+        // Run every DB read off the main actor on a detached cooperative
+        // task. Previously this loop ran ~25 SQLite reads on the
+        // MainActor every 5 seconds, blocking scroll for 50-150ms per
+        // tick. With the work moved off main, the only main-thread
+        // cost per refresh is the @Published applies below.
+        let result: Result<RawSnapshot, Error> = await Task.detached(priority: .userInitiated) {
+            do {
+                let raw = try Self.gatherRawSnapshot(
+                    store: store,
+                    now: now,
+                    dayStart: dayStart,
+                    dayEnd: dayEnd,
+                    heatmapDays: days,
+                    trajectoryDays: trajectoryDays,
+                    trendDays: trendDays,
+                    continuityDays: continuityDays,
+                    weekOverWeekDays: weekOverWeekDays,
+                    calendar: calendar
                 )
+                return .success(raw)
+            } catch {
+                return .failure(error)
             }
-            // F-16 — same shape as the dwell read above, sourced from
-            // `day_click_density`. Snapshot lookups are cached at the
-            // SQL layer so the second `latestDisplaySnapshot` call per
-            // display is effectively free.
-            let clickHistograms = try store.mouseClickDensity(
-                endingAt: now,
-                days: self.trajectoryDays
-            )
-            var clickTiles: [MouseTrajectoryTileData] = []
-            clickTiles.reserveCapacity(clickHistograms.count)
-            for histogram in clickHistograms {
-                let snapshot = try? store.latestDisplaySnapshot(displayId: histogram.displayId)
-                clickTiles.append(
-                    MouseTrajectoryTileData(
-                        histogram: histogram,
-                        snapshot: snapshot
-                    )
-                )
-            }
-            let progress = GoalEvaluator.evaluate(
-                goals: goalsStore.enabledGoals(),
-                summary: summary,
-                longestFocus: focus,
-                appSwitchesToday: switches
-            )
-            // A27 — run the cross-metric rule engine. The past-days
-            // longest-focus query is one extra DB hit per prior day;
-            // `try?` so a single-day failure just reduces the history
-            // the deep-focus rule sees rather than blanking the whole
-            // insights row.
-            let calendar = Calendar.current
-            let pastLongestFocus: [Int] = (1...(Self.trendDays - 1)).compactMap { offset in
-                guard let day = calendar.date(byAdding: .day, value: -offset, to: dayStart),
-                      let segment = try? store.longestFocusSegment(on: day, now: now)
-                else {
-                    return nil
-                }
-                return segment.durationSeconds
-            }
-            let insightContext = InsightContext(
-                today: summary,
-                pastDailyTrend: Array(trend.dropLast()),
-                todayLongestFocus: focus,
-                pastLongestFocusSeconds: pastLongestFocus,
-                heatmapCells: heatmap,
-                continuity: continuity,
-                now: now,
-                calendar: calendar
-            )
-            self.summary = summary
-            self.heatmapCells = heatmap
-            self.heatmapDays = days
-            self.trendPoints = trend
-            self.longestFocus = focus
-            self.sessionPosture = posture
-            self.goalProgress = progress
-            self.insights = insightEngine.evaluate(context: insightContext)
-            self.continuity = continuity
-            self.lidOpensToday = lidToday
-            self.lidOpensTrend = lidTrend
-            self.restToday = restDay
-            self.timelineToday = timeline
-            self.keyPressPeak = keyPeak
-            self.passiveToday = passive
-            self.shortcutsToday = shortcuts
-            self.appTransitionsToday = appTransitions
-            self.appCombinationsToday = appCombinations
-            self.chaoticMomentToday = chaoticMoment
-            self.chronotype = chronotype
-            self.activityWeight = activityWeight
-            self.keyboardRhythm = keyboardRhythm
-            self.mouseSpeedRhythm = mouseSpeedRhythm
-            self.keyCodeDistribution = keyCodes
-            self.handBalance = handBalance
-            self.focusSecondsToday = focusSeconds
-            self.focusFractionToday = focusFraction
-            self.clipboardChangesToday = clipboardCount
-            self.clipboardHourly = clipboardHourly
-            self.focusDonut = focusDonut
-            self.weekOverWeek = weekOverWeek
-            self.trajectoryTiles = trajectoryTiles
-            self.clickTrajectoryTiles = clickTiles
-            self.lastRefreshAt = now
-            self.errorMessage = nil
-            updateAchievementIfNeeded(
-                distanceMillimeters: summary.totalMouseDistanceMillimeters,
-                now: now
-            )
-            let lifetimeMm = (try? store.lifetimeMouseDistanceMillimeters()) ?? 0
-            self.lifetimeMouseDistanceMillimeters = lifetimeMm
-            updateLifetimeAchievementIfNeeded(
-                lifetimeMillimeters: lifetimeMm,
-                now: now
-            )
-            // F-45 — threshold alerts. Derive "continuous active" from
-            // today's rest segments + dayStart; evaluator is pure so
-            // the controller just delivers the output.
-            let continuousActive = ContinuousActiveDeriver.derive(
-                restSegments: restDay.segments.map {
-                    (startedAt: $0.startedAt, endedAt: $0.endedAt)
-                },
-                dayStart: dayStart,
-                now: now
-            )
-            alertsController.evaluateAndFire(
-                metrics: ThresholdAlertMetrics(
-                    activeSecondsToday: summary.totalActiveSeconds,
-                    continuousActiveSeconds: continuousActive
-                ),
-                now: now
-            )
-        } catch {
+        }.value
+
+        let raw: RawSnapshot
+        switch result {
+        case .success(let snapshot):
+            raw = snapshot
+        case .failure(let error):
             self.errorMessage = String.localizedStringWithFormat(
                 NSLocalizedString("Failed to load summary: %@", bundle: .pulse, comment: ""),
                 error.localizedDescription
             )
+            return
         }
+
+        // Back on MainActor — derive UI-state from the raw snapshot
+        // and apply. These functions touch MainActor-bound state
+        // (`goalsStore`, `insightEngine`, `alertsController`) so they
+        // belong here, not in `gatherRawSnapshot`.
+        let weekOverWeek = PeriodComparisonBuilder.split(from: raw.comparisonTrend)
+        let focusDonut = FocusDonutBuilder.build(from: raw.allAppsToday)
+        let progress = GoalEvaluator.evaluate(
+            goals: goalsStore.enabledGoals(),
+            summary: raw.summary,
+            longestFocus: raw.focus,
+            appSwitchesToday: raw.switches
+        )
+        let insightContext = InsightContext(
+            today: raw.summary,
+            pastDailyTrend: Array(raw.trend.dropLast()),
+            todayLongestFocus: raw.focus,
+            pastLongestFocusSeconds: raw.pastLongestFocus,
+            heatmapCells: raw.heatmap,
+            continuity: raw.continuity,
+            now: now,
+            calendar: calendar
+        )
+
+        self.summary = raw.summary
+        self.heatmapCells = raw.heatmap
+        self.heatmapDays = days
+        self.trendPoints = raw.trend
+        self.longestFocus = raw.focus
+        self.sessionPosture = raw.posture
+        self.goalProgress = progress
+        self.insights = insightEngine.evaluate(context: insightContext)
+        self.continuity = raw.continuity
+        self.lidOpensToday = raw.lidToday
+        self.lidOpensTrend = raw.lidTrend
+        self.restToday = raw.restDay
+        self.timelineToday = raw.timeline
+        self.keyPressPeak = raw.keyPeak
+        self.passiveToday = raw.passive
+        self.shortcutsToday = raw.shortcuts
+        self.appTransitionsToday = raw.appTransitions
+        self.appCombinationsToday = raw.appCombinations
+        self.chaoticMomentToday = raw.chaoticMoment
+        self.chronotype = raw.chronotype
+        self.activityWeight = raw.activityWeight
+        self.keyboardRhythm = raw.keyboardRhythm
+        self.mouseSpeedRhythm = raw.mouseSpeedRhythm
+        self.keyCodeDistribution = raw.keyCodes
+        self.handBalance = raw.handBalance
+        self.focusSecondsToday = raw.focusSeconds
+        self.focusFractionToday = raw.focusFraction
+        self.clipboardChangesToday = raw.clipboardCount
+        self.clipboardHourly = raw.clipboardHourly
+        self.focusDonut = focusDonut
+        self.weekOverWeek = weekOverWeek
+        self.trajectoryTiles = raw.trajectoryTiles
+        self.clickTrajectoryTiles = raw.clickTiles
+        self.lastRefreshAt = now
+        self.errorMessage = nil
+        updateAchievementIfNeeded(
+            distanceMillimeters: raw.summary.totalMouseDistanceMillimeters,
+            now: now
+        )
+        self.lifetimeMouseDistanceMillimeters = raw.lifetimeMm
+        updateLifetimeAchievementIfNeeded(
+            lifetimeMillimeters: raw.lifetimeMm,
+            now: now
+        )
+        // F-45 — threshold alerts. Derive "continuous active" from
+        // today's rest segments + dayStart; evaluator is pure so
+        // the controller just delivers the output.
+        let continuousActive = ContinuousActiveDeriver.derive(
+            restSegments: raw.restDay.segments.map {
+                (startedAt: $0.startedAt, endedAt: $0.endedAt)
+            },
+            dayStart: dayStart,
+            now: now
+        )
+        alertsController.evaluateAndFire(
+            metrics: ThresholdAlertMetrics(
+                activeSecondsToday: raw.summary.totalActiveSeconds,
+                continuousActiveSeconds: continuousActive
+            ),
+            now: now
+        )
     }
 
     // MARK: - Milestone achievements (F-25)
@@ -4411,7 +4513,7 @@ struct ContinuityCard: View {
 /// physical aspect ratio. `snapshot` may be `nil` on a first launch
 /// where no `display_snapshots` row has been written yet; the card
 /// falls back to a square tile in that case.
-struct MouseTrajectoryTileData: Equatable {
+struct MouseTrajectoryTileData: Sendable, Equatable {
     let histogram: MouseDisplayHistogram
     let snapshot: DisplayInfo?
 }
