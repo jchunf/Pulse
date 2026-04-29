@@ -4748,19 +4748,53 @@
         }
       }
     },
-    "While on, “Check for updates…” pulls only from `main` after every merge — newer features arrive sooner, may be unstable, and stable releases are **not** offered through this channel. Turn off to switch back to the stable channel; the next update check will offer the latest tagged release.": {
-      "comment": "Settings About — caption under the dev builds toggle. Spells out that dev and stable channels are mutually exclusive so the user knows turning the toggle off is how they get back to stable.",
+    "While on, “Check for updates…” only offers rolling builds from `main`. Stable releases stay on the stable channel and are not surfaced here. Switching channels in either direction needs a one-time manual reinstall — use the link below to grab the other channel's build.": {
+      "comment": "Settings About — caption under the dev builds toggle. Spells out the channel separation and that cross-channel switching needs a manual reinstall (since Sparkle only steps forward by sparkle:version).",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "While on, “Check for updates…” pulls only from `main` after every merge — newer features arrive sooner, may be unstable, and stable releases are **not** offered through this channel. Turn off to switch back to the stable channel; the next update check will offer the latest tagged release."
+            "value": "While on, “Check for updates…” only offers rolling builds from `main`. Stable releases stay on the stable channel and are not surfaced here. Switching channels in either direction needs a one-time manual reinstall — use the link below to grab the other channel's build."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "开启后，「检查更新」只会从每次合入 `main` 的滚动构建中拉取 —— 新功能更早到达，但可能不稳定；且开启时**不会**收到稳定版的更新提示。关闭即切回稳定频道，下一次检查更新会自动推送最新的正式版本。"
+            "value": "开启后，「检查更新」只会推送来自 `main` 的滚动构建；稳定版的更新不会出现在这条频道里。要切换频道（任一方向）都需要手动重装一次 —— 用下方链接下载另一边的最新构建即可。"
+          }
+        }
+      }
+    },
+    "Download latest stable build…": {
+      "comment": "Settings About — link surfaced when dev channel is on. Opens the GitHub Releases latest URL so the user can grab a stable build.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download latest stable build…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载最新稳定版…"
+          }
+        }
+      }
+    },
+    "Download latest development build…": {
+      "comment": "Settings About — link surfaced when dev channel is off. Opens the dev-latest GitHub Release so the user can switch in by reinstalling.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download latest development build…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载最新开发版…"
           }
         }
       }

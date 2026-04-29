@@ -6735,13 +6735,28 @@ struct SettingsView: View {
                 )) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Receive development builds", bundle: .pulse)
-                        Text("While on, “Check for updates…” pulls only from `main` after every merge — newer features arrive sooner, may be unstable, and stable releases are **not** offered through this channel. Turn off to switch back to the stable channel; the next update check will offer the latest tagged release.", bundle: .pulse)
+                        Text("While on, “Check for updates…” only offers rolling builds from `main`. Stable releases stay on the stable channel and are not surfaced here. Switching channels in either direction needs a one-time manual reinstall — use the link below to grab the other channel's build.", bundle: .pulse)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
                 Button(action: onCheckForUpdates) {
                     Text("Check for updates…", bundle: .pulse)
+                }
+                // Cross-channel switching path. Sparkle's "newer
+                // version wins" rule won't downgrade a 12_000_001-build
+                // stable user to a 240-build dev (and won't
+                // upgrade-down a dev user back to stable until the
+                // next stable release ships with a higher build), so
+                // a one-time manual install is the canonical bridge.
+                // The label flips to point at the *other* channel
+                // since that's where you'd be heading.
+                Link(destination: crossChannelDownloadURL) {
+                    if updateChannel == PulseUpdaterDelegate.devChannel {
+                        Text("Download latest stable build…", bundle: .pulse)
+                    } else {
+                        Text("Download latest development build…", bundle: .pulse)
+                    }
                 }
             } header: {
                 Text("About", bundle: .pulse)
@@ -6753,6 +6768,23 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 520, height: 360)
+    }
+
+    /// GitHub Releases URL for the channel the user is *not* currently
+    /// on. Surfaced as the "Download latest [opposite channel]…" link
+    /// in the About section so a user can perform the one-time manual
+    /// switch that Sparkle's update flow can't do on its own (Sparkle
+    /// only steps forward in `sparkle:version`; cross-channel build
+    /// numbers live in different ranges, so a stable→dev jump
+    /// looks like a downgrade and a dev→stable jump waits for the
+    /// next stable to clear the dev's build number).
+    private var crossChannelDownloadURL: URL {
+        if updateChannel == PulseUpdaterDelegate.devChannel {
+            // On dev — point at the latest tagged stable release.
+            return URL(string: "https://github.com/jchunf/Pulse/releases/latest")!
+        }
+        // On stable — point at the rolling dev-latest pre-release.
+        return URL(string: "https://github.com/jchunf/Pulse/releases/tag/dev-latest")!
     }
 }
 
