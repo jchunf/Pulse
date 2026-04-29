@@ -194,6 +194,159 @@
         }
       }
     },
+    "App usage today": {
+      "comment": "F-44 PulseAppShortcuts — short title for the app-usage intent in the Shortcuts library.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App usage today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日 App 使用时长"
+          }
+        }
+      }
+    },
+    "Bundle ID": {
+      "comment": "F-44 GetAppUsageTodayIntent — parameter title (bundle identifier).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bundle ID"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bundle ID"
+          }
+        }
+      }
+    },
+    "How far your cursor has travelled today, in metres.": {
+      "comment": "F-44 GetTodayMouseDistanceIntent — description.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How far your cursor has travelled today, in metres."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天你的鼠标走了多远（米）。"
+          }
+        }
+      }
+    },
+    "How long did I use…": {
+      "comment": "F-44 GetAppUsageTodayIntent — title shown in the Shortcuts library.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How long did I use…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天我用了多久…"
+          }
+        }
+      }
+    },
+    "Keystrokes today": {
+      "comment": "F-44 GetTodayKeystrokesIntent — title (also reused as the shortTitle in PulseAppShortcuts).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keystrokes today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日按键数"
+          }
+        }
+      }
+    },
+    "Mouse distance today": {
+      "comment": "F-44 GetTodayMouseDistanceIntent — title (also reused as the shortTitle in PulseAppShortcuts).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mouse distance today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日鼠标距离"
+          }
+        }
+      }
+    },
+    "Returns the seconds you've spent in a given app today, read from Pulse's local data only.": {
+      "comment": "F-44 GetAppUsageTodayIntent — description shown when configuring the intent.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Returns the seconds you've spent in a given app today, read from Pulse's local data only."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "返回今天你在某个 App 中停留的秒数，仅读取 Pulse 本地数据。"
+          }
+        }
+      }
+    },
+    "The bundle identifier of the app (e.g. com.apple.dt.Xcode for Xcode).": {
+      "comment": "F-44 GetAppUsageTodayIntent — parameter description (bundle identifier example).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The bundle identifier of the app (e.g. com.apple.dt.Xcode for Xcode)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App 的 bundle 标识（例如 Xcode 是 com.apple.dt.Xcode）。"
+          }
+        }
+      }
+    },
+    "Total key presses Pulse recorded for you today.": {
+      "comment": "F-44 GetTodayKeystrokesIntent — description shown when configuring the intent.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total key presses Pulse recorded for you today."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse 今天为你记录的按键总数。"
+          }
+        }
+      }
+    },
     "Accessibility": {
       "localizations": {
         "en": {
