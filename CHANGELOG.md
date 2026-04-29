@@ -12,6 +12,49 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Fix — toggling the dev-builds switch actually switches you
+
+Follow-up to PR #142. The previous round added a "Download latest
+[opposite channel]…" link that opened the browser; a dogfooder
+reasonably called that out as not the right UX — flipping the toggle
+should *be* the switch, not just open a webpage.
+
+The blocker is Sparkle's "newer `sparkle:version` wins" rule: stable
+BUILD encoding (`10⁷ + …`) puts v2.0.1 at `12_000_001`, dev BUILD =
+GHA run number (~240). Across-channel build numbers don't compete,
+so `checkForUpdates` on the new channel just says "you're current."
+
+Solution: a one-shot version-compare override.
+
+- **`AlwaysNewerComparator`** implements `SUVersionComparison.compareVersion(_:to:)`
+  to always return `.orderedAscending` — i.e. the candidate is
+  always newer than the current.
+- **`PulseUpdaterDelegate.versionComparator(for:)`** returns this
+  comparator only while a process-memory `_forceNewerForNextCheck`
+  flag is armed; the rest of the time it returns `nil` (Sparkle's
+  default semver-aware compare).
+- **`PulseUpdaterDelegate.updater(_:didFinishUpdateCycleFor:error:)`**
+  clears the flag the moment Sparkle finishes a cycle, regardless
+  of outcome (install / dismiss / network error / signature
+  failure). The override is scoped to one cycle.
+- **`UpdateController.switchChannel(to:)`** is the new public entry:
+  set the channel preference, arm the flag, call
+  `checkForUpdates()`. Sparkle pulls the new channel's feed,
+  applies the override, and shows the standard install prompt for
+  the latest build in that channel.
+- **Settings → About** — the toggle's `set:` now calls
+  `onSwitchUpdateChannel(target)` directly. Flip ON → standard
+  install prompt for latest dev. Flip OFF → standard install
+  prompt for latest stable. The "Download latest [opposite
+  channel]…" link is gone (no longer needed).
+- Caption rewritten to lead with "toggling on/off offers the latest
+  build of the other channel through the standard update prompt."
+
+The override is process-memory-only (not persisted) — if the app
+crashes mid-flow, the next launch starts clean and the user
+re-toggles from a clean state rather than inheriting a stale
+"always-newer" override.
+
 ### Fix — channel switching gets a manual-reinstall escape hatch + delegate-level Sparkle filtering
 
 A dogfooder on stable v2.0.1 toggled the dev-channel switch and saw
