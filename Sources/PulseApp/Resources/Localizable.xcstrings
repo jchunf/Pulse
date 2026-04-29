@@ -4901,19 +4901,53 @@
         }
       }
     },
-    "Toggling on will offer the latest rolling build from `main`; toggling off will offer the latest stable release. Either direction installs through the standard update prompt — accept it to switch, dismiss it to stay where you are. Within each channel, “Check for updates…” keeps stepping forward as new builds ship.": {
-      "comment": "Settings About — caption under the dev builds toggle. Explains that flipping the toggle triggers a real install of the opposite channel's latest build via Sparkle's standard prompt; within-channel forward updates keep working as usual.",
+    "Sets which feed “Check for updates…” looks at. Flipping the toggle alone doesn't download anything — use the “Switch to latest …” button below to actually install the other channel's most recent build.": {
+      "comment": "Settings About — caption under the dev builds toggle. Spells out that the toggle is just a preference for which feed to query; the explicit Switch button is what actually performs the cross-channel install.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Toggling on will offer the latest rolling build from `main`; toggling off will offer the latest stable release. Either direction installs through the standard update prompt — accept it to switch, dismiss it to stay where you are. Within each channel, “Check for updates…” keeps stepping forward as new builds ship."
+            "value": "Sets which feed “Check for updates…” looks at. Flipping the toggle alone doesn't download anything — use the “Switch to latest …” button below to actually install the other channel's most recent build."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "开启会立即推送 `main` 上最新的滚动构建；关闭会推送最新的正式版本。无论哪个方向，都通过标准的更新提示来装 —— 接受就完成切换，取消则保持原状。频道内部的「检查更新」会继续按版本递进。"
+            "value": "决定「检查更新…」从哪条 feed 拉取。单独翻这个开关不会下载或安装任何东西 —— 真要切换到另一边的最新构建，请用下方的「切换到最新…」按钮。"
+          }
+        }
+      }
+    },
+    "Switch to latest stable build…": {
+      "comment": "Settings About — explicit cross-channel action button shown when dev channel is on. Clicks trigger the in-app force-install of the latest stable release.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch to latest stable build…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换到最新稳定版…"
+          }
+        }
+      }
+    },
+    "Switch to latest development build…": {
+      "comment": "Settings About — explicit cross-channel action button shown when dev channel is off. Clicks trigger the in-app force-install of the latest dev rolling build.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch to latest development build…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换到最新开发版…"
           }
         }
       }
