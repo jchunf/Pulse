@@ -74,6 +74,7 @@ struct PulseApp: App {
         Settings {
             SettingsView(
                 goalsStore: appDelegate.goalsStore,
+                healthModel: appDelegate.healthModel,
                 onOpenPrivacyAudit: { appDelegate.requestShowPrivacyAudit() },
                 onPurgeRange: { start, end in
                     try appDelegate.purgeRange(start: start, end: end)
@@ -1593,7 +1594,7 @@ struct DashboardView: View {
     /// categories on the left, focused content pane on the
     /// right.
     enum Section: String, CaseIterable, Hashable, Identifiable {
-        case today, rhythm, focus, apps, input, health
+        case today, rhythm, focus, apps, input
 
         var id: String { rawValue }
 
@@ -1608,7 +1609,6 @@ struct DashboardView: View {
             case .focus:  return "Focus"
             case .apps:   return "Apps"
             case .input:  return "Input"
-            case .health: return "Health"
             }
         }
 
@@ -1631,7 +1631,6 @@ struct DashboardView: View {
             case .focus:  return String(localized: "Focus",  bundle: .pulse)
             case .apps:   return String(localized: "Apps",   bundle: .pulse)
             case .input:  return String(localized: "Input",  bundle: .pulse)
-            case .health: return String(localized: "Health", bundle: .pulse)
             }
         }
 
@@ -1642,8 +1641,9 @@ struct DashboardView: View {
         /// `app.badge` for "apps" (which apps you used),
         /// `keyboard` for "input" (where keyboard + mouse heatmaps
         /// live — they're about input behaviour, not app
-        /// behaviour), `stethoscope` for "health" (collector
-        /// diagnostics, not human health).
+        /// behaviour). The pre-A61 `health` row was removed when the
+        /// only card it carried (`DiagnosticsCard`) moved to
+        /// Settings → Diagnostics.
         var systemImage: String {
             switch self {
             case .today:  return "sun.max"
@@ -1651,7 +1651,6 @@ struct DashboardView: View {
             case .focus:  return "scope"
             case .apps:   return "app.badge"
             case .input:  return "keyboard"
-            case .health: return "stethoscope"
             }
         }
     }
@@ -1737,10 +1736,6 @@ struct DashboardView: View {
             sidebarRow(.focus)
             sidebarRow(.apps)
             sidebarRow(.input)
-
-            sidebarDivider
-
-            sidebarRow(.health)
 
             Spacer(minLength: 0)
         }
@@ -1856,7 +1851,6 @@ struct DashboardView: View {
             case .focus:  focusSection
             case .apps:   appsSection(summary: summary)
             case .input:  inputSection
-            case .health: healthSection
             }
         } else if let error = model.errorMessage {
             Text(error)
@@ -1967,18 +1961,13 @@ struct DashboardView: View {
         if !model.shortcutsToday.isEmpty {
             ShortcutLeaderboardCard(rows: model.shortcutsToday)
         }
-        if model.clipboardChangesToday > 0 {
-            ClipboardCard(
-                count: model.clipboardChangesToday,
-                hourly: model.clipboardHourly
-            )
-        }
     }
 
-    /// "Input" — keyboard + mouse heatmaps. Carved out of `apps`
-    /// in A61 because both visualisations are about *input*
-    /// behaviour (which keys, where the cursor parked) rather
-    /// than which application was foreground.
+    /// "Input" — keyboard + mouse + clipboard interactions.
+    /// Carved out of `apps` in A61 because these visualisations are
+    /// about *input* behaviour (which keys, where the cursor parked,
+    /// how often the pasteboard fired) rather than which application
+    /// was foreground.
     @ViewBuilder
     private var inputSection: some View {
         KeyboardHeatmapCard(keyCodes: model.keyCodeDistribution)
@@ -1999,11 +1988,16 @@ struct DashboardView: View {
         if model.mouseSpeedRhythm.totalMoveEvents > 0 {
             MouseSpeedCard(rhythm: model.mouseSpeedRhythm)
         }
-    }
-
-    @ViewBuilder
-    private var healthSection: some View {
-        DiagnosticsCard(snapshot: healthModel.snapshot)
+        // ClipboardCard lives here (not in `apps`) because copy / cut
+        // is interaction behaviour — the user pressed cmd+c. The
+        // appsSection focuses strictly on which apps were
+        // foreground / how the user moved between them.
+        if model.clipboardChangesToday > 0 {
+            ClipboardCard(
+                count: model.clipboardChangesToday,
+                hourly: model.clipboardHourly
+            )
+        }
     }
 
     // MARK: - Today pane subviews
@@ -3377,7 +3371,7 @@ struct FocusModeCard: View {
                 Image(systemName: "moon.zzz.fill")
                     .foregroundStyle(PulseDesign.coral)
                     .opacity(0.85)
-                Text("Focus mode today", bundle: .pulse)
+                Text("DND / Focus mode time", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
             HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -4176,7 +4170,7 @@ struct ActivityWeightCard: View {
                 Image(systemName: "chart.line.uptrend.xyaxis")
                     .foregroundStyle(PulseDesign.coral)
                     .opacity(0.85)
-                Text("Activity weight", bundle: .pulse)
+                Text("Daily active hours", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
             subtitle
@@ -6177,7 +6171,7 @@ struct AppCombinationsCard: View {
                 Image(systemName: "square.stack.3d.up")
                     .foregroundStyle(PulseDesign.coral)
                     .opacity(0.85)
-                Text("Work stacks today", bundle: .pulse)
+                Text("App combinations today", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
             Text("Apps you cycled through in the same 10-minute window.", bundle: .pulse)
@@ -6609,14 +6603,20 @@ struct SettingsView: View {
     @AppStorage(PulsePreferenceKey.alertNoBreakSeconds)
     private var alertNoBreakSeconds: Int = 0
     @ObservedObject var goalsStore: GoalsStore
+    /// Powers the Diagnostics section at the bottom of Settings.
+    /// Pre-A61 the same `DiagnosticsCard` lived under a Health
+    /// sidebar item; that sidebar row only ever held this one card,
+    /// so it became wasted real estate. The card moved here where
+    /// the rest of the "what's Pulse doing?" controls live.
+    @ObservedObject var healthModel: HealthModel
     let onOpenPrivacyAudit: () -> Void
     let onPurgeRange: (Date, Date) throws -> RangePurgeResult
     let onCheckForUpdates: () -> Void
-    /// Called when the user flips the "Receive development builds"
-    /// toggle. The closure does the channel-flip + force-install
-    /// dance via `UpdateController.switchChannel(to:)` so the user
-    /// sees the standard Sparkle install prompt for the *opposite*
-    /// channel's latest build, not the "you're already current"
+    /// Called when the user clicks the explicit cross-channel switch
+    /// button. The closure flips the channel pref + arms the
+    /// one-shot version-compare override via
+    /// `UpdateController.switchChannel(to:)` so Sparkle offers the
+    /// other channel's latest build, not the "you're already current"
     /// dialog (which is what naive build-number compare gives us
     /// across channels).
     let onSwitchUpdateChannel: (String) -> Void
@@ -6795,9 +6795,27 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+
+            Section {
+                // Pre-A61 this card had its own sidebar row
+                // ("Health"). The sidebar row was the only thing in
+                // its pane, so it sat awkward and empty most of the
+                // time. The card itself is genuinely useful when
+                // something's silently broken (e.g. permissions
+                // revoked, writer wedged), so it lives here in
+                // Settings — the same place a power user already
+                // looks for "what's Pulse doing?" controls.
+                DiagnosticsCard(snapshot: healthModel.snapshot)
+            } header: {
+                Text("Diagnostics", bundle: .pulse)
+            } footer: {
+                Text("Live counts straight from your local SQLite. Surfaces a warning if Pulse hasn't written anything in the past minute — the usual cause is a revoked permission.", bundle: .pulse)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 520, height: 360)
+        .frame(width: 520, height: 480)
     }
 }
 

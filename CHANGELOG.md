@@ -12,6 +12,42 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Polish — five clarity fixes from a top-to-bottom Dashboard review
+
+A pass over every card on the three usability dimensions (collection
+correctness, display clarity, position in the layout). The
+collection layer audited clean — what we ship feels accurate. The
+display + position layers had five things worth fixing now, before
+they accumulate into a "subtly off" feeling for new users.
+
+- **Two cards both started with "Focus" in the same pane.** The
+  Focus pane carried `Deep focus today` (longest app-switch-free
+  streak) and `Focus mode today` (macOS DND duration). Same prefix,
+  unrelated mechanics. The latter is renamed to `DND / Focus mode
+  time` so a reader can tell what each one measures at a glance.
+- **`AppCombinationsCard` title used jargon.** "Work stacks today"
+  → `App combinations today`. The subtitle ("Apps you cycled
+  through in the same 10-minute window") was already concrete; the
+  new title matches it instead of pointing somewhere else.
+- **`ActivityWeightCard` title was metaphorical.** "Activity weight"
+  → `Daily active hours`. Same chart, same subtitle ("Avg X h/day ·
+  peak Y h on date") — the title now says what the chart shows.
+- **`ClipboardCard` was in the wrong section.** Apps section is
+  for *which app was foreground / how the user moved between
+  apps*. Copy-cut is interaction behaviour, the same family as
+  keyboard, mouse, and shortcut counts. Moved to Input section
+  alongside `KeyboardHeatmapCard`, `MouseTrajectoryCard`, etc.
+- **Health sidebar item was holding one card.** `DiagnosticsCard`
+  was the lone occupant of the Health pane — a sidebar slot worth
+  of real estate spent on one card most users never need to look
+  at. The card moved into Settings → Diagnostics where the rest
+  of the "what's Pulse doing?" controls live; the sidebar shrinks
+  from six items to a tighter five (Today / Rhythm / Focus /
+  Apps / Input).
+
+xcstrings catalog gains four new keys (en + zh-Hans) for the
+renamed titles and the new Settings footer.
+
 ### Polish — split the channel toggle into preference + explicit action
 
 Two real-user complaints about #143's "toggle = install" behaviour:
