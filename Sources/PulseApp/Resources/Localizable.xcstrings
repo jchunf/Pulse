@@ -523,6 +523,74 @@
         }
       }
     },
+    "Daily active hours": {
+      "comment": "F-42 ActivityWeightCard — card title (replaces the older 'Activity weight' which was metaphorical). Subtitle below the title is what gives the concrete read.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daily active hours"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每日活跃时长"
+          }
+        }
+      }
+    },
+    "DND / Focus mode time": {
+      "comment": "F-37 FocusModeCard — card title. Replaces 'Focus mode today' to disambiguate from the DeepFocusCard ('Deep focus today') in the same Focus pane: this card measures macOS Focus / DND mode duration, not application-switch-free streaks.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DND / Focus mode time"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "勿扰 / 专注模式时长"
+          }
+        }
+      }
+    },
+    "App combinations today": {
+      "comment": "F-14 AppCombinationsCard — card title. Replaces the older 'Work stacks today' which used the abstract metaphor 'stack'.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App combinations today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日同时使用的 App 组合"
+          }
+        }
+      }
+    },
+    "Live counts straight from your local SQLite. Surfaces a warning if Pulse hasn't written anything in the past minute — the usual cause is a revoked permission.": {
+      "comment": "Settings Diagnostics section footer — explains what the diagnostics card surfaces and why a user might see a warning there.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live counts straight from your local SQLite. Surfaces a warning if Pulse hasn't written anything in the past minute — the usual cause is a revoked permission."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直接从你本地的 SQLite 实时统计。如果 Pulse 过去一分钟没写入任何东西，这里会显示警告 —— 常见原因是某个权限被撤销了。"
+          }
+        }
+      }
+    },
     "Diagnostics": {
       "localizations": {
         "en": {
