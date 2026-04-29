@@ -12,6 +12,21 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Fix — channel toggle no longer prompts to "install" the same version
+
+Follow-up to PR #143. A user on stable `2.0.1` who toggled dev → stable
+saw Sparkle prompt them to install `2.0.1` again, even though `2.0.1`
+was already installed. The `AlwaysNewerComparator` returned
+`.orderedAscending` unconditionally, so even when the candidate's
+version string was byte-for-byte identical to current, Sparkle
+treated it as "newer" and offered the install.
+
+`AlwaysNewerComparator.compareVersion(_:to:)` now returns
+`.orderedSame` when the strings match exactly. Toggling to a channel
+where the user is already on the latest build is a no-op (no prompt,
+no install). Cross-channel BUILD-encoding asymmetry is still bridged
+when the candidate genuinely differs.
+
 ### Fix — toggling the dev-builds switch actually switches you
 
 Follow-up to PR #142. The previous round added a "Download latest
