@@ -370,19 +370,24 @@ jobs:
           # before the next refresh and silently miss the stable
           # release. Sparkle picks the highest `sparkle:version` on
           # parse, so combining the two items produces the right
-          # answer with no client-side change. If no stable release
-          # exists yet (or `releases/latest` 404s), the splice is
-          # quietly skipped and the dev appcast stays single-item.
+          # answer with no client-side change.
+          #
+          # Splice is best-effort: if the stable feed 404s (first
+          # release case) or the splice script errors on a malformed
+          # feed, we still upload the unspliced dev appcast so the
+          # dev channel keeps working. The previous awk-based splice
+          # in PR #128 conflated splice failure with upload failure
+          # via `set -e`, which broke `dev-latest` for whole runs
+          # (PR #230 — appcast.xml never landed, Sparkle 404'd for
+          # every dev-channel user).
           stable_url="https://github.com/${REPO}/releases/latest/download/appcast.xml"
           if curl -fsSL "$stable_url" -o "$work_dir/stable-appcast.xml" 2>/dev/null; then
-              stable_item="$(awk '/<item>/,/<\/item>/' "$work_dir/stable-appcast.xml")"
-              if [[ -n "$stable_item" ]]; then
-                  awk -v item="$stable_item" '
-                      /<\/channel>/ { print item }
-                      { print }
-                  ' "$work_dir/appcast.xml" > "$work_dir/appcast-merged.xml"
-                  mv "$work_dir/appcast-merged.xml" "$work_dir/appcast.xml"
+              if python3 scripts/splice_stable_into_dev_appcast.py \
+                   "$work_dir/appcast.xml" \
+                   "$work_dir/stable-appcast.xml"; then
                   echo "==> spliced latest stable item into dev appcast"
+              else
+                  echo "==> splice script returned non-zero — uploading unspliced dev appcast"
               fi
           else
               echo "==> no stable appcast found at $stable_url (first-release case) — skipping splice"
