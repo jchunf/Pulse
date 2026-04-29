@@ -93,9 +93,7 @@ final class PulseUpdaterDelegate: NSObject, SPUUpdaterDelegate {
     func feedURLString(for _: SPUUpdater) -> String? {
         // Sparkle may call this off the main actor; `UserDefaults` and
         // `Bundle.main` reads are thread-safe.
-        let channel = UserDefaults.standard.string(forKey: Self.channelKey)
-            ?? Self.stableChannel
-        guard channel == Self.devChannel else {
+        guard isDevChannel else {
             // Stable: nil hands control back to Sparkle, which reads
             // `SUFeedURL` from Info.plist.
             return nil
@@ -107,6 +105,32 @@ final class PulseUpdaterDelegate: NSObject, SPUUpdaterDelegate {
         // Dev feed missing from Info.plist (forks, ad-hoc builds) —
         // fail back to stable so the user isn't stranded.
         return nil
+    }
+
+    /// Filters appcast items by `<sparkle:channel>` tag. Returning
+    /// `["dev"]` when the toggle is on means a single feed could carry
+    /// both dev and stable items and the right ones would surface;
+    /// today the feeds are separate (see `feedURLString(for:)`), but
+    /// implementing the delegate also future-proofs us — splicing
+    /// items across feeds is now safe to revisit. The empty-set case
+    /// (toggle off) lets through items with no channel tag, which is
+    /// the convention for "stable" in Sparkle 2.x.
+    ///
+    /// History note: pre-v1.1.6 we tagged stable items with
+    /// `<sparkle:channel>stable</sparkle:channel>` and shipped no
+    /// `allowedChannels` delegate, so every item got filtered out
+    /// and "Check for updates…" silently said you were current. The
+    /// 1.1.6 fix was to strip the tag everywhere; this restoration
+    /// is paired with the matching delegate so the same trap doesn't
+    /// reopen.
+    func allowedChannels(for _: SPUUpdater) -> Set<String> {
+        isDevChannel ? [Self.devChannel] : []
+    }
+
+    private var isDevChannel: Bool {
+        let channel = UserDefaults.standard.string(forKey: Self.channelKey)
+            ?? Self.stableChannel
+        return channel == Self.devChannel
     }
 }
 #endif

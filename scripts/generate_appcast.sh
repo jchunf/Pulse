@@ -23,27 +23,30 @@
 # Channels:
 # -----------------------------------------------------------------------
 # Pulse uses **two separate feed URLs** rather than a single appcast with
-# `<sparkle:channel>` filter tags. History of the channel-tag approach:
-# pre-v1.1.6 appcasts emitted `<sparkle:channel>stable</sparkle:channel>`
-# on every item, and because no client shipped with a matching
-# `SUAllowedChannels` / `allowedChannels(for:)` declaration, every
-# release was silently skipped — the "you're on the latest" dialog at
-# 1.1.4 → 1.1.5 was this bug. The 1.1.6 fix stripped channel tags
-# entirely.
+# `<sparkle:channel>` filter tags doing all the work. History of the
+# channel-tag approach: pre-v1.1.6 appcasts emitted
+# `<sparkle:channel>stable</sparkle:channel>` on every item, and because
+# no client shipped with a matching `SUAllowedChannels` /
+# `allowedChannels(for:)` declaration, every release was silently
+# skipped — the "you're on the latest" dialog at 1.1.4 → 1.1.5 was
+# this bug. The 1.1.6 fix stripped channel tags entirely.
 #
-# To avoid re-stepping into that trap the dev channel now lives on its
-# own feed URL (`releases/download/dev-latest/appcast.xml`), selected
-# client-side by `SPUUpdaterDelegate.feedURLString(for:)` when the user
-# opts into dev builds. No `<sparkle:channel>` tags are emitted on
-# either feed — channel isolation comes entirely from the feed URL.
+# After v2.0.1 we still primarily isolate via feed URL
+# (`releases/download/dev-latest/appcast.xml` vs
+# `releases/latest/download/appcast.xml`), selected client-side by
+# `SPUUpdaterDelegate.feedURLString(for:)` when the user opts in. But
+# the dev item now ALSO carries `<sparkle:channel>dev</sparkle:channel>`
+# as belt-and-suspenders: if a future revision ever splices items
+# across feeds, the client's `allowedChannels(for:)` will filter
+# correctly. Stable items stay un-tagged so legacy clients without
+# the delegate continue to see them as the default channel.
 #
-# A previous revision of this script emitted `<sparkle:channel>dev</sparkle:channel>`
-# on dev items as "defensive signposting". It re-triggered the original
-# bug: Sparkle filters items whose `channel` is not in the client's
-# `allowedChannelsForUpdater:` set, and the delegate didn't implement
-# that method, so every tagged item was silently dropped. v1.1.10 users
-# who flipped the toggle saw "You're up to date" forever. The tag is
-# now removed; the feed URL is the only channel selector.
+# Cross-channel switching (e.g. stable v2.0.1 → latest dev rolling
+# build) still requires a manual reinstall — Sparkle's "newer wins"
+# rule won't downgrade a 12_000_001-build user to a 240-build dev,
+# even with channel filtering, because channel filtering selects
+# *candidates*, not direction. The Settings → About panel surfaces
+# a "Download latest [opposite channel]…" button for that path.
 #
 # The appcast intentionally only carries one <item>: the release that
 # just built. Sparkle clients pick the newest `sparkle:version` they
@@ -74,14 +77,13 @@ case "$CHANNEL" in
     dev)
         # Dev items live on the rolling `dev-latest` release. ZIP_NAME
         # is "Pulse.zip" (stable filename, see PR #83) so the URL is
-        # bookmarkable across merges. No channel tag — see header comment:
-        # the feed URL is the only channel selector; a tag would make
-        # Sparkle filter this item out for every client that doesn't
-        # implement `allowedChannelsForUpdater:`.
+        # bookmarkable across merges. The channel tag is set so a
+        # client implementing `allowedChannels(for:)` can filter this
+        # item correctly when it ever shares a feed with stable items.
         enclosure_url="https://github.com/${REPO}/releases/download/dev-latest/${ZIP_NAME}"
         release_notes_url="https://github.com/${REPO}/releases/tag/dev-latest"
         item_title="Dev ${VERSION}"
-        channel_tag=""
+        channel_tag="      <sparkle:channel>dev</sparkle:channel>"
         ;;
     *)
         echo "generate_appcast.sh: unknown CHANNEL=${CHANNEL} (expected stable|dev)" >&2

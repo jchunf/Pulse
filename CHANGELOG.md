@@ -12,6 +12,49 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Fix — channel switching gets a manual-reinstall escape hatch + delegate-level Sparkle filtering
+
+A dogfooder on stable v2.0.1 toggled the dev-channel switch and saw
+"You're on the latest!" for `Pulse 0.0.0-dev.240+6beba52` even
+though they expected to be pulled to the rolling dev build. Same
+class of bug as PR #139 but in the opposite direction:
+
+- Stable BUILD encoding (`10⁷ + major×10⁶ + minor×10³ + patch`) puts
+  v2.0.1 at `12_000_001`.
+- Dev BUILD = GHA run number, currently in the low hundreds.
+- Sparkle's "highest sparkle:version wins" rule means the dev
+  appcast item (build 240) cannot top a stable user's current build,
+  even when the channel match is right. Sparkle simply doesn't
+  downgrade; channels are a candidate filter, not a directional
+  override.
+
+This is also the canonical Sparkle behaviour — Transmission, 1Password
+insider builds, etc. handle cross-channel jumps with a manual
+reinstall, then let Sparkle take over within the new channel from
+there.
+
+The fix has three parts:
+
+- **`scripts/generate_appcast.sh`** — re-emits
+  `<sparkle:channel>dev</sparkle:channel>` on dev items (stable
+  items stay untagged, which Sparkle reads as the default channel).
+  Belt-and-suspenders against any future feed splice; today's
+  per-channel feeds keep working unchanged.
+- **`PulseUpdaterDelegate.allowedChannels(for:)`** is now
+  implemented — returns `["dev"]` when the toggle is on, the empty
+  set when it's off. Pre-v1.1.6 we tagged stable items but didn't
+  ship the matching delegate, so all items got filtered out and
+  Sparkle silently said "you're current" forever; that trap is
+  paired-and-closed this time.
+- **Settings → About** gets a `Download latest [opposite channel]…`
+  link — opens the appropriate GitHub Release page in the browser
+  so the user can reinstall from the other channel. The toggle
+  caption is rewritten to lead with "switching channels needs a
+  one-time manual reinstall — use the link below."
+
+Once the channel switch completes (either direction), Sparkle's
+existing within-channel forward-update path takes over again.
+
 ### Perf — Dashboard refresh no longer blocks scroll
 
 `DashboardModel` is `@MainActor`, and its `refresh()` ran ~25 SQLite
