@@ -225,20 +225,36 @@ final class PulseUpdaterDelegate: NSObject, SPUUpdaterDelegate {
     }
 }
 
-/// Always reports the candidate as newer than the current. Used as a
-/// one-shot version comparator during a cross-channel switch — see
-/// `PulseUpdaterDelegate.versionComparator(for:)`. Sparkle invokes
-/// this for every appcast item, so when armed we end up with all of
-/// the new channel's items as candidates; combined with channel
-/// filtering, the "best" item is the latest one in the new channel.
+/// Reports the candidate as newer than the current except when the
+/// two version strings are byte-for-byte equal — in which case we
+/// return `.orderedSame` so Sparkle skips the "install update" prompt.
+/// Used as a one-shot version comparator during a cross-channel
+/// switch — see `PulseUpdaterDelegate.versionComparator(for:)`.
+///
+/// Why the equality short-circuit matters: a user already on stable
+/// `2.0.1` who toggles dev → stable would otherwise see Sparkle pull
+/// the stable feed (which carries `2.0.1`), apply the unconditional-
+/// newer rule, and prompt to "install" `2.0.1` again. The short-
+/// circuit makes the toggle a no-op when the user is already on the
+/// latest build of the target channel — which is the right answer.
+///
+/// Sparkle invokes this for every appcast item, so when armed we
+/// end up with all of the new channel's items as candidates;
+/// combined with channel filtering, the "best" item is the latest
+/// one in the new channel.
 final class AlwaysNewerComparator: NSObject, SUVersionComparison {
     func compareVersion(_ versionA: String, toVersion versionB: String) -> ComparisonResult {
         // Sparkle compares (currentVersion, candidateVersion) and
         // accepts when the result is `.orderedAscending`
-        // (currentVersion < candidateVersion). Returning that
-        // unconditionally turns every appcast item into "this is
-        // newer, install it".
-        .orderedAscending
+        // (currentVersion < candidateVersion).
+        if versionA == versionB {
+            // Same build already installed — nothing to install,
+            // skip the prompt.
+            return .orderedSame
+        }
+        // Different — pretend the candidate is always newer so the
+        // cross-channel BUILD-encoding asymmetry doesn't hide it.
+        return .orderedAscending
     }
 }
 #endif
