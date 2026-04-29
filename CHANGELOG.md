@@ -12,6 +12,39 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Fix — dev channel and stable channel are mutually exclusive
+
+A user testing the dev channel surfaced the actual bug PR #128's
+splice was masking: the dev appcast contained both the dev item
+and the spliced stable item, but Sparkle picks the highest
+`sparkle:version` and the stable BUILD encoding (~10⁷) is **always
+larger** than the dev BUILD (the GHA run number, ~10²). So every
+dev-channel user, on every Check for Updates…, was silently pushed
+back to the latest stable — they could never actually receive a
+dev build. The "you're on dev now" experience was indistinguishable
+from "you're on stable" because the in-flight feed always offered
+the stable item.
+
+Removed the splice. The dev appcast now contains ONLY dev items;
+the stable appcast contains ONLY stable items. The two channels
+are mutually exclusive at the feed level, which is the cleanest
+mental model:
+
+- **Dev channel ON** — `Check for updates…` only ever offers
+  rolling builds from `main`. You will not be notified of new
+  stable releases through this channel.
+- **Dev channel OFF** — back to the stable feed; the next
+  `Check for updates…` will offer the latest tagged release.
+  `SPUUpdaterDelegate.feedURLString(for:)` re-resolves on every
+  click, so flipping the toggle is enough; no app restart required.
+
+The Settings caption under the toggle in Settings → About was
+rewritten to spell this out — both en and zh-Hans entries
+updated.
+
+`scripts/splice_stable_into_dev_appcast.py` (added in PR #138) is
+removed; it has no remaining caller.
+
 ### Fix — dev appcast splice no longer kills the upload
 
 The "Generate + upload dev appcast" step in `package.yml` failed on

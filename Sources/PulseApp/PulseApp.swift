@@ -6633,7 +6633,7 @@ struct SettingsView: View {
                 )) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Receive development builds", bundle: .pulse)
-                        Text("“Check for updates…” will pull from `main` after every merge. Newer features arrive sooner but may be unstable.", bundle: .pulse)
+                        Text("While on, “Check for updates…” pulls only from `main` after every merge — newer features arrive sooner, may be unstable, and stable releases are **not** offered through this channel. Turn off to switch back to the stable channel; the next update check will offer the latest tagged release.", bundle: .pulse)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
