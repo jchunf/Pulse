@@ -12,6 +12,38 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Polish — split the channel toggle into preference + explicit action
+
+Two real-user complaints about #143's "toggle = install" behaviour:
+
+1. *"I clicked the dev toggle and it auto-fetched and offered an
+   install."* The auto-fetch is technically what #143 wanted, but the
+   UX is surprising: you flipped a toggle, you got a modal install
+   dialog. Toggle controls should change preferences, not pop modals.
+2. *"I turned the toggle off and it offered to install the same
+   version."* Fixed in #145 (equality short-circuit), but it was a
+   symptom of toggling-as-action being too eager.
+
+The clean answer is to follow macOS System Settings: toggles are
+declarative ("from now on, do X"), buttons are imperative ("do X
+right now"). Decoupled here:
+
+- **Toggle "Receive development builds"** — pure preference. Flipping
+  it just sets which feed `Check for updates…` will query next time;
+  no download, no modal. Cheap and reversible — toggle on/off freely
+  to peek at either feed.
+- **Button "Switch to latest [opposite channel]…"** — explicit
+  imperative action. Routes through the same `switchChannel(to:)`
+  the toggle used to fire, so a click pops Sparkle's standard
+  install prompt for the other channel's most recent build.
+  Decoupled from the toggle.
+
+Caption rewritten to call out the split: *"Sets which feed Check
+for updates… looks at. Flipping the toggle alone doesn't download
+anything — use the 'Switch to latest …' button below to actually
+install the other channel's most recent build."* En + zh-Hans both
+updated.
+
 ### i18n — F-44 App Intents now ship with zh-Hans
 
 The original v2.0.0 cut shipped F-44 (Shortcuts integration) with

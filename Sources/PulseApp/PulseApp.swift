@@ -6743,27 +6743,50 @@ struct SettingsView: View {
                 Toggle(isOn: Binding(
                     get: { updateChannel == PulseUpdaterDelegate.devChannel },
                     set: { newValue in
-                        let target = newValue
+                        // Toggle is *just a preference*: it changes
+                        // which feed the next "Check for updates…"
+                        // hits. Flipping it never starts a download
+                        // or pops a modal — that's the explicit
+                        // "Switch to latest …" button below. Pre-#143
+                        // a flip auto-fired the install dialog, which
+                        // dogfooders found surprising (toggle that
+                        // *behaves* like a button). The split mirrors
+                        // macOS System Settings (declarative toggle +
+                        // explicit action button).
+                        updateChannel = newValue
                             ? PulseUpdaterDelegate.devChannel
                             : PulseUpdaterDelegate.stableChannel
-                        // Don't double-fire when the binding refreshes
-                        // (e.g. after Sparkle sets the channel from
-                        // somewhere else). Only switch when the user
-                        // actually flipped to a new value.
-                        guard target != updateChannel else { return }
-                        updateChannel = target
-                        onSwitchUpdateChannel(target)
                     }
                 )) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Receive development builds", bundle: .pulse)
-                        Text("Toggling on will offer the latest rolling build from `main`; toggling off will offer the latest stable release. Either direction installs through the standard update prompt — accept it to switch, dismiss it to stay where you are. Within each channel, “Check for updates…” keeps stepping forward as new builds ship.", bundle: .pulse)
+                        Text("Sets which feed “Check for updates…” looks at. Flipping the toggle alone doesn't download anything — use the “Switch to latest …” button below to actually install the other channel's most recent build.", bundle: .pulse)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
                 Button(action: onCheckForUpdates) {
                     Text("Check for updates…", bundle: .pulse)
+                }
+                // Explicit cross-channel action. Routes through the
+                // same `UpdateController.switchChannel(to:)` as the
+                // pre-#143 toggle did — flips the channel preference,
+                // arms a one-shot version-compare override so
+                // Sparkle treats the new channel's latest as "newer"
+                // regardless of cross-channel BUILD asymmetry, and
+                // shows the standard install dialog. Decoupled from
+                // the toggle so a toggle flip never surprise-installs.
+                Button(action: {
+                    let target = updateChannel == PulseUpdaterDelegate.devChannel
+                        ? PulseUpdaterDelegate.stableChannel
+                        : PulseUpdaterDelegate.devChannel
+                    onSwitchUpdateChannel(target)
+                }) {
+                    if updateChannel == PulseUpdaterDelegate.devChannel {
+                        Text("Switch to latest stable build…", bundle: .pulse)
+                    } else {
+                        Text("Switch to latest development build…", bundle: .pulse)
+                    }
                 }
             } header: {
                 Text("About", bundle: .pulse)
