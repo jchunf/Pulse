@@ -24,6 +24,18 @@ import Sparkle
 /// feed (baked into `SUDevFeedURL`) based on `UserDefaults.standard`
 /// key `pulse.update.channel`. Flipping the toggle in Settings →
 /// About changes which feed the next "Check for updates…" hits.
+///
+/// Cross-channel switching: `switchChannel(to:)` is the
+/// AppDelegate-facing entry point that handles the
+/// stable↔dev jump when the user flips the toggle. Sparkle's "newer
+/// `sparkle:version` wins" rule normally prevents a 12_000_001-build
+/// stable user from being pulled to a 240-build dev item — channels
+/// filter candidates, not direction. We work around it by feeding
+/// Sparkle a one-shot `SUVersionComparison` that pretends the new
+/// channel's item is always newer; the delegate clears the override
+/// the moment Sparkle finishes the update cycle, so within-channel
+/// updates revert to the standard "newer wins" semantics immediately
+/// after.
 @MainActor
 final class UpdateController {
 
@@ -67,6 +79,33 @@ final class UpdateController {
     func checkForUpdates() {
         updaterController.checkForUpdates(nil)
     }
+
+    /// Switch the user to the opposite channel and immediately offer
+    /// the latest item from that channel as an "update". Called when
+    /// the Settings → About toggle is flipped — the user expects
+    /// "ON = dev" / "OFF = stable" to *do* the switch, not just
+    /// change a preference.
+    ///
+    /// Sequence:
+    ///   1. Persist the new channel preference (the toggle binding
+    ///      may already have done this, but call it again for the
+    ///      direct `switchChannel(to:)` callers — `AppDelegate` may
+    ///      route from a future menu shortcut, etc.).
+    ///   2. Mark the next check as "force-newer" so the version
+    ///      comparator below short-circuits the build-number compare.
+    ///   3. Trigger a normal `checkForUpdates()`. Sparkle sees an
+    ///      "available" item, prompts the standard install flow,
+    ///      EdDSA-verifies the download, swaps the .app, restarts.
+    ///
+    /// If the user dismisses Sparkle's prompt, the channel preference
+    /// stays flipped (no rollback) — they intended the switch and
+    /// dismissing the install dialog just means "not right now". The
+    /// force-newer flag clears either way.
+    func switchChannel(to newChannel: String) {
+        UserDefaults.standard.set(newChannel, forKey: PulseUpdaterDelegate.channelKey)
+        delegate.armForceNextCheck()
+        checkForUpdates()
+    }
 }
 
 /// Picks between stable and dev Sparkle feeds on every update check.
@@ -89,6 +128,31 @@ final class PulseUpdaterDelegate: NSObject, SPUUpdaterDelegate {
     /// Swift sources so the URL lives alongside `SUFeedURL` and
     /// `SUPublicEDKey` — one place to retarget when forking.
     static let devFeedInfoKey = "SUDevFeedURL"
+
+    /// Process-memory force-newer flag. Set by `armForceNextCheck()`
+    /// right before `UpdateController` triggers a check; cleared by
+    /// `updater(_:didFinishUpdateCycleFor:error:)` when Sparkle
+    /// finishes (success, dismiss, or error). Deliberately NOT
+    /// persisted — if the app crashes mid-check, the user re-toggles
+    /// from a clean state on the next launch rather than inheriting
+    /// a stale "always-newer" override.
+    private let forceLock = NSLock()
+    private var _forceNewerForNextCheck = false
+
+    fileprivate func armForceNextCheck() {
+        forceLock.lock(); defer { forceLock.unlock() }
+        _forceNewerForNextCheck = true
+    }
+
+    private func clearForceNextCheck() {
+        forceLock.lock(); defer { forceLock.unlock() }
+        _forceNewerForNextCheck = false
+    }
+
+    private var isForceNewerArmed: Bool {
+        forceLock.lock(); defer { forceLock.unlock() }
+        return _forceNewerForNextCheck
+    }
 
     func feedURLString(for _: SPUUpdater) -> String? {
         // Sparkle may call this off the main actor; `UserDefaults` and
@@ -127,10 +191,54 @@ final class PulseUpdaterDelegate: NSObject, SPUUpdaterDelegate {
         isDevChannel ? [Self.devChannel] : []
     }
 
+    /// One-shot version-compare override. Active only between
+    /// `armForceNextCheck()` and the matching
+    /// `didFinishUpdateCycleFor:` callback below. While armed, the
+    /// candidate feed item always reads as "newer" than the current
+    /// build, so Sparkle offers it for install regardless of the
+    /// asymmetric BUILD encoding (stable BUILD ~10⁷ vs dev BUILD ~10²
+    /// — without this hook, dev→stable goes through naturally but
+    /// stable→dev hits "you're already on a newer version").
+    func versionComparator(for _: SPUUpdater) -> (any SUVersionComparison)? {
+        guard isForceNewerArmed else { return nil }
+        return AlwaysNewerComparator()
+    }
+
+    /// Fires when Sparkle's update cycle ends, regardless of outcome
+    /// (user installed, user dismissed, network error, signature
+    /// failure). Clearing here means the force-override is scoped
+    /// exactly to the cycle that `armForceNextCheck()` armed; the
+    /// next manual "Check for updates…" goes through the standard
+    /// version-compare path.
+    func updater(
+        _ updater: SPUUpdater,
+        didFinishUpdateCycleFor updateCheck: SPUUpdateCheck,
+        error: Error?
+    ) {
+        clearForceNextCheck()
+    }
+
     private var isDevChannel: Bool {
         let channel = UserDefaults.standard.string(forKey: Self.channelKey)
             ?? Self.stableChannel
         return channel == Self.devChannel
+    }
+}
+
+/// Always reports the candidate as newer than the current. Used as a
+/// one-shot version comparator during a cross-channel switch — see
+/// `PulseUpdaterDelegate.versionComparator(for:)`. Sparkle invokes
+/// this for every appcast item, so when armed we end up with all of
+/// the new channel's items as candidates; combined with channel
+/// filtering, the "best" item is the latest one in the new channel.
+final class AlwaysNewerComparator: NSObject, SUVersionComparison {
+    func compareVersion(_ versionA: String, toVersion versionB: String) -> ComparisonResult {
+        // Sparkle compares (currentVersion, candidateVersion) and
+        // accepts when the result is `.orderedAscending`
+        // (currentVersion < candidateVersion). Returning that
+        // unconditionally turns every appcast item into "this is
+        // newer, install it".
+        .orderedAscending
     }
 }
 #endif

@@ -4748,53 +4748,19 @@
         }
       }
     },
-    "While on, “Check for updates…” only offers rolling builds from `main`. Stable releases stay on the stable channel and are not surfaced here. Switching channels in either direction needs a one-time manual reinstall — use the link below to grab the other channel's build.": {
-      "comment": "Settings About — caption under the dev builds toggle. Spells out the channel separation and that cross-channel switching needs a manual reinstall (since Sparkle only steps forward by sparkle:version).",
+    "Toggling on will offer the latest rolling build from `main`; toggling off will offer the latest stable release. Either direction installs through the standard update prompt — accept it to switch, dismiss it to stay where you are. Within each channel, “Check for updates…” keeps stepping forward as new builds ship.": {
+      "comment": "Settings About — caption under the dev builds toggle. Explains that flipping the toggle triggers a real install of the opposite channel's latest build via Sparkle's standard prompt; within-channel forward updates keep working as usual.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "While on, “Check for updates…” only offers rolling builds from `main`. Stable releases stay on the stable channel and are not surfaced here. Switching channels in either direction needs a one-time manual reinstall — use the link below to grab the other channel's build."
+            "value": "Toggling on will offer the latest rolling build from `main`; toggling off will offer the latest stable release. Either direction installs through the standard update prompt — accept it to switch, dismiss it to stay where you are. Within each channel, “Check for updates…” keeps stepping forward as new builds ship."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "开启后，「检查更新」只会推送来自 `main` 的滚动构建；稳定版的更新不会出现在这条频道里。要切换频道（任一方向）都需要手动重装一次 —— 用下方链接下载另一边的最新构建即可。"
-          }
-        }
-      }
-    },
-    "Download latest stable build…": {
-      "comment": "Settings About — link surfaced when dev channel is on. Opens the GitHub Releases latest URL so the user can grab a stable build.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download latest stable build…"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下载最新稳定版…"
-          }
-        }
-      }
-    },
-    "Download latest development build…": {
-      "comment": "Settings About — link surfaced when dev channel is off. Opens the dev-latest GitHub Release so the user can switch in by reinstalling.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download latest development build…"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下载最新开发版…"
+            "value": "开启会立即推送 `main` 上最新的滚动构建；关闭会推送最新的正式版本。无论哪个方向，都通过标准的更新提示来装 —— 接受就完成切换，取消则保持原状。频道内部的「检查更新」会继续按版本递进。"
           }
         }
       }
