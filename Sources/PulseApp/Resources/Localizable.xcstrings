@@ -4748,19 +4748,19 @@
         }
       }
     },
-    "“Check for updates…” will pull from `main` after every merge. Newer features arrive sooner but may be unstable.": {
-      "comment": "Settings About — caption under the dev builds toggle.",
+    "While on, “Check for updates…” pulls only from `main` after every merge — newer features arrive sooner, may be unstable, and stable releases are **not** offered through this channel. Turn off to switch back to the stable channel; the next update check will offer the latest tagged release.": {
+      "comment": "Settings About — caption under the dev builds toggle. Spells out that dev and stable channels are mutually exclusive so the user knows turning the toggle off is how they get back to stable.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "“Check for updates…” will pull from `main` after every merge. Newer features arrive sooner but may be unstable."
+            "value": "While on, “Check for updates…” pulls only from `main` after every merge — newer features arrive sooner, may be unstable, and stable releases are **not** offered through this channel. Turn off to switch back to the stable channel; the next update check will offer the latest tagged release."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "开启后，「检查更新」会拉取 `main` 分支每次合并后的构建 —— 新功能更早拿到，但可能不稳定。"
+            "value": "开启后，「检查更新」只会从每次合入 `main` 的滚动构建中拉取 —— 新功能更早到达，但可能不稳定；且开启时**不会**收到稳定版的更新提示。关闭即切回稳定频道，下一次检查更新会自动推送最新的正式版本。"
           }
         }
       }

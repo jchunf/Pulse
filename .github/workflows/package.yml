@@ -339,7 +339,22 @@ jobs:
       # filename we copied into dev-latest in "Publish rolling
       # dev-latest release" above. Sparkle will resolve the enclosure
       # URL to that stable path and validate against the EdDSA sig
-      # emitted below.
+      # emitted by the previous step.
+      #
+      # Channel isolation: this feed contains ONLY dev items. A
+      # previous revision (PR #128) spliced the latest stable item
+      # in here too, so a dev-channel user flipping back to stable
+      # would still get a stable-version offer on the in-flight Check
+      # for Updates… that hadn't refreshed feedURLString(for:) yet.
+      # That trick had a fatal interaction with the BUILD encoding:
+      # stable BUILD is ~10⁷ while dev BUILD is the GHA run number
+      # (~10²), so Sparkle's "highest sparkle:version wins" rule
+      # picked the stable item every time — dev-channel users were
+      # silently pushed back to stable on every Check for Updates
+      # and never received their dev rolls. The toggle in Settings
+      # already calls out that the two channels are mutually
+      # exclusive; flip-back works because feedURLString(for:)
+      # re-resolves on the next click.
       - name: Generate + upload dev appcast
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
@@ -361,37 +376,6 @@ jobs:
           rm -rf "$work_dir"
           mkdir -p "$work_dir"
           bash scripts/generate_appcast.sh > "$work_dir/appcast.xml"
-
-          # Splice the latest stable release's <item> into the dev
-          # appcast so dev-channel users see a new stable release as
-          # an upgrade. Without this the rolling dev appcast contains
-          # only the just-built dev item; a user on dev who flips the
-          # toggle back to stable would still hit the dev feed once
-          # before the next refresh and silently miss the stable
-          # release. Sparkle picks the highest `sparkle:version` on
-          # parse, so combining the two items produces the right
-          # answer with no client-side change.
-          #
-          # Splice is best-effort: if the stable feed 404s (first
-          # release case) or the splice script errors on a malformed
-          # feed, we still upload the unspliced dev appcast so the
-          # dev channel keeps working. The previous awk-based splice
-          # in PR #128 conflated splice failure with upload failure
-          # via `set -e`, which broke `dev-latest` for whole runs
-          # (PR #230 — appcast.xml never landed, Sparkle 404'd for
-          # every dev-channel user).
-          stable_url="https://github.com/${REPO}/releases/latest/download/appcast.xml"
-          if curl -fsSL "$stable_url" -o "$work_dir/stable-appcast.xml" 2>/dev/null; then
-              if python3 scripts/splice_stable_into_dev_appcast.py \
-                   "$work_dir/appcast.xml" \
-                   "$work_dir/stable-appcast.xml"; then
-                  echo "==> spliced latest stable item into dev appcast"
-              else
-                  echo "==> splice script returned non-zero — uploading unspliced dev appcast"
-              fi
-          else
-              echo "==> no stable appcast found at $stable_url (first-release case) — skipping splice"
-          fi
 
           echo "----- dev appcast -----"
           cat "$work_dir/appcast.xml"
