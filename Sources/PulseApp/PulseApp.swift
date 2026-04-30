@@ -37,7 +37,8 @@ struct PulseApp: App {
                 anomalyMonitor: appDelegate.anomalyMonitor,
                 briefingTrigger: appDelegate.briefingTrigger,
                 privacyAuditTrigger: appDelegate.privacyAuditTrigger,
-                onboardingTrigger: appDelegate.onboardingTrigger
+                onboardingTrigger: appDelegate.onboardingTrigger,
+                yearWrappedTrigger: appDelegate.yearWrappedTrigger
             )
         }
         .menuBarExtraStyle(.window)
@@ -71,6 +72,17 @@ struct PulseApp: App {
         .defaultSize(width: 600, height: 540)
         .windowResizability(.contentSize)
 
+        // F-24 — year-to-date wrapped. Owns a fresh
+        // `YearWrappedModel` per AppDelegate so the snapshot loads
+        // each time the window opens (the underlying `EventStore`
+        // is the same one the Dashboard uses, so newly-rolled
+        // hour summaries show up on subsequent opens).
+        Window("Year so far", id: "yearWrapped") {
+            YearWrappedView(model: appDelegate.yearWrappedModel)
+        }
+        .defaultSize(width: 640, height: 720)
+        .windowResizability(.contentSize)
+
         Settings {
             SettingsView(
                 goalsStore: appDelegate.goalsStore,
@@ -82,7 +94,8 @@ struct PulseApp: App {
                 onCheckForUpdates: { appDelegate.updateController.checkForUpdates() },
                 onSwitchUpdateChannel: { newChannel in
                     appDelegate.updateController.switchChannel(to: newChannel)
-                }
+                },
+                onShowYearWrapped: { appDelegate.requestShowYearWrapped() }
             )
         }
     }
@@ -100,6 +113,7 @@ struct MenuBarLabel: View {
     let briefingTrigger: PassthroughSubject<Void, Never>
     let privacyAuditTrigger: PassthroughSubject<Void, Never>
     let onboardingTrigger: PassthroughSubject<Void, Never>
+    let yearWrappedTrigger: PassthroughSubject<Void, Never>
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -132,6 +146,10 @@ struct MenuBarLabel: View {
         }
         .onReceive(onboardingTrigger) { _ in
             openWindow(id: "onboarding")
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        .onReceive(yearWrappedTrigger) { _ in
+            openWindow(id: "yearWrapped")
             NSApp.activate(ignoringOtherApps: true)
         }
     }
@@ -172,6 +190,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Same invisible-listener pattern as briefing / privacy audit; fired
     /// once on `applicationDidFinishLaunching` for first-time users.
     let onboardingTrigger = PassthroughSubject<Void, Never>()
+
+    /// F-24 — fired by Settings → "Open year so far…" or by the
+    /// menu bar's wrapped entry. The MenuBarLabel listens for this
+    /// and opens the `yearWrapped` window via `openWindow(id:)`.
+    let yearWrappedTrigger = PassthroughSubject<Void, Never>()
+
+    /// F-24 — long-lived model behind the year-wrapped window. The
+    /// snapshot itself loads on `.task` inside the view, so we just
+    /// hand the model around; AppDelegate keeps it alive for the
+    /// session.
+    let yearWrappedModel: YearWrappedModel
 
     private let database: PulseDatabase?
     private let runtime: CollectorRuntime?
@@ -240,6 +269,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             store: dbResult.database.map { EventStore(database: $0) }
         )
         self.onboardingModel = OnboardingModel(permissionService: permissions)
+        self.yearWrappedModel = YearWrappedModel(
+            store: dbResult.database.map { EventStore(database: $0) }
+        )
         super.init()
     }
 
@@ -337,6 +369,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             await self?.privacyAuditModel.reload()
             await MainActor.run { self?.privacyAuditTrigger.send(()) }
         }
+    }
+
+    /// F-24 — triggers the "Year so far" window. The view itself
+    /// loads its snapshot via `.task` so we don't pre-load here.
+    /// Same MenuBarLabel-listens-for-Void pattern as briefing /
+    /// privacy audit so SettingsView doesn't need its own
+    /// `@Environment(\.openWindow)`.
+    func requestShowYearWrapped() {
+        yearWrappedTrigger.send(())
     }
 
     /// F-47 — user-initiated purge of every data row whose timestamp
@@ -6620,6 +6661,11 @@ struct SettingsView: View {
     /// dialog (which is what naive build-number compare gives us
     /// across channels).
     let onSwitchUpdateChannel: (String) -> Void
+    /// F-24 — opens the year-wrapped window. Same trigger pattern as
+    /// `onOpenPrivacyAudit`; AppDelegate fans the Void out to a
+    /// `PassthroughSubject` and the MenuBarLabel listener calls
+    /// `openWindow(id: "yearWrapped")`.
+    let onShowYearWrapped: () -> Void
 
     @State private var isPresentingPurgeSheet = false
 
@@ -6704,6 +6750,22 @@ struct SettingsView: View {
                 Text("Alerts", bundle: .pulse)
             } footer: {
                 Text("Alerts stay local — Pulse never sends anything over the network. macOS may ask for notification permission the first time an alert triggers.", bundle: .pulse)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                // F-24 — opens a window with year-to-date highlights
+                // ("Wrapped" / "Year So Far"). The data is read on
+                // open — every Pulse already has access to its own
+                // numbers. No new collection.
+                Button(action: onShowYearWrapped) {
+                    Text("Open year so far…", bundle: .pulse)
+                }
+            } header: {
+                Text("Recap", bundle: .pulse)
+            } footer: {
+                Text("Year-to-date totals — keystrokes, mouse distance, top apps, longest focus session — rendered as a single page you can save as an image.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

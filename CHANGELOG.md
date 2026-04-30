@@ -12,6 +12,54 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### F-24 — "Year so far" wrapped page
+
+A single-page Spotify-style year-to-date summary, built from the
+data Pulse already collects. No new collection layer, no new
+permission. Open from **Settings → Recap → Open year so far…**;
+the page lays out:
+
+- **Days with Pulse** — distinct calendar days with at least one
+  rolled-up hour, plus the date you started recording.
+- **Keystrokes** — total key presses, with a "≈ N words / M× a
+  novel" narrative (English ratio of 5 chars/word, ~80k words/novel).
+- **Mouse distance** — total in km / m, with the existing
+  `LandmarkLibrary` narrative ("≈ 3.2× a marathon", "≈ 1.5× the
+  Pacific").
+- **Most-used apps** — top 5 by foreground time, computed by the
+  existing `appUsageRanking` against the year window.
+- **Longest focus session** — the year's single longest
+  uninterrupted run in one app, found by walking
+  `longestFocusSegment` per day.
+- **Busiest day** — the date with the highest
+  `key_press_total + mouse_click_total` in `hour_summary`.
+- **Peak hour + distinct hours** — which hour of the day was your
+  loudest, and how many of the 24 hours had any activity.
+- **Save as image…** — flattens the whole page through SwiftUI's
+  `ImageRenderer` and writes a PNG via `NSSavePanel`. Year-end
+  share-bait without bringing in a network share extension.
+
+Implementation:
+- New `Sources/PulseCore/Storage/WrappedQueries.swift` exposes
+  `EventStore.yearWrappedSnapshot(yearStart:capUntil:calendar:)`
+  → `YearWrappedSnapshot`. Walks `hour_summary` for totals + busiest
+  day + peak hour + distinct hours, calls existing
+  `appUsageRanking` / `longestFocusSegment` / `chronotype` for the
+  curated views, and counts `system_events.foreground_app` rows
+  for app switches. All `Sendable` so the snapshot can be
+  produced on a detached cooperative task and applied on main.
+- New `Sources/PulseApp/YearWrappedView.swift` carries the SwiftUI
+  layout, the `YearWrappedModel` orchestrator, and the export
+  path (`ImageRenderer` + `NSSavePanel`).
+- `AppDelegate.yearWrappedModel` + `requestShowYearWrapped()` +
+  `yearWrappedTrigger`. `MenuBarLabel` listens for the trigger
+  the same way it listens for briefing / privacy-audit / onboarding
+  triggers and calls `openWindow(id: "yearWrapped")`.
+- `WrappedQueriesTests` covers the empty-store, totals-sum,
+  busiest-day, peak-hour, year-windowed app-switches, and capUntil
+  paths.
+- xcstrings catalog gains 19 new keys (en + zh-Hans).
+
 ### Polish — five clarity fixes from a top-to-bottom Dashboard review
 
 A pass over every card on the three usability dimensions (collection
