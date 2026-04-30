@@ -12,6 +12,43 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Polish — toggle-then-check is the only channel-switching path; "Build" row now shows the actual version
+
+Two user reports, one fix each:
+
+1. **The "Switch to latest …" button errored out** for a dev-channel
+   user trying to switch back to stable: clicking it surfaced
+   "更新错误！" instead of installing v2.0.1. Reproducing the
+   underlying Sparkle issue requires runtime logs we don't have, but
+   the *button itself* turned out to be redundant — the toggle's
+   one-shot version-compare override does the same job, just cleaner.
+   The button is removed; the toggle now arms the override on flip,
+   and the user clicks the existing **"Check for updates…"** to
+   install. macOS System Settings idiom: toggle is the preference,
+   the button is the action.
+2. **The "Build" row showed a build-system marker, not the version.**
+   `PulsePlatform.buildFingerprint` was hardcoded to
+   `"pulse-b4-platform-observers"` (a leftover B4 branch tag),
+   so the Settings About row read like gibberish. Replaced with a
+   computed string that joins `CFBundleShortVersionString` and
+   `CFBundleVersion`, e.g. `2.0.1 (build 12000001)`. The row label
+   in Settings is renamed `Version` to match.
+
+Implementation:
+- `UpdateController.switchChannel(to:)` removed; replaced with
+  `armCrossChannelCheck()` which sets only the override flag (no
+  preference write — the toggle's `@AppStorage` already does that;
+  no auto-fired `checkForUpdates()` — that's the user's explicit
+  next click).
+- `SettingsView.onSwitchUpdateChannel` becomes
+  `onArmCrossChannelCheck`. Toggle's `set:` calls it. The
+  cross-channel `Button(action:)` deleted.
+- `PulsePlatform.buildFingerprint` becomes a computed property
+  reading `Bundle.main` Info.plist.
+- xcstrings: caption replaced; new `Version` label key; old
+  "Switch to latest …" keys stay in the catalog for now (Xcode
+  prunes unused keys on the next build).
+
 ### F-24 — "Year so far" wrapped page
 
 A single-page Spotify-style year-to-date summary, built from the

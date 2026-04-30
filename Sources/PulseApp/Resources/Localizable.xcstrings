@@ -5123,19 +5123,36 @@
         }
       }
     },
-    "Sets which feed “Check for updates…” looks at. Flipping the toggle alone doesn't download anything — use the “Switch to latest …” button below to actually install the other channel's most recent build.": {
-      "comment": "Settings About — caption under the dev builds toggle. Spells out that the toggle is just a preference for which feed to query; the explicit Switch button is what actually performs the cross-channel install.",
+    "Sets which feed “Check for updates…” queries. Flip the toggle, then click the button below — Pulse will install the most recent build of the channel you just switched to.": {
+      "comment": "Settings About — caption under the dev builds toggle. Toggle = preference + primer; the existing Check for updates… button is the action. No separate cross-channel button — flipping the toggle arms a one-shot version-compare override so the next check installs the new channel's latest build.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sets which feed “Check for updates…” looks at. Flipping the toggle alone doesn't download anything — use the “Switch to latest …” button below to actually install the other channel's most recent build."
+            "value": "Sets which feed “Check for updates…” queries. Flip the toggle, then click the button below — Pulse will install the most recent build of the channel you just switched to."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "决定「检查更新…」从哪条 feed 拉取。单独翻这个开关不会下载或安装任何东西 —— 真要切换到另一边的最新构建，请用下方的「切换到最新…」按钮。"
+            "value": "决定「检查更新…」从哪条 feed 拉取。翻动这个开关之后，再点下面的「检查更新…」按钮 —— Pulse 会装上你刚切到的频道的最新构建。"
+          }
+        }
+      }
+    },
+    "Version": {
+      "comment": "Settings About — label for the row showing the running version + build number.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本"
           }
         }
       }

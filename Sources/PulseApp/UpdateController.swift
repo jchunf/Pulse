@@ -25,17 +25,20 @@ import Sparkle
 /// key `pulse.update.channel`. Flipping the toggle in Settings →
 /// About changes which feed the next "Check for updates…" hits.
 ///
-/// Cross-channel switching: `switchChannel(to:)` is the
-/// AppDelegate-facing entry point that handles the
-/// stable↔dev jump when the user flips the toggle. Sparkle's "newer
-/// `sparkle:version` wins" rule normally prevents a 12_000_001-build
-/// stable user from being pulled to a 240-build dev item — channels
-/// filter candidates, not direction. We work around it by feeding
-/// Sparkle a one-shot `SUVersionComparison` that pretends the new
-/// channel's item is always newer; the delegate clears the override
-/// the moment Sparkle finishes the update cycle, so within-channel
-/// updates revert to the standard "newer wins" semantics immediately
-/// after.
+/// Cross-channel switching: `armCrossChannelCheck()` is the
+/// AppDelegate-facing entry point that handles the stable↔dev jump.
+/// The Settings toggle calls it the moment the user flips the
+/// channel preference; the user then clicks "Check for updates…"
+/// in the same window, and Sparkle treats the new channel's latest
+/// item as newer than the current build via a one-shot
+/// `SUVersionComparison` override. The override clears the moment
+/// Sparkle finishes the cycle (install / dismiss / error), so
+/// within-channel forward updates revert to the standard
+/// "newer-wins" semantics immediately after. Splitting the
+/// preference flip from the actual check matches macOS System
+/// Settings idioms (toggle = state, separate button = action) —
+/// flipping the toggle has zero side-effect until the user
+/// explicitly invokes a check.
 @MainActor
 final class UpdateController {
 
@@ -80,31 +83,21 @@ final class UpdateController {
         updaterController.checkForUpdates(nil)
     }
 
-    /// Switch the user to the opposite channel and immediately offer
-    /// the latest item from that channel as an "update". Called when
-    /// the Settings → About toggle is flipped — the user expects
-    /// "ON = dev" / "OFF = stable" to *do* the switch, not just
-    /// change a preference.
+    /// Arm the one-shot version-compare override so the *next*
+    /// `checkForUpdates()` treats the feed item as newer than the
+    /// current build, regardless of cross-channel BUILD asymmetry.
+    /// Settings → About calls this when the channel toggle flips,
+    /// so a subsequent "Check for updates…" click installs the
+    /// new channel's latest build (instead of saying "you're
+    /// already current" because dev BUILD ≪ stable BUILD).
     ///
-    /// Sequence:
-    ///   1. Persist the new channel preference (the toggle binding
-    ///      may already have done this, but call it again for the
-    ///      direct `switchChannel(to:)` callers — `AppDelegate` may
-    ///      route from a future menu shortcut, etc.).
-    ///   2. Mark the next check as "force-newer" so the version
-    ///      comparator below short-circuits the build-number compare.
-    ///   3. Trigger a normal `checkForUpdates()`. Sparkle sees an
-    ///      "available" item, prompts the standard install flow,
-    ///      EdDSA-verifies the download, swaps the .app, restarts.
-    ///
-    /// If the user dismisses Sparkle's prompt, the channel preference
-    /// stays flipped (no rollback) — they intended the switch and
-    /// dismissing the install dialog just means "not right now". The
-    /// force-newer flag clears either way.
-    func switchChannel(to newChannel: String) {
-        UserDefaults.standard.set(newChannel, forKey: PulseUpdaterDelegate.channelKey)
+    /// The flag clears at the end of the next update cycle (install,
+    /// dismiss, or error — see
+    /// `PulseUpdaterDelegate.updater(_:didFinishUpdateCycleFor:error:)`),
+    /// so within-channel forward updates revert to standard
+    /// "newer-wins" semantics immediately after.
+    func armCrossChannelCheck() {
         delegate.armForceNextCheck()
-        checkForUpdates()
     }
 }
 
