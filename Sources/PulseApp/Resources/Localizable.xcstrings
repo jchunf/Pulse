@@ -523,6 +523,160 @@
         }
       }
     },
+    "Pulse · Year so far": {
+      "comment": "F-24 YearWrappedView — header title.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Pulse · Year so far" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Pulse · 今年至今" } }
+      }
+    },
+    "%1$@ · as of %2$@": {
+      "comment": "F-24 YearWrappedView header subtitle. %1$@ year, %2$@ short date.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%1$@ · as of %2$@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%1$@ · 截至 %2$@" } }
+      }
+    },
+    "Days with Pulse": {
+      "comment": "F-24 YearWrappedView — days-active card label.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Days with Pulse" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "和 Pulse 一起的天数" } }
+      }
+    },
+    "Recording since %@.": {
+      "comment": "F-24 YearWrappedView — days-active subtitle. %@ short date of first event in the year.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recording since %@." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "从 %@ 开始记录。" } }
+      }
+    },
+    "Keystrokes": {
+      "comment": "F-24 YearWrappedView — keystrokes card label.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Keystrokes" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "总按键数" } }
+      }
+    },
+    "Roughly %@ words — about %@ a mid-length novel.": {
+      "comment": "F-24 YearWrappedView — keystrokes narrative. %1$@ formatted word count, %2$@ multiplier like '0.3×' or '2×' or fallback phrase.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Roughly %@ words — about %@ a mid-length novel." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "约 %@ 个单词 —— 大概是 %@ 一本中等长度小说。" } }
+      }
+    },
+    "Mouse distance": {
+      "comment": "F-24 YearWrappedView — mouse-distance card label.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Mouse distance" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "鼠标里程" } }
+      }
+    },
+    "Most-used apps": {
+      "comment": "F-24 YearWrappedView — top-apps card label.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Most-used apps" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "最常用 App" } }
+      }
+    },
+    "Longest focus session": {
+      "comment": "F-24 YearWrappedView — longest-focus card label.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Longest focus session" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "最长专注片段" } }
+      }
+    },
+    "%1$@ on %2$@": {
+      "comment": "F-24 YearWrappedView — longest-focus subtitle. %1$@ app display name, %2$@ short date.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%1$@ on %2$@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%1$@ · %2$@" } }
+      }
+    },
+    "Busiest day": {
+      "comment": "F-24 YearWrappedView — busiest-day card label.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Busiest day" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "最忙的一天" } }
+      }
+    },
+    "%@ keystrokes + clicks combined.": {
+      "comment": "F-24 YearWrappedView — busiest-day subtitle. %@ formatted total event count.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%@ keystrokes + clicks combined." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "按键 + 点击合计 %@ 次。" } }
+      }
+    },
+    "Your rhythm": {
+      "comment": "F-24 YearWrappedView — peak-hour / rhythm card label.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Your rhythm" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "你的节奏" } }
+      }
+    },
+    "Your peak hour. You were active across %lld of 24 hours of the day.": {
+      "comment": "F-24 YearWrappedView — peak-hour subtitle. %lld is the count of distinct hours-of-day with activity.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Your peak hour. You were active across %lld of 24 hours of the day." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "你的活跃高峰时段。你在 24 小时中的 %lld 个小时段都活跃过。" } }
+      }
+    },
+    "Not enough data yet.": {
+      "comment": "F-24 YearWrappedView — empty-state placeholder when there's no rolled-up activity.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Not enough data yet." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "数据还不够。" } }
+      }
+    },
+    "Save as image…": {
+      "comment": "F-24 YearWrappedView — export button label.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Save as image…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "保存为图片…" } }
+      }
+    },
+    "Save year wrapped image": {
+      "comment": "F-24 YearWrappedView — NSSavePanel title for the export PNG.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Save year wrapped image" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "保存年度回顾图片" } }
+      }
+    },
+    "Couldn't compute wrapped: %@": {
+      "comment": "F-24 YearWrappedView — query-error fallback. %@ is the underlying error description.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Couldn't compute wrapped: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法计算年度回顾：%@" } }
+      }
+    },
+    "Open year so far…": {
+      "comment": "F-24 SettingsView — Recap section button label.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Open year so far…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "查看今年至今…" } }
+      }
+    },
+    "Recap": {
+      "comment": "F-24 SettingsView — section header.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recap" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "回顾" } }
+      }
+    },
+    "Year-to-date totals — keystrokes, mouse distance, top apps, longest focus session — rendered as a single page you can save as an image.": {
+      "comment": "F-24 SettingsView — Recap section footer.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Year-to-date totals — keystrokes, mouse distance, top apps, longest focus session — rendered as a single page you can save as an image." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "今年至今的总数 —— 按键、鼠标里程、最常用 App、最长专注片段 —— 显示在单页面上，可保存为图片。" } }
+      }
+    },
+    "Year so far": {
+      "comment": "F-24 — window title for the year-wrapped window (`Window(_:id:)`).",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Year so far" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "今年至今" } }
+      }
+    },
     "Daily active hours": {
       "comment": "F-42 ActivityWeightCard — card title (replaces the older 'Activity weight' which was metaphorical). Subtitle below the title is what gives the concrete read.",
       "localizations": {
