@@ -199,13 +199,52 @@ text = (text.replace("__NAME__", name)
 pathlib.Path(dst).write_text(text, encoding="utf-8")
 PY
 
-echo "==> ad-hoc sign (pass 1: deep-seal helpers + frameworks)"
-# --force overwrites any existing signature from swift build; --deep walks
-# the embedded resource bundles so nothing inside the .app is unsigned
-# when Gatekeeper scans it on first run.
+echo "==> ad-hoc sign (pass 1: Sparkle helpers, inside-out)"
+# Apple deprecated `codesign --deep` for new code starting macOS 10.13:
+# the recursive walk silently skips some nested resources (notably
+# helper Mach-Os and XPC services inside frameworks) on newer macOS
+# versions, leaving the original signatures intact. For Sparkle that
+# means Autoupdate / Updater.app / Downloader.xpc / Installer.xpc keep
+# the Sparkle-team signature they shipped with — when our outer Pulse.app
+# is then signed ad-hoc (no team), the team-id mismatch trips the XPC
+# validation in `SPUInstallerLauncher` and Sparkle errors with
+#   SUSparkleErrorDomain #4005 — "remote port connection invalidated"
+#   underlying #10 — "Failed to start installer"
+# at install time.
+#
+# Fix: walk Sparkle's bundle and re-sign each helper individually
+# (inside-out, leaves first), then the framework root, then the outer
+# Pulse.app. `--force --sign -` on each item gives every helper a
+# proper ad-hoc signature so they all share the same "no team id"
+# identity Sparkle's XPC validation expects.
+SPARKLE_FW="$FRAMEWORKS/Sparkle.framework"
+SPARKLE_VERS="$SPARKLE_FW/Versions/B"
+# `Versions/B` is Sparkle 2.x's current version dir; the layout is
+# `B/Sparkle` (the dylib), `B/Autoupdate` (binary), `B/Updater.app`,
+# `B/XPCServices/{Downloader,Installer}.xpc`. Sign each bottom-up.
+for nested in \
+    "$SPARKLE_VERS/XPCServices/Downloader.xpc" \
+    "$SPARKLE_VERS/XPCServices/Installer.xpc" \
+    "$SPARKLE_VERS/Updater.app" \
+    "$SPARKLE_VERS/Autoupdate" \
+    "$SPARKLE_VERS/Sparkle"
+do
+    if [[ -e "$nested" ]]; then
+        codesign --force --sign - --timestamp=none "$nested"
+    fi
+done
+# Now the framework root itself.
+codesign --force --sign - --timestamp=none "$SPARKLE_FW"
+
+echo "==> ad-hoc sign (pass 2: outer bundle, single-pass over remaining contents)"
+# `--deep` here only wraps up anything we didn't already sign above
+# (e.g. SwiftUI's resource bundles); the Sparkle helpers are already
+# stamped by the inside-out loop. Even if `--deep` skips some nested
+# code on newer macOS versions, the items where it matters
+# (Sparkle.framework's XPC / helpers) are already correct.
 codesign --force --deep --sign - --timestamp=none "$APP"
 
-echo "==> ad-hoc sign (pass 2: outer bundle w/ stable designated requirement)"
+echo "==> ad-hoc sign (pass 3: outer bundle w/ stable designated requirement)"
 # macOS TCC (Input Monitoring / Accessibility grants) identifies an app by
 # its designated requirement (DR). The ad-hoc codesign default DR is
 #   identifier "dev.pulse.Pulse" and cdhash H"…"

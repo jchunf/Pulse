@@ -12,6 +12,46 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Fix — Sparkle in-place updates work again (Sparkle helpers now ad-hoc signed properly)
+
+Diagnostic from PR #154 captured the actual Sparkle error a user
+hit when updating to a dev build:
+
+```
+SUSparkleErrorDomain #4005 — 运行更新程序时出现错误
+Reason: The remote port connection was invalidated from the
+updater. … Otherwise if Autoupdate is not adhoc signed, your app
+must be signed with a matching team ID.
+Underlying: SUSparkleErrorDomain #10 — Failed to start installer
+```
+
+Root cause: `scripts/package.sh` was using `codesign --force --deep
+--sign -` on the outer `.app`, expecting the recursive walk to
+re-sign every nested helper inside `Sparkle.framework` ad-hoc.
+Apple deprecated `--deep` for new code starting macOS 10.13 and
+the walk silently skips some nested Mach-Os / XPC services on
+newer macOS versions. Sparkle's
+`Autoupdate` / `Updater.app` / `Downloader.xpc` / `Installer.xpc`
+were left with the original Sparkle-team signature; Pulse.app's
+outer ad-hoc identity didn't match → XPC validation in
+`SPUInstallerLauncher` failed → installer never launched.
+
+Fix: walk Sparkle's bundle inside-out and re-sign each helper
+individually before the outer-bundle pass. The new pass order is:
+
+1. Per-helper ad-hoc sign (XPC services, Updater.app, Autoupdate,
+   Sparkle dylib, framework root). Order matters — leaves first.
+2. Outer-bundle `--deep --sign -` to wrap up SwiftUI resource
+   bundles that aren't part of the Sparkle inventory.
+3. Outer-bundle re-sign with identifier-only DR (unchanged from
+   before — this is the TCC-grant-stability fix from earlier).
+
+Once the next stable release ships with this build, updates from
+v2.0.4 → v2.0.5+ in either direction install through Sparkle's
+standard prompt. The diagnostic from PR #154 stays — it's the
+reason we knew what to fix, and it'll catch the next class of
+update error if one ever appears.
+
 ### Diagnostic — Sparkle abort errors surface in Settings → Diagnostics
 
 A user keeps seeing "更新错误！运行更新程序时出现错误" (Sparkle's
