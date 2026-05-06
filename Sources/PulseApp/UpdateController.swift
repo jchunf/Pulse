@@ -209,6 +209,55 @@ final class PulseUpdaterDelegate: NSObject, SPUUpdaterDelegate {
         error: Error?
     ) {
         clearForceNextCheck()
+        if let error {
+            captureUpdateError(error)
+        } else {
+            // Cycle finished cleanly — clear any previous error so
+            // the Diagnostics card stops showing it.
+            clearCapturedUpdateError()
+        }
+    }
+
+    /// Sparkle calls this when the cycle aborts before completion
+    /// (network failure, signature mismatch, installer-launcher
+    /// failure, etc.). Captured into UserDefaults so the
+    /// Diagnostics card in Settings can surface the exact error
+    /// without the user having to fish through Console.app.
+    func updater(_ updater: SPUUpdater, didAbortWithError error: Error) {
+        captureUpdateError(error)
+    }
+
+    /// Stable UserDefaults keys for the last-update-error trace.
+    /// Read by `HealthSnapshot` so the Diagnostics card can render
+    /// the captured info.
+    static let lastUpdateErrorKey = "pulse.update.lastError"
+    static let lastUpdateErrorAtKey = "pulse.update.lastErrorAt"
+
+    private func captureUpdateError(_ error: Error) {
+        let nsError = error as NSError
+        var lines: [String] = []
+        lines.append("\(nsError.domain) #\(nsError.code)")
+        lines.append(nsError.localizedDescription)
+        if let reason = nsError.localizedFailureReason {
+            lines.append("Reason: \(reason)")
+        }
+        if let suggestion = nsError.localizedRecoverySuggestion {
+            lines.append("Suggestion: \(suggestion)")
+        }
+        // userInfo often carries an `NSUnderlyingError` on Sparkle
+        // failures — include its description too so we don't need a
+        // second round-trip to the user.
+        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? Error {
+            let underNS = underlying as NSError
+            lines.append("Underlying: \(underNS.domain) #\(underNS.code) — \(underNS.localizedDescription)")
+        }
+        UserDefaults.standard.set(lines.joined(separator: " · "), forKey: Self.lastUpdateErrorKey)
+        UserDefaults.standard.set(Date(), forKey: Self.lastUpdateErrorAtKey)
+    }
+
+    private func clearCapturedUpdateError() {
+        UserDefaults.standard.removeObject(forKey: Self.lastUpdateErrorKey)
+        UserDefaults.standard.removeObject(forKey: Self.lastUpdateErrorAtKey)
     }
 
     private var isDevChannel: Bool {
