@@ -12,6 +12,54 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+## [2.0.4] — 2026-04-30
+
+CHANGELOG catch-up. v2.0.2 / v2.0.3 / v2.0.4 were tagged in
+quick succession from `main` as the polish round landed; this
+section rolls every change since v2.0.1 into one set of release
+notes (the intermediate point releases tagged whatever `main` was
+at when each tag fired and don't carry their own notes).
+
+The "polish & wrapped" round. v2.0.0 / v2.0.1 shipped the
+interaction-layer trio (Focus mode, clipboard, Shortcuts);
+v2.0.2-2.0.4 is the round of changes that came back from real
+dogfooding plus one fun feature on top.
+
+What's user-visible:
+
+- **F-24 Year so far** — single-page year-to-date wrapped, opens
+  from Settings → Recap. Save as PNG to share.
+- **Channel switching is finally trustworthy** — toggle = pure
+  preference (flip freely, no surprise modal); Check for updates…
+  on the new channel does the real install via the Sparkle prompt;
+  same-version "fake updates" gone.
+- **Smoother scroll** — Dashboard refresh moved off the main
+  actor, so the per-5-second SQLite read no longer hitches the
+  scroll.
+- **Five clarity fixes from a top-to-bottom Dashboard review** —
+  Focus pane no longer has two cards both starting with "Focus";
+  ClipboardCard moved to Input section; "Activity weight" /
+  "Work stacks" got plainer titles; sidebar dropped the
+  one-card-only Health item; DiagnosticsCard moved to Settings →
+  Diagnostics.
+- **F-44 App Intents now ship with zh-Hans** — the three
+  Shortcuts intents are localised in the Shortcuts.app library.
+- **Settings → About "Build" row shows the real version** — was
+  showing the long buildFingerprint; now just `2.0.4 (12000004)`.
+
+What's invisible plumbing:
+
+- v2 of the SQLite migration suite gets `partialUpgradeMatchesFreshUpgrade`
+  / `partialUpgradePreservesData` regression tests so a future
+  V8 → V9 jump can't quietly diverge from a fresh install schema.
+- Observer test coverage for `FocusObserver` (DND JSON parser) +
+  `ClipboardObserver` (simulate hook).
+- VoiceOver containment grouping on every Dashboard card via the
+  three shared `pulseFeaturedCard()` modifiers.
+- `WriterBenchmarks` budgets widened (still flaky on the shared
+  GHA runner — see follow-up to convert the timing gates to
+  log-only).
+
 ### Polish — toggle-then-check is the only channel-switching path; "Build" row now shows the actual version
 
 Two user reports, one fix each:
