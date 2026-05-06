@@ -3977,18 +3977,19 @@
         }
       }
     },
-    "No clipboard, no screen recording, no microphone, no camera, ever.": {
+    "No clipboard content, no screen recording, no microphone, no camera, ever. (Pulse only reads the pasteboard's incrementing change counter to count copy/cut frequency — never the text or files on it.)": {
+      "comment": "Onboarding privacy pledge. Updated 2026-05 for F-32 accuracy: Pulse reads NSPasteboard.changeCount but not the pasteboard contents — the original pledge said 'no clipboard' which was technically loose.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No clipboard, no screen recording, no microphone, no camera, ever."
+            "value": "No clipboard content, no screen recording, no microphone, no camera, ever. (Pulse only reads the pasteboard's incrementing change counter to count copy/cut frequency — never the text or files on it.)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "永远不读剪贴板、不录屏、不开麦克风、不开摄像头。"
+            "value": "永远不读剪贴板内容、不录屏、不开麦克风、不开摄像头。（Pulse 只读取系统剪贴板每次变动的递增计数，用来统计复制/剪切频率 —— 不读上面的任何文字或文件。）"
           }
         }
       }
@@ -4009,18 +4010,19 @@
         }
       }
     },
-    "Pulse makes zero outbound network calls (a future opt-in update checker is the only exception, and it would only hit GitHub Releases).": {
+    "Update checks only run when you click “Check for updates…”. Pulse fetches a Sparkle appcast from GitHub Releases at that moment and never on a schedule.": {
+      "comment": "Onboarding privacy pledge. Updated 2026-05: Sparkle update checker is shipped — text now reflects the actual user-initiated trigger instead of saying it's a 'future' feature.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pulse makes zero outbound network calls (a future opt-in update checker is the only exception, and it would only hit GitHub Releases)."
+            "value": "Update checks only run when you click “Check for updates…”. Pulse fetches a Sparkle appcast from GitHub Releases at that moment and never on a schedule."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pulse 不会发起任何出站网络请求（未来若加入更新检查也将是可选项，并且仅指向 GitHub Releases）。"
+            "value": "只有你点击「检查更新…」时 Pulse 才会发起一次出站请求 —— 在那一刻从 GitHub Releases 拉取 Sparkle appcast，绝不在后台按计划自动检查。"
           }
         }
       }

@@ -12,6 +12,29 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Polish — privacy-pledge text catches up to what Pulse actually does
+
+The onboarding pledge and the user-facing promise block in
+`docs/05-privacy.md` carried two stale phrases:
+
+- **"No clipboard"** was technically loose. F-32 reads
+  `NSPasteboard.changeCount` (an integer that the system increments
+  on every copy/cut) so we can chart copy frequency. The contents
+  of the pasteboard remain off-limits. The pledge now says
+  *"No clipboard **content**"* with a parenthetical that names the
+  changeCount mechanism so a careful reader can verify against
+  `ClipboardObserver.swift`.
+- **"a future opt-in update checker"** was already shipped (Sparkle
+  has been live since v1.1.x). Pledge updated to *"Update checks
+  only run when you click 'Check for updates…'. Pulse fetches a
+  Sparkle appcast from GitHub Releases at that moment and never on
+  a schedule."* Same substance, accurate present tense.
+
+Both `Localizable.xcstrings` entries (en + zh-Hans) updated to
+match. The Chinese-facing user-promise block in
+`docs/05-privacy.md` §七 picks up the same parenthetical so the
+audit doc and the in-app pledge tell the same story.
+
 ## [2.0.4] — 2026-04-30
 
 CHANGELOG catch-up. v2.0.2 / v2.0.3 / v2.0.4 were tagged in
