@@ -247,9 +247,9 @@ private struct PledgeStep: View {
             VStack(alignment: .leading, spacing: 12) {
                 pledge("All raw data stays inside ~/Library/Application Support/Pulse/. Nothing is ever uploaded.")
                 pledge("No keystroke contents — only press counts. By default the key code is not stored either.")
-                pledge("No clipboard, no screen recording, no microphone, no camera, ever.")
+                pledge("No clipboard content, no screen recording, no microphone, no camera, ever. (Pulse only reads the pasteboard's incrementing change counter to count copy/cut frequency — never the text or files on it.)")
                 pledge("Window titles are SHA-256 hashed before being persisted.")
-                pledge("Pulse makes zero outbound network calls (a future opt-in update checker is the only exception, and it would only hit GitHub Releases).")
+                pledge("Update checks only run when you click “Check for updates…”. Pulse fetches a Sparkle appcast from GitHub Releases at that moment and never on a schedule.")
             }
             .padding(.vertical, 4)
             Toggle(isOn: $accepted) {
