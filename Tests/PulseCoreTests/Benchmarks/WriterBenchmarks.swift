@@ -4,19 +4,25 @@ import GRDB
 @testable import PulseCore
 import PulseTestSupport
 
-/// Performance regression guard rails. Targets pulled from
-/// `docs/10-testing-and-ci.md#五`. Disabled by default so PR CI stays fast;
-/// the `nightly.yml` workflow sets `PULSE_RUN_BENCHMARKS=1` to opt in.
+/// Performance regression guard rails. Disabled by default so PR CI
+/// stays fast; the `nightly.yml` workflow sets
+/// `PULSE_RUN_BENCHMARKS=1` to opt in.
 ///
-/// **Threshold philosophy**: these are *order-of-magnitude regression*
-/// catchers, not micro-benchmarks. They're calibrated against the
-/// shared GHA macos-15 runner, which has notable variance — a slow
-/// neighbour or cold dyld cache can stretch a "10k mouse moves"
-/// scenario far beyond what local-Mac timing would suggest. The
-/// budgets below have ~3-4× headroom over a fast run so transient
-/// runner load doesn't turn nightly red. If a real regression takes
-/// the elapsed past these limits, that's a > 2× slowdown — far above
-/// any cooperative-task / actor-hop noise — and worth investigating.
+/// **What we test vs what we don't:**
+///
+/// - **Correctness** (`#expect(counts == ...)`): hard-gated. The
+///   benchmark is meaningless if the events aren't actually written.
+/// - **Timing** (`print(...)`): logged but **not** gated. PR #141
+///   already widened budgets to 12s / 5s and nightly still red-flagged
+///   regularly — the GHA macos-15 shared runner has tail latency that
+///   makes any hard timing assertion inherently flaky. Surfacing
+///   numbers in the log lets a human eyeball the trend without
+///   nightly going red on every slow neighbour.
+///
+/// To recover a hard regression gate later, reintroduce the
+/// `#expect(elapsed < ...)` line with a generous-but-meaningful
+/// budget — but only after a few weeks of data on what the actual
+/// runner-side numbers look like, sourced from these `print` lines.
 @Suite(
     "Writer / rollup performance benchmarks",
     .enabled(if: ProcessInfo.processInfo.environment["PULSE_RUN_BENCHMARKS"] != nil)
@@ -24,8 +30,8 @@ import PulseTestSupport
 struct WriterBenchmarks {
 
     @Test(
-        "ingest 10k mouse moves and flush within the runner-variance budget",
-        .timeLimit(.minutes(1))
+        "ingest 10k mouse moves and flush",
+        .timeLimit(.minutes(2))
     )
     func ingest10kMoves() async throws {
         let db = try PulseDatabase.inMemory()
@@ -47,18 +53,15 @@ struct WriterBenchmarks {
         let elapsed = Date().timeIntervalSince(started)
         let counts = try store.l0Counts()
         #expect(counts.mouseMoves == 10_000)
-        // Local Macs land around 1-2s. The 12s budget is calibrated for
-        // the GHA macos-15 shared runner: PR #94/#95 expanded the
-        // `EventWriter` actor with shortcut + keycode buffers, which
-        // bumped per-`enqueue` actor-hop overhead just enough that the
-        // previous 5s budget started catching shared-runner tail latency
-        // rather than real regressions (see nightly #9-#13).
-        #expect(elapsed < 12.0, "10k inserts: \(elapsed)s (budget 12s)")
+        // Logged for trend-watching, deliberately not gated.
+        // Local Macs land around 1-2s; shared GHA runners have run
+        // 5s-15s+ depending on neighbour load.
+        print("BENCHMARK ingest10kMoves elapsed=\(elapsed)s")
     }
 
     @Test(
-        "rolling raw → second on 10k moves spread across 100 seconds within the runner-variance budget",
-        .timeLimit(.minutes(1))
+        "rolling raw → second on 10k moves spread across 100 seconds",
+        .timeLimit(.minutes(2))
     )
     func rollupOf10kMoves() throws {
         let clock = FakeClock(start: Date(timeIntervalSince1970: 1_700_000_000))
@@ -82,9 +85,8 @@ struct WriterBenchmarks {
             try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM sec_mouse") ?? 0
         }
         #expect(secCount == 100)
-        // Local Macs land around 0.3-0.5s. 5s budget = ~10× headroom
-        // for shared-runner SQLite tail latency.
-        #expect(elapsed < 5.0, "rollup of 10k → 100 buckets: \(elapsed)s (budget 5s)")
+        // Logged, not gated. Local Macs ~ 0.3-0.5s.
+        print("BENCHMARK rollupOf10kMoves elapsed=\(elapsed)s")
     }
 }
 
