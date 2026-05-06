@@ -44,8 +44,13 @@ jobs:
       - name: Resolve packages
         run: swift package resolve
 
+      # Benchmarks deliberately serial — they're timing-sensitive
+      # and `--parallel` makes the two write/rollup tests share
+      # cooperative threads with each other, hurting the numbers we
+      # log for trend-watching. The full test suite below stays
+      # parallel for speed.
       - name: Run benchmarks
-        run: swift test --parallel --filter "WriterBenchmarks"
+        run: swift test --filter "WriterBenchmarks"
 
       - name: Run full test suite
         run: swift test --parallel
