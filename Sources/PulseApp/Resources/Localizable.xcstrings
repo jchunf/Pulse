@@ -1001,6 +1001,23 @@
         }
       }
     },
+    "Last update error": {
+      "comment": "Diagnostics card — shown when Sparkle's last update cycle aborted with an error. Captures the error domain / code / failure reason so the user can copy-paste a precise trace when reporting an update bug.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last update error"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近更新错误"
+          }
+        }
+      }
+    },
     "Listening to your pulse.": {
       "localizations": {
         "en": {

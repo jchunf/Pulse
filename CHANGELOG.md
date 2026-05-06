@@ -12,6 +12,40 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Diagnostic — Sparkle abort errors surface in Settings → Diagnostics
+
+A user keeps seeing "更新错误！运行更新程序时出现错误" (Sparkle's
+generic installer-launcher failure dialog) when toggling on the
+dev channel and clicking Check for updates… The error has been
+opaque from the user's side: Sparkle shows the localized string
+but stays silent on the actual failure domain / code / reason.
+
+This PR captures the abort error and surfaces it in the
+Diagnostics card, so the user can copy-paste a precise trace
+without fishing through Console.app.
+
+- `PulseUpdaterDelegate` implements
+  `updater(_:didAbortWithError:)` and the `error:` arm of
+  `updater(_:didFinishUpdateCycleFor:error:)`. Both feed
+  `captureUpdateError(_:)`, which stringifies the `NSError`
+  (domain, code, `localizedDescription`,
+  `localizedFailureReason`, `localizedRecoverySuggestion`,
+  any `NSUnderlyingError`) and stamps it into UserDefaults
+  under `pulse.update.lastError` + `pulse.update.lastErrorAt`.
+- A clean cycle (no error) clears the captured trace so the
+  Diagnostics card stops surfacing stale failures after the
+  user fixes the underlying issue.
+- `DiagnosticsCard` reads the captured error on each body
+  re-evaluation and renders an "Last update error" row with
+  a 6-line `textSelection(.enabled)` block — copy-paste away.
+- `Localizable.xcstrings` gains the "Last update error" key
+  (en + zh-Hans).
+
+This is purely diagnostic. Once we know the actual error the
+user is seeing, the targeted fix is one focused PR away
+(common candidates: app not in `/Applications`, EdDSA
+mismatch on the dev zip, installer-launcher XPC failure).
+
 ### Polish — privacy-pledge text catches up to what Pulse actually does
 
 The onboarding pledge and the user-facing promise block in

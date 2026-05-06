@@ -3143,8 +3143,40 @@ struct DiagnosticsCard: View {
                         .lineLimit(3)
                 }
             }
+
+            if let (description, errorAt) = lastSparkleError {
+                Divider().overlay(PulseDesign.warmGray(0.12))
+                VStack(alignment: .leading, spacing: 4) {
+                    Label {
+                        Text("Last update error", bundle: .pulse)
+                    } icon: {
+                        Image(systemName: "arrow.down.circle.trianglebadge.exclamationmark")
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(PulseDesign.amber)
+                    Text("\(PulseFormat.ago(from: errorAt, to: snapshot.capturedAt)): \(description)")
+                        .font(.footnote.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .lineLimit(6)
+                }
+            }
         }
         .pulseFeaturedCard()
+    }
+
+    /// Reads the most recent Sparkle abort error captured by
+    /// `PulseUpdaterDelegate.captureUpdateError(_:)`. Returns `nil` if
+    /// no error has been captured (or after a clean update cycle
+    /// cleared it). Read on every body re-evaluation; not reactive,
+    /// so the user closes + reopens Settings to refresh after running
+    /// a new check.
+    private var lastSparkleError: (description: String, at: Date)? {
+        let defaults = UserDefaults.standard
+        guard let desc = defaults.string(forKey: PulseUpdaterDelegate.lastUpdateErrorKey),
+              let date = defaults.object(forKey: PulseUpdaterDelegate.lastUpdateErrorAtKey) as? Date
+        else { return nil }
+        return (desc, date)
     }
 
     @ViewBuilder
