@@ -12,6 +12,35 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Fix #3 — strip `com.apple.quarantine` from Sparkle helpers on launch
+
+After PR #156 dropped the `--deep` pass and v2.0.8 still hit
+`SUSparkleErrorDomain #4005`, the working theory shifted: the
+"adhoc / team-id" line in Sparkle's error message is a hard-coded
+hint, not a diagnosis. The actual symptom is just "the XPC channel
+to `Installer.xpc` was invalidated", which happens for several
+reasons including **Gatekeeper refusing to launch a quarantined
+helper** when the host app isn't notarized.
+
+When a user downloads `Pulse.dmg` (or `.zip`) from the browser,
+macOS marks the file with `com.apple.quarantine`. Dragging the
+.app into `/Applications` propagates the attribute to every file
+inside the bundle — including
+`Sparkle.framework/Versions/B/{Autoupdate,Updater.app,XPCServices/…}`.
+When Sparkle later tries to launch one of those helpers via XPC,
+Gatekeeper blocks the launch (helper is quarantined + not
+notarized), the XPC channel never opens, Sparkle reports #4005,
+and we end up chasing signing rabbit holes.
+
+This PR strips quarantine from this .app and every nested file on
+every `applicationDidFinishLaunching`. Idempotent — paths already
+clean are no-ops. New `BundleQuarantineStripper` owns the strip
+loop; `DiagnosticsCard` surfaces the bundle path + the count of
+attribute removals from the most recent launch ("Quarantine:
+clean (0 paths)" or "Quarantine: stripped from N paths"), so a
+follow-up #4005 can be triaged without guessing whether
+quarantine was ever the issue.
+
 ### Fix #2 — drop the `codesign --deep --force` pass that was undoing the per-item Sparkle signing
 
 PR #155 (cut in v2.0.7) tried to fix `SUSparkleErrorDomain #4005` by
