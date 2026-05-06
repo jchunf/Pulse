@@ -12,6 +12,37 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Fix #2 — drop the `codesign --deep --force` pass that was undoing the per-item Sparkle signing
+
+PR #155 (cut in v2.0.7) tried to fix `SUSparkleErrorDomain #4005` by
+adding per-item Sparkle helper signing before the outer-bundle pass
+— but kept a follow-up `codesign --force --deep --sign - "$APP"` step
+that *silently re-signed those helpers via the same broken `--deep`
+walk*, undoing pass 1's work.
+
+The dogfooder hit the same #4005 again on v2.0.7, and the
+diagnostic surface (PR #154) confirmed: byte-for-byte same domain /
+code / underlying / reason as before.
+
+Sparkle's docs are explicit
+(<https://sparkle-project.org/documentation/sandboxing/>):
+
+> "You cannot use `codesign --deep`, you must specifically code-sign
+> Sparkle's helpers."
+
+This PR removes the `--deep --force` outer-bundle pass entirely. Pass
+order is now:
+
+1. Inner Mach-Os of the nested `.app` / `.xpc` bundles.
+2. The bundles themselves (`.xpc`, `Updater.app`, `Autoupdate`, the
+   Sparkle dylib).
+3. The framework root.
+4. Outer Pulse.app re-signed once with the identifier-only DR for
+   TCC stability — `--deep` deliberately omitted.
+
+No tail step that walks back through the helpers. Pass 1's
+signatures stay intact through to install time.
+
 ### Fix — Sparkle in-place updates work again (Sparkle helpers now ad-hoc signed properly)
 
 Diagnostic from PR #154 captured the actual Sparkle error a user
