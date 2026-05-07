@@ -12,6 +12,39 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Fix #4 — preserve Sparkle helpers' identifiers when re-signing (the actual `#4005` cause)
+
+Diagnostic #2 (PR #158) finally captured what was actually broken
+in v2.0.10's bundle:
+
+```json
+"Autoupdate": "Identifier=Autoupdate-55554944c885cecb77e63656933767b4dcfffd2f"
+```
+
+When `codesign --force --sign -` runs against a **bare Mach-O**
+(no surrounding Info.plist — that's `Sparkle.framework/Versions/B/Autoupdate`,
+a standalone executable Sparkle launches as a child process to do
+the in-place install), codesign autogenerates the identifier as
+`<filename>-<hash>` instead of preserving whatever identifier the
+binary shipped with from the Sparkle distribution. Sparkle's
+internal launcher then asks "is the helper at this path the
+`org.sparkle-project.Autoupdate` I expect?" — sees
+`Autoupdate-55554944…` — rejects the connection. The XPC channel
+invalidates, Sparkle reports #4005.
+
+Every other helper escaped this trap because they're bundles with
+their own Info.plist (`Sparkle dylib` / `Updater.app` /
+`Downloader.xpc` / `Installer.xpc`); codesign reads identifier
+from there. Only the bare `Autoupdate` Mach-O got mangled.
+
+`scripts/package.sh` now passes `--preserve-metadata=identifier,
+entitlements,flags,runtime` on every Sparkle helper signing call.
+The flag tells codesign to keep the existing identifier (and
+entitlements, hardened-runtime flags) when re-signing — which for
+bundles is a no-op (their identifier already comes from
+Info.plist) and for `Autoupdate` preserves the
+`org.sparkle-project.Autoupdate` it shipped with.
+
 ### Diagnostic #2 — runtime `codesign -dv` snapshot of every Sparkle helper
 
 After PR #157 landed (and v2.0.9 shipped), the user still hit the
