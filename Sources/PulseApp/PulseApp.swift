@@ -292,6 +292,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // by the time the user clicks Check for updates…, the helpers
         // are clean.
         BundleQuarantineStripper.strip(at: Bundle.main.bundlePath)
+        // Capture a verbatim `codesign -dv --verbose=4` snapshot of
+        // every Sparkle helper. Surfaces in Settings → Diagnostics so
+        // the dogfooder hitting #4005 can copy-paste actual signing
+        // info instead of us guessing what's wrong from the
+        // hard-coded Sparkle hint string. Cheap (a few exec calls
+        // on launch) and only meaningful when something's wrong.
+        BundleSigningInspector.captureReport(bundlePath: Bundle.main.bundlePath)
         Task { [weak self] in await self?.bootCollector() }
         startHealthPolling()
         registerWakeObserver()
@@ -3201,6 +3208,25 @@ struct DiagnosticsCard: View {
                     .font(.footnote.monospacedDigit())
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
+                if let codesignReport = UserDefaults.standard.string(
+                    forKey: BundleSigningInspector.lastReportKey
+                ), !codesignReport.isEmpty {
+                    DisclosureGroup {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            Text(codesignReport)
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                                .lineLimit(nil)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .frame(maxHeight: 200)
+                    } label: {
+                        Text("Codesign report (Sparkle helpers)", bundle: .pulse)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
         .pulseFeaturedCard()

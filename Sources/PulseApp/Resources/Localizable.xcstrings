@@ -1001,6 +1001,13 @@
         }
       }
     },
+    "Codesign report (Sparkle helpers)": {
+      "comment": "Diagnostics — disclosure group that expands to show `codesign -dv` output for every Sparkle helper. Surfaced for #4005 debugging when none of the previous theories panned out.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Codesign report (Sparkle helpers)" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "签名信息（Sparkle helpers）" } }
+      }
+    },
     "Quarantine: clean (0 paths)": {
       "comment": "Diagnostics — quarantine strip ran on launch and found nothing to remove. 'Clean' = bundle has no `com.apple.quarantine` attributes left.",
       "localizations": {
