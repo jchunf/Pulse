@@ -12,6 +12,27 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Diagnostic #2 — runtime `codesign -dv` snapshot of every Sparkle helper
+
+After PR #157 landed (and v2.0.9 shipped), the user still hit the
+same `SUSparkleErrorDomain #4005`. Diagnostics confirmed:
+
+- `/Applications/Pulse.app` — bundle is in the right place.
+- `Quarantine: clean (0 paths)` — quarantine wasn't the cause.
+
+Three plausible-but-wrong fixes (per-item signing #155, drop
+`--deep` #156, strip quarantine #157) and the install path is
+still broken with the same opaque XPC-invalidation error. To
+stop guessing and ship one more wrong fix, this PR captures a
+verbatim `codesign -dv --verbose=4` snapshot of every Sparkle
+helper at launch and surfaces it under a disclosure in the
+`DiagnosticsCard`.
+
+The dogfooder copies the JSON blob, we read it once, and we know
+exactly what authorities / identifiers / team IDs / DRs each
+helper actually has. From there the targeted fix is one focused
+PR away — instead of three.
+
 ### Fix #3 — strip `com.apple.quarantine` from Sparkle helpers on launch
 
 After PR #156 dropped the `--deep` pass and v2.0.8 still hit
