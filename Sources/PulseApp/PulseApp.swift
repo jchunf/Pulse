@@ -92,7 +92,6 @@ struct PulseApp: App {
                     try appDelegate.purgeRange(start: start, end: end)
                 },
                 onCheckForUpdates: { appDelegate.updateController.checkForUpdates() },
-                onArmCrossChannelCheck: { appDelegate.updateController.armCrossChannelCheck() },
                 onShowYearWrapped: { appDelegate.requestShowYearWrapped() }
             )
         }
@@ -6767,8 +6766,6 @@ struct SettingsView: View {
     private var refreshIntervalSeconds: Double = DashboardModel.defaultRefreshIntervalSeconds
     @AppStorage(PulsePreferenceKey.heatmapDays)
     private var heatmapDays: Int = DashboardModel.defaultHeatmapDays
-    @AppStorage(PulseUpdaterDelegate.channelKey)
-    private var updateChannel: String = PulseUpdaterDelegate.stableChannel
     @AppStorage(PulsePreferenceKey.alertScreenTimeSeconds)
     private var alertScreenTimeSeconds: Int = 0
     @AppStorage(PulsePreferenceKey.alertNoBreakSeconds)
@@ -6783,24 +6780,6 @@ struct SettingsView: View {
     let onOpenPrivacyAudit: () -> Void
     let onPurgeRange: (Date, Date) throws -> RangePurgeResult
     let onCheckForUpdates: () -> Void
-    /// Called when the user flips the dev-channel toggle. Arms the
-    /// `forceNextCheck` flag inside `PulseUpdaterDelegate` so the
-    /// next "Check for updates…" click installs the new channel's
-    /// latest build (the override clears at the end of that one
-    /// cycle). Decoupled from the toggle's other side-effect of
-    /// updating `updateChannel` because flipping a SwiftUI toggle
-    /// already persists to `@AppStorage` for free; the only thing
-    /// the closure needs to do is the arming.
-    ///
-    /// Why no separate "Switch to latest …" button: a previous
-    /// revision (#143) installed the cross-channel build directly
-    /// from the toggle, then #146 split it into toggle (preference)
-    /// + button (action) after a dogfooder reported the toggle
-    /// felt aggressive. The button itself then turned out to fail
-    /// for some users — the explicit-button path was easy to remove
-    /// because the toggle + standard "Check for updates…" already
-    /// covers the workflow once the flag is armed.
-    let onArmCrossChannelCheck: () -> Void
     /// F-24 — opens the year-wrapped window. Same trigger pattern as
     /// `onOpenPrivacyAudit`; AppDelegate fans the Void out to a
     /// `PassthroughSubject` and the MenuBarLabel listener calls
@@ -6941,35 +6920,6 @@ struct SettingsView: View {
                         .font(.footnote.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
-                }
-                Toggle(isOn: Binding(
-                    get: { updateChannel == PulseUpdaterDelegate.devChannel },
-                    set: { newValue in
-                        // Toggle is a preference + a primer: it
-                        // updates which feed the next "Check for
-                        // updates…" queries AND arms a one-shot
-                        // override so Sparkle treats the new feed's
-                        // latest item as newer than the current build
-                        // (without the override, dev BUILD ≪ stable
-                        // BUILD makes a stable-user-opting-into-dev
-                        // get "you're up to date" forever). The flag
-                        // clears the moment Sparkle finishes the next
-                        // cycle, so within-channel forward updates
-                        // stay on standard "newer-wins" semantics.
-                        let target = newValue
-                            ? PulseUpdaterDelegate.devChannel
-                            : PulseUpdaterDelegate.stableChannel
-                        guard target != updateChannel else { return }
-                        updateChannel = target
-                        onArmCrossChannelCheck()
-                    }
-                )) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Receive development builds", bundle: .pulse)
-                        Text("Sets which feed “Check for updates…” queries. Flip the toggle, then click the button below — Pulse will install the most recent build of the channel you just switched to.", bundle: .pulse)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
                 }
                 Button(action: onCheckForUpdates) {
                     Text("Check for updates…", bundle: .pulse)

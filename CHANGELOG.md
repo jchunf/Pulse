@@ -12,6 +12,56 @@ Entries are grouped by release. Inside each release, changes are grouped into
 
 ## [Unreleased]
 
+### Drop the dev-channel feature; stable-only updates from here on
+
+After five PRs trying to make Sparkle's cross-channel install path
+work for ad-hoc-signed builds (`SUSparkleErrorDomain #4005` recurring
+through #155 / #156 / #157 / #158 / #159 with each "fix" still not
+resolving the user's report), the maintenance cost outgrew the
+surface's value. The dev channel was a power-user feature; it's
+retired.
+
+What's removed:
+
+- **Settings → About** loses the "Receive development builds" toggle.
+  The "Check for updates…" button stays and queries the stable feed.
+- **`PulseUpdaterDelegate`** drops `feedURLString(for:)`,
+  `allowedChannels(for:)`, `versionComparator(for:)`, the
+  `AlwaysNewerComparator` class, the `forceNewer` flag + lock, and
+  every channel-routing constant. What stays: the
+  `didFinishUpdateCycleFor:error:` and `didAbortWithError:` hooks
+  that capture an abort error trace into `UserDefaults` for the
+  Diagnostics card. Useful for any future stable update that
+  misbehaves; invisible when nothing's wrong.
+- **`UpdateController`** drops `armCrossChannelCheck()`. Class is
+  now a 70-line wrapper over `SPUStandardUpdaterController` with
+  one public method (`checkForUpdates()`).
+- **`apple/Info.plist`** drops `SUDevFeedURL`. `SUFeedURL`,
+  `SUPublicEDKey`, the three "no automatic checks" keys all stay.
+- **`.github/workflows/package.yml`** drops the
+  "Generate + upload dev appcast" step. The "Publish rolling
+  dev-latest release" step still runs so the GitHub `dev-latest`
+  pre-release stays available as a manual download for tinkerers
+  who want to try a `main` build — Sparkle just no longer routes
+  there.
+
+What stays (intentionally):
+
+- The package.sh signing fixes from #155 / #156 / #159 — they
+  apply to stable updates too and only cost a few extra
+  `codesign` invocations per build.
+- `BundleQuarantineStripper` (#157) — quarantine-strip on launch
+  is cheap, idempotent, and helps any non-notarized scenario.
+- `BundleSigningInspector` (#158) — runtime codesign snapshot in
+  Diagnostics. Cheap insurance for any future "Check for updates
+  is broken" report.
+- The captured Sparkle abort error display in the Diagnostics
+  card — same idea.
+
+xcstrings keys for the dropped UI strings ("Receive development
+builds", "Switch to latest …", channel captions) stay in the
+catalog for now; Xcode prunes unused keys on the next build.
+
 ### Fix #4 — preserve Sparkle helpers' identifiers when re-signing (the actual `#4005` cause)
 
 Diagnostic #2 (PR #158) finally captured what was actually broken
