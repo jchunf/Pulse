@@ -5900,8 +5900,18 @@ struct AppRankingChart: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Top apps", bundle: .pulse)
-                .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: pre-A28 the card showed only
+            // "Top apps", which left users guessing whether the bars
+            // were the top 5, top 20 or every app they used today.
+            // The subtitle now anchors the cap so the user knows
+            // exactly what's on screen.
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Top apps", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+                Text("Top 5 by time today", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if rows.isEmpty {
                 Text("No app activity recorded yet today.", bundle: .pulse)
                     .foregroundStyle(.secondary)
@@ -5922,9 +5932,22 @@ struct AppRankingChart: View {
                 }
                 .chartXAxis(.hidden)
                 .chartYAxis {
-                    AxisMarks(position: .leading) { _ in
-                        AxisValueLabel()
-                            .foregroundStyle(.primary)
+                    // Custom `AxisValueLabel` body so long app
+                    // names ("Microsoft Outlook", "Visual Studio
+                    // Code", zh-Hans full names like
+                    // "微信开发者工具") truncate cleanly with a
+                    // tail ellipsis instead of pushing the bar
+                    // chart sideways or wrapping unpredictably.
+                    AxisMarks(position: .leading) { value in
+                        AxisValueLabel(centered: true) {
+                            if let label = value.as(String.self) {
+                                Text(label)
+                                    .font(.footnote)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                    .foregroundStyle(.primary)
+                            }
+                        }
                     }
                 }
                 .frame(height: max(120, CGFloat(rows.count) * 32))

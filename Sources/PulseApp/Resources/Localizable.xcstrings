@@ -1754,6 +1754,13 @@
         }
       }
     },
+    "Top 5 by time today": {
+      "comment": "AppRankingChart subtitle — anchors the cap so users know exactly how many rows the chart shows.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Top 5 by time today" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "今日按使用时长排前 5 名" } }
+      }
+    },
     "Top shortcuts today": {
       "localizations": {
         "en": {
