@@ -4488,6 +4488,13 @@
         }
       }
     },
+    "Based on US-QWERTY key positions — bars may not reflect physical hands on Dvorak or Colemak.": {
+      "comment": "F-20 HandBalanceCard footnote — disclaims the static QWERTY-keyed left/right classification so users on alternate layouts know why the bars may not match their physical hands.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Based on US-QWERTY key positions — bars may not reflect physical hands on Dvorak or Colemak." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "基于 US-QWERTY 键位划分 —— 在 Dvorak / Colemak 等其他键盘布局上，左右比例可能与你实际的左右手不符。" } }
+      }
+    },
     "Back": {
       "localizations": {
         "en": {
@@ -5463,19 +5470,19 @@
         }
       }
     },
-    "A diagnostic report was saved by macOS. Open it to see the stack trace, or dismiss this banner — it won't reappear unless another crash happens.": {
-      "comment": "F-49b CrashBeaconBanner — body text explaining the crash report and dismiss behavior.",
+    "macOS saved a crash log when this happened. Open it if you want to see what went wrong (or share it for debugging), or dismiss this banner — it won't reappear unless another crash happens.": {
+      "comment": "F-49b CrashBeaconBanner — body text explaining the crash report and dismiss behavior. Reworded in A31 to drop 'stack trace' jargon and frame the action as 'see what went wrong / share for debugging' instead.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "A diagnostic report was saved by macOS. Open it to see the stack trace, or dismiss this banner — it won't reappear unless another crash happens."
+            "value": "macOS saved a crash log when this happened. Open it if you want to see what went wrong (or share it for debugging), or dismiss this banner — it won't reappear unless another crash happens."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "macOS 已保存一份诊断报告。打开它可以查看崩溃堆栈；或者忽略 — 此横幅只在再次异常退出时才会重新出现。"
+            "value": "上次崩溃时 macOS 保存了一份崩溃日志。你可以打开它看看出了什么问题（或把它分享出去用于排错），也可以忽略这条提示 —— 只有下次再崩溃时它才会重新出现。"
           }
         }
       }
