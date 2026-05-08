@@ -7691,12 +7691,74 @@ struct DailyBriefingView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Yesterday in Pulse", bundle: .pulse)
                 .font(.system(.title2, design: .rounded, weight: .semibold))
-            if let day = model.day {
+            // Pre-A33 the subtitle was just a localised date
+            // ("Wed, May 7, 2026") — accurate, dull, no different
+            // tomorrow than today. The briefing is a celebration, so
+            // the subtitle now leads with whichever of yesterday's
+            // numbers can carry a dramatic comparison: distance →
+            // landmark, focus → film/pomodoro/workday, keystrokes →
+            // novella/short story. The date drops to a tertiary line
+            // below so users still have it for orientation.
+            if let summary = model.summary, let day = model.day {
+                if let dramatic = Self.dramaticOpener(summary: summary, focus: model.longestFocus) {
+                    Text(dramatic)
+                        .font(.subheadline)
+                        .foregroundStyle(PulseDesign.coral)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text(Self.headerDateFormatter.string(from: day))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else if let day = model.day {
                 Text(Self.headerDateFormatter.string(from: day))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// Picks the most dramatic single-sentence narrative we can
+    /// truthfully say about yesterday, in priority order:
+    /// distance → focus duration → keystrokes → scrolls. Returns
+    /// `nil` when every available metric is below its narrative
+    /// floor — a genuinely quiet day shouldn't get a forced
+    /// celebration line; the date subtitle still anchors the view.
+    static func dramaticOpener(summary: TodaySummary, focus: FocusSegment?) -> String? {
+        let library = LandmarkLibrary.standard
+        let narrative = NarrativeEngine.standard
+
+        // Distance — most dramatic anchor when present, falls back
+        // to "0 mm = fingernail width" only when meters >= 1 so a
+        // < 1m day doesn't claim a milestone.
+        let meters = summary.totalMouseDistanceMillimeters / 1_000.0
+        if meters >= 1 {
+            let comparison = library.bestMatch(forMeters: meters)
+            return PulseFormat.landmarkComparisonSentence(for: comparison)
+        }
+
+        // Focus segment — use the longest stretch's narrative if
+        // we have one and it's at least a short film's worth.
+        if let focus,
+           focus.durationSeconds >= 15 * 60,
+           let match = narrative.bestMatch(metric: .focusDurationSeconds, value: Double(focus.durationSeconds)) {
+            return PulseFormat.narrativeSentence(for: match)
+        }
+
+        // Keystrokes — a short-story-or-larger headline reads
+        // celebratory; below that the engine returns `nil` and we
+        // fall through.
+        if let match = narrative.bestMatch(metric: .keystrokes, value: Double(summary.totalKeyPresses)) {
+            return PulseFormat.narrativeSentence(for: match)
+        }
+
+        // Scrolls — last fallback before dropping the line
+        // entirely. Anchored at "blog post" so a 30-tick day isn't
+        // overstated.
+        if let match = narrative.bestMatch(metric: .scrollTicks, value: Double(summary.totalScrollTicks)) {
+            return PulseFormat.narrativeSentence(for: match)
+        }
+
+        return nil
     }
 
     private static let headerDateFormatter: DateFormatter = {
