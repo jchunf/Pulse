@@ -1323,18 +1323,19 @@
         }
       }
     },
-    "No writes in the last minute — Pulse may have lost permission or stopped.": {
+    "No writes in the last minute — Pulse may have lost a permission. Open Settings → Diagnostics or recheck Input Monitoring + Accessibility under System Settings.": {
+      "comment": "DiagnosticsCard silent-failure warning. Reworded in A30 to give the user a concrete next step (where to look) instead of just naming the failure mode.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No writes in the last minute — Pulse may have lost permission or stopped."
+            "value": "No writes in the last minute — Pulse may have lost a permission. Open Settings → Diagnostics or recheck Input Monitoring + Accessibility under System Settings."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "过去一分钟没有新数据 — Pulse 可能已失去权限或已停止。"
+            "value": "过去一分钟没有新数据 —— Pulse 可能丢失了权限。打开「设置 → 诊断」，或在系统设置里重新确认「输入监控」和「辅助功能」。"
           }
         }
       }

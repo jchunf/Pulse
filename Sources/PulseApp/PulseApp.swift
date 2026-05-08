@@ -3362,7 +3362,7 @@ struct DiagnosticsCard: View {
 
             if snapshot.isSilentlyFailing {
                 Label {
-                    Text("No writes in the last minute — Pulse may have lost permission or stopped.", bundle: .pulse)
+                    Text("No writes in the last minute — Pulse may have lost a permission. Open Settings → Diagnostics or recheck Input Monitoring + Accessibility under System Settings.", bundle: .pulse)
                 } icon: {
                     Image(systemName: "exclamationmark.circle.fill")
                 }
