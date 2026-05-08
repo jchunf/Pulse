@@ -493,22 +493,6 @@
       }
     },
     "Database size": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Database size"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "数据库大小"
-          }
-        }
-      }
-    },
-    "Database size": {
       "comment": "Menu-bar CountersView — disk footprint of Pulse's local database. Renamed from 'DB size' to use words a non-developer reads naturally.",
       "localizations": {
         "en": {
@@ -647,6 +631,23 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "最忙的一天" } }
       }
     },
+    "Busiest day: %1$@ — %2$@ keystrokes + clicks combined.": {
+      "comment": "Weekly HTML report — one-line highlight inside the hero. %1$@ is a localized weekday + date, %2$@ is the formatted sum of keystrokes + clicks. Positional specifiers because zh-Hans reorders the clauses.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Busiest day: %1$@ — %2$@ keystrokes + clicks combined."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最忙的一天：%1$@ —— 按键 + 点击合计 %2$@ 次。"
+          }
+        }
+      }
+    },
     "%@ keystrokes + clicks combined.": {
       "comment": "F-24 YearWrappedView — busiest-day subtitle. %@ formatted total event count.",
       "localizations": {
@@ -737,6 +738,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "每日活跃时长"
+          }
+        }
+      }
+    },
+    "Each ribbon goes from the app you left to the app you opened next; thicker ribbons mean more frequent switches.": {
+      "comment": "AppSankeyCard explainer caption — names the columns and the ribbon-thickness convention so first-time users can decode the diagram without a legend.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Each ribbon goes from the app you left to the app you opened next; thicker ribbons mean more frequent switches."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每条曲线都从你切走的 App 流向你切去的 App；越粗的曲线代表切换越频繁。"
           }
         }
       }
@@ -1013,6 +1031,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "最近汇总"
+          }
+        }
+      }
+    },
+    "Last %lld days vs the %lld days before that": {
+      "comment": "WeekOverWeekCard subtitle — explicitly names the comparison the row deltas are computed against. Both %lld are the same window length (e.g. 7 days).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last %1$lld days vs the %2$lld days before that"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近 %1$lld 天与之前的 %2$lld 天相比"
           }
         }
       }
@@ -1688,6 +1723,23 @@
         }
       }
     },
+    "Set a daily target — Pulse will track progress toward it here.": {
+      "comment": "GoalsDiscoveryNudge — quiet day-zero row that telegraphs the existence of the Goals feature when the user hasn't enabled any preset goals. Lives on the Dashboard's Today pane, replaces the empty space `GoalsCard` used to leave behind.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set a daily target — Pulse will track progress toward it here."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置一个每日目标 —— Pulse 会在这里显示你的进度。"
+          }
+        }
+      }
+    },
     "Settings": {
       "localizations": {
         "en": {
@@ -1734,6 +1786,13 @@
             "value": "应用排行"
           }
         }
+      }
+    },
+    "Top 5 by time today": {
+      "comment": "AppRankingChart subtitle — anchors the cap so users know exactly how many rows the chart shows.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Top 5 by time today" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "今日按使用时长排前 5 名" } }
       }
     },
     "Top shortcuts today": {

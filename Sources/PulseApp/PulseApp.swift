@@ -1978,6 +1978,15 @@ struct DashboardView: View {
         }
         if !model.goalProgress.isEmpty {
             GoalsCard(progress: model.goalProgress)
+        } else {
+            // Day-zero / never-configured users used to see nothing
+            // here, so the entire Goals feature was undiscoverable
+            // unless they happened to scroll Settings far enough to
+            // find it. The discovery nudge is a single quiet row
+            // that points at Settings → Goals; once any goal is
+            // enabled the row collapses (the populated `GoalsCard`
+            // takes its place above).
+            GoalsDiscoveryNudge()
         }
         todayPulseSection(summary: summary)
         if !model.insights.isEmpty {
@@ -2535,6 +2544,50 @@ struct GoalsCard: View {
             }
         }
         .pulseFeaturedCard()
+    }
+}
+
+/// Day-zero / never-configured replacement for `GoalsCard`. Up to
+/// A28, the Goals feature only manifested on the Dashboard *after*
+/// the user found Settings → Goals and toggled at least one preset —
+/// the dashboard surface itself never told them the feature existed.
+/// This nudge is the single quiet row that bridges that gap: it's
+/// not a full card, it doesn't shout, but it's enough to telegraph
+/// "you can set a daily target" + give a one-click route there.
+///
+/// The row collapses naturally as soon as any goal is enabled
+/// (the populated `GoalsCard` takes its place upstream), so users
+/// who do opt in never see it again.
+struct GoalsDiscoveryNudge: View {
+
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: "target")
+                .foregroundStyle(PulseDesign.coral.opacity(0.85))
+                .font(.system(size: 14, weight: .medium))
+            Text("Set a daily target — Pulse will track progress toward it here.", bundle: .pulse)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            Button {
+                openSettings()
+                NSApp.activate(ignoringOtherApps: true)
+            } label: {
+                Text("Open Settings", bundle: .pulse)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(PulseDesign.warmGray(0.05))
+        )
     }
 }
 
@@ -3216,16 +3269,27 @@ struct WeekOverWeekCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("This week vs last", bundle: .pulse)
-                    .font(PulseDesign.cardTitleFont)
-                Spacer()
-                Text(
-                    "\(comparison.currentPeriodDayCount)-day window",
-                    bundle: .pulse
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            // Title + subtitle pair: pre-A28 the card showed an
+            // ambiguous "N-day window" caption. New users couldn't
+            // tell whether the +23% on a row meant "vs the 7 days
+            // before that" or "vs a rolling 14-day average". The
+            // subtitle now spells the comparison out explicitly so
+            // the row deltas read unambiguously.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("This week vs last", bundle: .pulse)
+                        .font(PulseDesign.cardTitleFont)
+                    Spacer()
+                    Text(
+                        "\(comparison.currentPeriodDayCount)-day window",
+                        bundle: .pulse
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                Text("Last \(comparison.currentPeriodDayCount) days vs the \(comparison.currentPeriodDayCount) days before that", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             VStack(spacing: 10) {
                 ForEach(comparison.rows, id: \.metric) { row in
@@ -4328,24 +4392,41 @@ private struct ChronotypeSparkline: View {
 
     var body: some View {
         let peak = max(1, hourly.max() ?? 1)
+        // Index of the highest-activity hour. The card subtitle
+        // already names the peak hour numerically; rendering the
+        // matching bar in full coral (vs. the 0.30–0.85 ramp the
+        // other 23 bars use) gives the user a one-glance visual
+        // anchor that matches the prose.
+        let peakIndex = hourly.enumerated()
+            .max(by: { $0.element < $1.element })?
+            .offset
         GeometryReader { geo in
             HStack(alignment: .bottom, spacing: 2) {
                 ForEach(0..<24, id: \.self) { hour in
                     let intensity = Double(hourly[hour]) / Double(peak)
+                    let isPeak = (hour == peakIndex && hourly[hour] > 0)
                     VStack(spacing: 2) {
                         RoundedRectangle(cornerRadius: 1.5)
-                            .fill(PulseDesign.coral.opacity(0.30 + intensity * 0.55))
+                            .fill(
+                                isPeak
+                                    ? PulseDesign.coral
+                                    : PulseDesign.coral.opacity(0.30 + intensity * 0.55)
+                            )
                             .frame(height: max(2, intensity * (geo.size.height - 12)))
                             .frame(maxHeight: .infinity, alignment: .bottom)
-                        // Show every 6th hour as a tick label so the
-                        // axis is readable but not crowded.
+                        // Pre-A28 the tick labels were `size: 9` — readable
+                        // on a 27" iMac, borderline on a 13" laptop. Bumped
+                        // to caption2 + medium so the 0/6/12/18 anchors are
+                        // scannable at the dashboard's normal viewing
+                        // distance, matching the hour-axis treatment in
+                        // the WeekHourlyHeatmap (round 2).
                         if hour % 6 == 0 {
                             Text("\(hour)")
-                                .font(.system(size: 9).monospacedDigit())
+                                .font(.caption2.monospacedDigit().weight(.medium))
                                 .foregroundStyle(.secondary)
                         } else {
                             Text(" ")
-                                .font(.system(size: 9))
+                                .font(.caption2)
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -5889,8 +5970,18 @@ struct AppRankingChart: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Top apps", bundle: .pulse)
-                .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: pre-A28 the card showed only
+            // "Top apps", which left users guessing whether the bars
+            // were the top 5, top 20 or every app they used today.
+            // The subtitle now anchors the cap so the user knows
+            // exactly what's on screen.
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Top apps", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+                Text("Top 5 by time today", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if rows.isEmpty {
                 Text("No app activity recorded yet today.", bundle: .pulse)
                     .foregroundStyle(.secondary)
@@ -5911,9 +6002,22 @@ struct AppRankingChart: View {
                 }
                 .chartXAxis(.hidden)
                 .chartYAxis {
-                    AxisMarks(position: .leading) { _ in
-                        AxisValueLabel()
-                            .foregroundStyle(.primary)
+                    // Custom `AxisValueLabel` body so long app
+                    // names ("Microsoft Outlook", "Visual Studio
+                    // Code", zh-Hans full names like
+                    // "微信开发者工具") truncate cleanly with a
+                    // tail ellipsis instead of pushing the bar
+                    // chart sideways or wrapping unpredictably.
+                    AxisMarks(position: .leading) { value in
+                        AxisValueLabel(centered: true) {
+                            if let label = value.as(String.self) {
+                                Text(label)
+                                    .font(.footnote)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                    .foregroundStyle(.primary)
+                            }
+                        }
                     }
                 }
                 .frame(height: max(120, CGFloat(rows.count) * 32))
@@ -5965,6 +6069,16 @@ struct AppSankeyCard: View {
                 Text("App switches today", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
+            // First-time users couldn't decode the Sankey shape:
+            // *what* are the columns, *what* does ribbon thickness
+            // mean? The card showed only a count subtitle ("N
+            // switches across M pairs"). New caption sentence
+            // names the columns and the ribbon convention so the
+            // diagram is parseable on first encounter.
+            Text("Each ribbon goes from the app you left to the app you opened next; thicker ribbons mean more frequent switches.", bundle: .pulse)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             subtitle
             SankeyDiagram(
                 layout: makeLayout(),
