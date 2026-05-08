@@ -2829,7 +2829,8 @@ struct SummaryCardsView: View {
             SummaryMetricCard(
                 titleKey: "Clicks",
                 value: PulseFormat.integer(summary.totalMouseClicks),
-                series: trend.map { Double($0.mouseClicks) }
+                series: trend.map { Double($0.mouseClicks) },
+                narrativeSubtitle: clicksNarrative
             )
             SummaryMetricCard(
                 titleKey: "Scrolls",
@@ -2866,6 +2867,23 @@ struct SummaryCardsView: View {
         Self.narrative
             .bestMatch(metric: .scrollTicks, value: Double(summary.totalScrollTicks))
             .map { PulseFormat.narrativeSentence(for: $0) }
+    }
+
+    /// Pace-tier narrative for today's mouse-click count. Mirrors
+    /// the playful tier ladder `KeyboardPeakCard.Tier` uses for KPM
+    /// — the click count itself doesn't have natural content
+    /// anchors the way keystrokes (words) and scroll ticks (pages)
+    /// do, but a pace label is more interesting than a bare number
+    /// once it's high enough to dramatize. Returns `nil` for quiet
+    /// days so the tile doesn't get a forced descriptor on day-zero.
+    private var clicksNarrative: String? {
+        switch summary.totalMouseClicks {
+        case ..<500:    return nil
+        case ..<2_000:  return String(localized: "a steady clicking day", bundle: .pulse)
+        case ..<5_000:  return String(localized: "a click-heavy day", bundle: .pulse)
+        case ..<10_000: return String(localized: "a click hurricane", bundle: .pulse)
+        default:        return String(localized: "a click marathon", bundle: .pulse)
+        }
     }
 }
 
@@ -6084,9 +6102,19 @@ struct ClipboardCard: View {
                 Text(PulseFormat.integer(count))
                     .font(PulseDesign.heroSecondaryFont)
                     .foregroundStyle(PulseDesign.coral)
-                Text("copies / cuts", bundle: .pulse)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("copies / cuts", bundle: .pulse)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    // Playful pace tier escalating with the day's
+                    // count. Same ladder pattern KeyboardPeak,
+                    // ChaoticMoment + clicks tile use, kept in one
+                    // line so the card's three "rows" (hero +
+                    // descriptor / privacy / sparkline) stay tidy.
+                    Text(Self.paceTier(for: count), bundle: .pulse)
+                        .font(.footnote)
+                        .foregroundStyle(PulseDesign.coral.opacity(0.85))
+                }
                 Spacer(minLength: 0)
             }
             // Privacy reassurance line. Pre-A30 this lived as a
@@ -6111,6 +6139,20 @@ struct ClipboardCard: View {
                 .frame(height: 44)
         }
         .pulseFeaturedCard()
+    }
+
+    /// Maps the day's pasteboard-change count to a playful pace tier.
+    /// The card is only shown when `count > 0` (parent guard), so the
+    /// floor tier still has something to celebrate. Same ladder
+    /// pattern as KeyboardPeak / ChaoticMoment / clicks tile.
+    static func paceTier(for count: Int) -> LocalizedStringKey {
+        switch count {
+        case ..<10:   return "a quiet pasteboard day"
+        case ..<30:   return "casual copy-paste flow"
+        case ..<80:   return "steady pasteboard work"
+        case ..<200:  return "a heavy copy-paste day"
+        default:      return "pasteboard at full throttle"
+        }
     }
 }
 
@@ -7033,6 +7075,13 @@ struct ChaoticMomentCard: View {
                         )
                     )
                     .font(.footnote.monospacedDigit())
+                    // Playful weather-tier descriptor escalates with
+                    // the switch count. Keeps the whimsical "tornado"
+                    // motif of the title icon and gives users a
+                    // qualitative read alongside the raw number.
+                    Text(Self.weatherTier(for: moment.switchCount), bundle: .pulse)
+                        .font(.footnote)
+                        .foregroundStyle(PulseDesign.coral.opacity(0.85))
                 }
             }
             CombinationPillFlow(
@@ -7041,6 +7090,24 @@ struct ChaoticMomentCard: View {
             )
         }
         .pulseFeaturedCard()
+    }
+
+    /// Maps the busiest minute's switch count to a "weather" label
+    /// — one localised line that escalates with intensity. The card
+    /// only renders when the count clears `minSwitches: 3` upstream
+    /// so the "light breeze" tier still has something to celebrate;
+    /// the top tier ("an all-out frenzy") deliberately doesn't reuse
+    /// the word "tornado" since the title icon is already
+    /// `tornado`. Same pattern KeyboardPeakCard.Tier and the new
+    /// `clicksNarrative` use.
+    static func weatherTier(for switches: Int) -> LocalizedStringKey {
+        switch switches {
+        case ..<6:    return "a light breeze of switches"
+        case ..<11:   return "a gusty minute"
+        case ..<21:   return "a small storm of switches"
+        case ..<41:   return "a full-blown thunderstorm"
+        default:      return "an all-out switching frenzy"
+        }
     }
 }
 
@@ -7691,12 +7758,74 @@ struct DailyBriefingView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Yesterday in Pulse", bundle: .pulse)
                 .font(.system(.title2, design: .rounded, weight: .semibold))
-            if let day = model.day {
+            // Pre-A33 the subtitle was just a localised date
+            // ("Wed, May 7, 2026") — accurate, dull, no different
+            // tomorrow than today. The briefing is a celebration, so
+            // the subtitle now leads with whichever of yesterday's
+            // numbers can carry a dramatic comparison: distance →
+            // landmark, focus → film/pomodoro/workday, keystrokes →
+            // novella/short story. The date drops to a tertiary line
+            // below so users still have it for orientation.
+            if let summary = model.summary, let day = model.day {
+                if let dramatic = Self.dramaticOpener(summary: summary, focus: model.longestFocus) {
+                    Text(dramatic)
+                        .font(.subheadline)
+                        .foregroundStyle(PulseDesign.coral)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text(Self.headerDateFormatter.string(from: day))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else if let day = model.day {
                 Text(Self.headerDateFormatter.string(from: day))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// Picks the most dramatic single-sentence narrative we can
+    /// truthfully say about yesterday, in priority order:
+    /// distance → focus duration → keystrokes → scrolls. Returns
+    /// `nil` when every available metric is below its narrative
+    /// floor — a genuinely quiet day shouldn't get a forced
+    /// celebration line; the date subtitle still anchors the view.
+    static func dramaticOpener(summary: TodaySummary, focus: FocusSegment?) -> String? {
+        let library = LandmarkLibrary.standard
+        let narrative = NarrativeEngine.standard
+
+        // Distance — most dramatic anchor when present, falls back
+        // to "0 mm = fingernail width" only when meters >= 1 so a
+        // < 1m day doesn't claim a milestone.
+        let meters = summary.totalMouseDistanceMillimeters / 1_000.0
+        if meters >= 1 {
+            let comparison = library.bestMatch(forMeters: meters)
+            return PulseFormat.landmarkComparisonSentence(for: comparison)
+        }
+
+        // Focus segment — use the longest stretch's narrative if
+        // we have one and it's at least a short film's worth.
+        if let focus,
+           focus.durationSeconds >= 15 * 60,
+           let match = narrative.bestMatch(metric: .focusDurationSeconds, value: Double(focus.durationSeconds)) {
+            return PulseFormat.narrativeSentence(for: match)
+        }
+
+        // Keystrokes — a short-story-or-larger headline reads
+        // celebratory; below that the engine returns `nil` and we
+        // fall through.
+        if let match = narrative.bestMatch(metric: .keystrokes, value: Double(summary.totalKeyPresses)) {
+            return PulseFormat.narrativeSentence(for: match)
+        }
+
+        // Scrolls — last fallback before dropping the line
+        // entirely. Anchored at "blog post" so a 30-tick day isn't
+        // overstated.
+        if let match = narrative.bestMatch(metric: .scrollTicks, value: Double(summary.totalScrollTicks)) {
+            return PulseFormat.narrativeSentence(for: match)
+        }
+
+        return nil
     }
 
     private static let headerDateFormatter: DateFormatter = {

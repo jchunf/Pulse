@@ -363,6 +363,104 @@
         }
       }
     },
+    "a quiet pasteboard day": {
+      "comment": "ClipboardCard pace tier — 1–9 changes today.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a quiet pasteboard day" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "安静的剪贴板一天" } }
+      }
+    },
+    "casual copy-paste flow": {
+      "comment": "ClipboardCard pace tier — 10–29 changes today.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "casual copy-paste flow" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "随手剪贴的节奏" } }
+      }
+    },
+    "steady pasteboard work": {
+      "comment": "ClipboardCard pace tier — 30–79 changes today.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "steady pasteboard work" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "稳定的剪贴板工作日" } }
+      }
+    },
+    "a heavy copy-paste day": {
+      "comment": "ClipboardCard pace tier — 80–199 changes today.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a heavy copy-paste day" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重度复制粘贴的一天" } }
+      }
+    },
+    "pasteboard at full throttle": {
+      "comment": "ClipboardCard pace tier — 200+ changes today. Top of the ladder.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "pasteboard at full throttle" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "剪贴板火力全开" } }
+      }
+    },
+    "a light breeze of switches": {
+      "comment": "ChaoticMomentCard weather tier — 3–5 switches in the busiest minute (mild multitasking).",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a light breeze of switches" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "一阵轻风般的切换" } }
+      }
+    },
+    "a gusty minute": {
+      "comment": "ChaoticMomentCard weather tier — 6–10 switches in the busiest minute.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a gusty minute" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "一阵阵风的一分钟" } }
+      }
+    },
+    "a small storm of switches": {
+      "comment": "ChaoticMomentCard weather tier — 11–20 switches in the busiest minute.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a small storm of switches" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "一场小型切换风暴" } }
+      }
+    },
+    "a full-blown thunderstorm": {
+      "comment": "ChaoticMomentCard weather tier — 21–40 switches in the busiest minute.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a full-blown thunderstorm" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "一场名副其实的雷暴" } }
+      }
+    },
+    "an all-out switching frenzy": {
+      "comment": "ChaoticMomentCard weather tier — 41+ switches in the busiest minute. Top of the ladder.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "an all-out switching frenzy" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "一场全面的切换狂潮" } }
+      }
+    },
+    "a steady clicking day": {
+      "comment": "SummaryCardsView Clicks tile narrative — playful pace tier for 500–1,999 clicks. Mirrors the KeyboardPeakCard.Tier ladder.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a steady clicking day" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "节奏稳健的点击日" } }
+      }
+    },
+    "a click-heavy day": {
+      "comment": "SummaryCardsView Clicks tile narrative — playful pace tier for 2,000–4,999 clicks.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a click-heavy day" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "高强度点击日" } }
+      }
+    },
+    "a click hurricane": {
+      "comment": "SummaryCardsView Clicks tile narrative — playful pace tier for 5,000–9,999 clicks.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a click hurricane" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "一场点击风暴" } }
+      }
+    },
+    "a click marathon": {
+      "comment": "SummaryCardsView Clicks tile narrative — playful pace tier for 10,000+ clicks.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a click marathon" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "点击马拉松" } }
+      }
+    },
     "Active time": {
       "localizations": {
         "en": {
