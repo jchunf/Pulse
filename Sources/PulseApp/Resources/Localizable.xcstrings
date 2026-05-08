@@ -622,11 +622,11 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "你的活跃高峰时段。你在 24 小时中的 %lld 个小时段都活跃过。" } }
       }
     },
-    "Not enough data yet.": {
-      "comment": "F-24 YearWrappedView — empty-state placeholder when there's no rolled-up activity.",
+    "Pulse needs a few more hours of recorded activity before it can pick out your peak. Check back at the end of a fuller day.": {
+      "comment": "F-24 YearWrappedView rhythm card — empty-state placeholder shown when there's not enough rolled-up activity to identify a peak hour.",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Not enough data yet." } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "数据还不够。" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Pulse needs a few more hours of recorded activity before it can pick out your peak. Check back at the end of a fuller day." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Pulse 还需要再多记录几个小时的活动才能找出你的高峰时段。等忙完一整天再回来看看吧。" } }
       }
     },
     "Save as image…": {
