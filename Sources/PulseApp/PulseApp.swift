@@ -1842,12 +1842,19 @@ struct DashboardView: View {
                 Text(verbatim: "Pulse \(Self.appVersion)")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                // `TimelineView` so the relative timestamp ticks
+                // forward without the sidebar needing its own
+                // refresh signal — without this the footer reads
+                // "Updated 1 m ago" indefinitely while the data
+                // pane keeps polling.
                 if let last = model.lastRefreshAt {
-                    Text("Updated \(PulseFormat.ago(from: last, to: Date()))", bundle: .pulse)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                        Text("Updated \(PulseFormat.ago(from: last, to: context.date))", bundle: .pulse)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
                 }
             }
             Spacer(minLength: 0)
@@ -2040,14 +2047,24 @@ struct DashboardView: View {
 
     // MARK: - Today pane subviews
 
+    /// Today pane header — locale-aware weekday + date as the
+    /// primary line ("Friday, May 8" / "5月8日 星期五") with a
+    /// `TimelineView` so both the date string (across midnight)
+    /// and the "Updated 5m ago" relative timestamp self-refresh
+    /// every 30 seconds without needing a separate timer or
+    /// observer plumbed through the model. The sidebar already
+    /// labels this section "Today"; the detail header now adds
+    /// the date so the view doesn't read as a tautology.
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Today", bundle: .pulse)
-                .font(.system(.largeTitle, design: .rounded, weight: .semibold))
-            if let last = model.lastRefreshAt {
-                Text("Updated \(PulseFormat.ago(from: last, to: Date()))", bundle: .pulse)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            VStack(alignment: .leading, spacing: 6) {
+                Text(context.date.formatted(.dateTime.weekday(.wide).month().day()))
+                    .font(.system(.largeTitle, design: .rounded, weight: .semibold))
+                if let last = model.lastRefreshAt {
+                    Text("Updated \(PulseFormat.ago(from: last, to: context.date))", bundle: .pulse)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
