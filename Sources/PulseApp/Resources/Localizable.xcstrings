@@ -363,6 +363,34 @@
         }
       }
     },
+    "a steady clicking day": {
+      "comment": "SummaryCardsView Clicks tile narrative — playful pace tier for 500–1,999 clicks. Mirrors the KeyboardPeakCard.Tier ladder.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a steady clicking day" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "节奏稳健的点击日" } }
+      }
+    },
+    "a click-heavy day": {
+      "comment": "SummaryCardsView Clicks tile narrative — playful pace tier for 2,000–4,999 clicks.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a click-heavy day" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "高强度点击日" } }
+      }
+    },
+    "a click hurricane": {
+      "comment": "SummaryCardsView Clicks tile narrative — playful pace tier for 5,000–9,999 clicks.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a click hurricane" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "一场点击风暴" } }
+      }
+    },
+    "a click marathon": {
+      "comment": "SummaryCardsView Clicks tile narrative — playful pace tier for 10,000+ clicks.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a click marathon" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "点击马拉松" } }
+      }
+    },
     "Active time": {
       "localizations": {
         "en": {

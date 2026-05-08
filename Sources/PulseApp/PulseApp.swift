@@ -2829,7 +2829,8 @@ struct SummaryCardsView: View {
             SummaryMetricCard(
                 titleKey: "Clicks",
                 value: PulseFormat.integer(summary.totalMouseClicks),
-                series: trend.map { Double($0.mouseClicks) }
+                series: trend.map { Double($0.mouseClicks) },
+                narrativeSubtitle: clicksNarrative
             )
             SummaryMetricCard(
                 titleKey: "Scrolls",
@@ -2866,6 +2867,23 @@ struct SummaryCardsView: View {
         Self.narrative
             .bestMatch(metric: .scrollTicks, value: Double(summary.totalScrollTicks))
             .map { PulseFormat.narrativeSentence(for: $0) }
+    }
+
+    /// Pace-tier narrative for today's mouse-click count. Mirrors
+    /// the playful tier ladder `KeyboardPeakCard.Tier` uses for KPM
+    /// — the click count itself doesn't have natural content
+    /// anchors the way keystrokes (words) and scroll ticks (pages)
+    /// do, but a pace label is more interesting than a bare number
+    /// once it's high enough to dramatize. Returns `nil` for quiet
+    /// days so the tile doesn't get a forced descriptor on day-zero.
+    private var clicksNarrative: String? {
+        switch summary.totalMouseClicks {
+        case ..<500:    return nil
+        case ..<2_000:  return String(localized: "a steady clicking day", bundle: .pulse)
+        case ..<5_000:  return String(localized: "a click-heavy day", bundle: .pulse)
+        case ..<10_000: return String(localized: "a click hurricane", bundle: .pulse)
+        default:        return String(localized: "a click marathon", bundle: .pulse)
+        }
     }
 }
 
