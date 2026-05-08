@@ -1258,6 +1258,34 @@
         }
       }
     },
+    "Open Settings": {
+      "comment": "DashboardPermissionBanner — short button label that opens the relevant System Settings pane for a missing permission. The row already names the permission, so the button just says 'Open Settings'.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Open Settings" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开系统设置" } }
+      }
+    },
+    "Counts your keystrokes, clicks and scrolls system-wide. Pulse only counts the events — it never records what you type.": {
+      "comment": "DashboardPermissionBanner rationale for Input Monitoring. Mirrors the trust language the onboarding pledge uses.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Counts your keystrokes, clicks and scrolls system-wide. Pulse only counts the events — it never records what you type." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "用来统计你在系统里的按键、点击和滚轮次数。Pulse 只数次数 —— 永远不会记录你输入了什么。" } }
+      }
+    },
+    "Reads which app is in the foreground so Pulse can build your daily ranking. Window titles are hashed before storage.": {
+      "comment": "DashboardPermissionBanner rationale for Accessibility. Mirrors the trust language the onboarding pledge uses.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Reads which app is in the foreground so Pulse can build your daily ranking. Window titles are hashed before storage." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "用来读取当前前台是哪个 App，从而生成每日应用排行。窗口标题在写入磁盘前会做 SHA-256 哈希。" } }
+      }
+    },
+    "Required for one of Pulse's optional features.": {
+      "comment": "DashboardPermissionBanner generic rationale for Calendars / Location / Notifications — used as a fallback so future optional permissions still get a polite explanation in the banner.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Required for one of Pulse's optional features." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Pulse 某个可选功能需要这项权限。" } }
+      }
+    },
     "Open %@ settings": {
       "localizations": {
         "en": {

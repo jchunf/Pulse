@@ -2172,7 +2172,7 @@ struct DashboardPermissionBanner: View {
         if missing.isEmpty {
             EmptyView()
         } else {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(PulseDesign.amber)
@@ -2183,19 +2183,22 @@ struct DashboardPermissionBanner: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 8) {
+                // Each missing permission gets its own row: icon +
+                // name + one-line "why Pulse asks for this" rationale
+                // + Open System Settings button. Pre-A26b the banner
+                // listed the missing permissions as flat buttons in
+                // an HStack with no rationale, so users had to take
+                // it on faith that Pulse needed them — a hard sell
+                // for *Input Monitoring* in particular, the most
+                // sensitive macOS toggle. The rationale strings
+                // mirror the same trust language the onboarding
+                // pledge uses ("never the contents", "only the
+                // count", "hashed before storage") so the user
+                // doesn't get conflicting explanations from two
+                // surfaces.
+                VStack(alignment: .leading, spacing: 10) {
                     ForEach(missing, id: \.self) { permission in
-                        Button {
-                            if let url = permission.systemSettingsURL {
-                                NSWorkspace.shared.open(url)
-                            }
-                        } label: {
-                            Label {
-                                Text("Open \(localizedPermissionName(permission))", bundle: .pulse)
-                            } icon: {
-                                Image(systemName: "arrow.up.forward.app")
-                            }
-                        }
+                        permissionRow(permission)
                     }
                 }
             }
@@ -2209,6 +2212,69 @@ struct DashboardPermissionBanner: View {
                 RoundedRectangle(cornerRadius: PulseDesign.cardCornerRadius)
                     .strokeBorder(PulseDesign.amber.opacity(0.25), lineWidth: 0.5)
             )
+        }
+    }
+
+    @ViewBuilder
+    private func permissionRow(_ permission: Permission) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: Self.icon(for: permission))
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(PulseDesign.amber)
+                .frame(width: 24)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(localizedPermissionName(permission))
+                    .font(.subheadline.weight(.semibold))
+                Text(Self.rationaleKey(for: permission), bundle: .pulse)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Button {
+                if let url = permission.systemSettingsURL {
+                    NSWorkspace.shared.open(url)
+                }
+            } label: {
+                Label {
+                    Text("Open Settings", bundle: .pulse)
+                } icon: {
+                    Image(systemName: "arrow.up.forward.app")
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
+
+    /// SF Symbol per permission. Picked to telegraph the *kind* of
+    /// access being requested rather than the macOS pref-pane glyph
+    /// (the pref-pane glyphs are tiny and read as "system" rather
+    /// than as the input/observation domain Pulse uses them for).
+    private static func icon(for permission: Permission) -> String {
+        switch permission {
+        case .inputMonitoring: return "keyboard"
+        case .accessibility:   return "rectangle.on.rectangle"
+        case .calendars:       return "calendar"
+        case .location:        return "location"
+        case .notifications:   return "bell"
+        }
+    }
+
+    /// One-line "why Pulse asks for this" rationale per permission.
+    /// Returned as a `LocalizedStringKey` so the catalog handles
+    /// en + zh-Hans. Phrased to match the trust language the
+    /// onboarding pledge already uses so the user doesn't get
+    /// conflicting explanations from two surfaces.
+    private static func rationaleKey(for permission: Permission) -> LocalizedStringKey {
+        switch permission {
+        case .inputMonitoring:
+            return "Counts your keystrokes, clicks and scrolls system-wide. Pulse only counts the events — it never records what you type."
+        case .accessibility:
+            return "Reads which app is in the foreground so Pulse can build your daily ranking. Window titles are hashed before storage."
+        case .calendars, .location, .notifications:
+            return "Required for one of Pulse's optional features."
         }
     }
 }
