@@ -2699,15 +2699,28 @@ struct SummaryMetricCard: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
-            if showSparkline {
-                ZStack(alignment: .bottom) {
+            // Always reserve the 22pt chart slot so all six summary
+            // tiles line up to the same height, regardless of which
+            // ones have usable trend data. Tiles with data render
+            // the coral line + soft fill; tiles without (Active
+            // time today, or first-day installs where every series
+            // is < 2 points) render a thin warm-gray baseline so
+            // the slot reads as "chart will appear once Pulse has
+            // more days of data" rather than as a missing element
+            // that breaks the grid's rhythm.
+            ZStack(alignment: .bottom) {
+                if showSparkline {
                     Sparkline(points: series, closed: true)
                         .fill(PulseDesign.coral.opacity(0.10))
                     Sparkline(points: series, closed: false)
                         .stroke(PulseDesign.coral, style: StrokeStyle(lineWidth: 1.2, lineJoin: .round))
+                } else {
+                    Rectangle()
+                        .fill(PulseDesign.warmGray(0.18))
+                        .frame(height: 1)
                 }
-                .frame(height: 22)
             }
+            .frame(height: 22)
         }
         .padding(PulseDesign.cardPadding * 0.7)
         .frame(maxWidth: .infinity, alignment: .leading)
