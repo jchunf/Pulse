@@ -3797,12 +3797,26 @@ struct FocusDonutCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "chart.pie")
-                    .foregroundStyle(PulseDesign.coral)
-                    .opacity(0.85)
-                Text("Focus breakdown", bundle: .pulse)
-                    .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: pre-A29 the card showed only
+            // a "Focus breakdown" title. The four donut segments —
+            // Communication / Creation / Browsing / Other — are
+            // auto-classified from each app's bundle id by
+            // `AppCategoryClassifier`, so a user looking at a
+            // slice labelled "Communication" had no on-card hint
+            // for which apps fell into it. The subtitle now grounds
+            // the categorisation source.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "chart.pie")
+                        .foregroundStyle(PulseDesign.coral)
+                        .opacity(0.85)
+                    Text("Focus breakdown", bundle: .pulse)
+                        .font(PulseDesign.cardTitleFont)
+                }
+                Text("Today's foreground time, grouped automatically by the kind of app you were in.", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             HStack(alignment: .top, spacing: 24) {
                 FocusDonutShape(donut: donut)

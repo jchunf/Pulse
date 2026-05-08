@@ -4744,6 +4744,23 @@
         }
       }
     },
+    "Today's foreground time, grouped automatically by the kind of app you were in.": {
+      "comment": "FocusDonutCard subtitle — explains that the four donut categories (Communication / Creation / Browsing / Other) are auto-classified from each app's bundle id by AppCategoryClassifier, so users don't have to wonder which apps fell into which slice.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today's foreground time, grouped automatically by the kind of app you were in."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天的前台时间，按你使用的 App 类型自动分组。"
+          }
+        }
+      }
+    },
     "Typical day: about %lld key presses. Today: %lld.": {
       "comment": "A27 InsightsCard — activity anomaly body. Args: median keys, today keys.",
       "localizations": {
