@@ -1723,6 +1723,23 @@
         }
       }
     },
+    "Set a daily target — Pulse will track progress toward it here.": {
+      "comment": "GoalsDiscoveryNudge — quiet day-zero row that telegraphs the existence of the Goals feature when the user hasn't enabled any preset goals. Lives on the Dashboard's Today pane, replaces the empty space `GoalsCard` used to leave behind.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set a daily target — Pulse will track progress toward it here."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置一个每日目标 —— Pulse 会在这里显示你的进度。"
+          }
+        }
+      }
+    },
     "Settings": {
       "localizations": {
         "en": {

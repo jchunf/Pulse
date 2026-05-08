@@ -1978,6 +1978,15 @@ struct DashboardView: View {
         }
         if !model.goalProgress.isEmpty {
             GoalsCard(progress: model.goalProgress)
+        } else {
+            // Day-zero / never-configured users used to see nothing
+            // here, so the entire Goals feature was undiscoverable
+            // unless they happened to scroll Settings far enough to
+            // find it. The discovery nudge is a single quiet row
+            // that points at Settings → Goals; once any goal is
+            // enabled the row collapses (the populated `GoalsCard`
+            // takes its place above).
+            GoalsDiscoveryNudge()
         }
         todayPulseSection(summary: summary)
         if !model.insights.isEmpty {
@@ -2535,6 +2544,50 @@ struct GoalsCard: View {
             }
         }
         .pulseFeaturedCard()
+    }
+}
+
+/// Day-zero / never-configured replacement for `GoalsCard`. Up to
+/// A28, the Goals feature only manifested on the Dashboard *after*
+/// the user found Settings → Goals and toggled at least one preset —
+/// the dashboard surface itself never told them the feature existed.
+/// This nudge is the single quiet row that bridges that gap: it's
+/// not a full card, it doesn't shout, but it's enough to telegraph
+/// "you can set a daily target" + give a one-click route there.
+///
+/// The row collapses naturally as soon as any goal is enabled
+/// (the populated `GoalsCard` takes its place upstream), so users
+/// who do opt in never see it again.
+struct GoalsDiscoveryNudge: View {
+
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: "target")
+                .foregroundStyle(PulseDesign.coral.opacity(0.85))
+                .font(.system(size: 14, weight: .medium))
+            Text("Set a daily target — Pulse will track progress toward it here.", bundle: .pulse)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            Button {
+                openSettings()
+                NSApp.activate(ignoringOtherApps: true)
+            } label: {
+                Text("Open Settings", bundle: .pulse)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(PulseDesign.warmGray(0.05))
+        )
     }
 }
 
