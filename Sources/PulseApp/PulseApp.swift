@@ -2446,6 +2446,15 @@ struct MileageHeroCard: View {
     var body: some View {
         let meters = distanceMillimeters / 1_000.0
         let comparison = library.bestMatch(forMeters: meters)
+        // Day-zero installs (or first wake-up of a new day) hit
+        // this card with `distanceMillimeters == 0`. Pre-A27 the
+        // hero rendered "0 mm" + a `landmarkComparisonSentence`
+        // that resolved to "Less than 1% of a fingernail's width" —
+        // a sad, slightly absurd reading that made the dashboard
+        // feel broken on the first launch. Below 1 mm we now skip
+        // the hero number entirely and show a warmer placeholder
+        // line that tells the user what to do next.
+        let isQuietStart = distanceMillimeters < 1
 
         ZStack(alignment: .topTrailing) {
             // Concentric-circle heartbeat accent in the top-right,
@@ -2458,15 +2467,26 @@ struct MileageHeroCard: View {
                     .font(PulseDesign.labelFont)
                     .tracking(0.4)
                     .foregroundStyle(.secondary)
-                Text(PulseFormat.distance(millimeters: distanceMillimeters))
-                    .font(PulseDesign.heroFont)
-                    .monospacedDigit()
-                    .foregroundStyle(PulseDesign.coral)
-                Text(PulseFormat.landmarkComparisonSentence(for: comparison))
-                    .font(.title3)
-                    .foregroundStyle(.primary)
-                    .opacity(0.75)
-                    .fixedSize(horizontal: false, vertical: true)
+                if isQuietStart {
+                    Text("—")
+                        .font(PulseDesign.heroFont)
+                        .monospacedDigit()
+                        .foregroundStyle(PulseDesign.coral.opacity(0.45))
+                    Text("Pulse hasn't logged any cursor moves yet today. Move the mouse around — the number fills in within a minute.", bundle: .pulse)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text(PulseFormat.distance(millimeters: distanceMillimeters))
+                        .font(PulseDesign.heroFont)
+                        .monospacedDigit()
+                        .foregroundStyle(PulseDesign.coral)
+                    Text(PulseFormat.landmarkComparisonSentence(for: comparison))
+                        .font(.title3)
+                        .foregroundStyle(.primary)
+                        .opacity(0.75)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .pulseHeroCard()

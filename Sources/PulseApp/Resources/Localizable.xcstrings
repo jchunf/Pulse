@@ -559,6 +559,13 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "总按键数" } }
       }
     },
+    "Pulse hasn't logged any cursor moves yet today. Move the mouse around — the number fills in within a minute.": {
+      "comment": "MileageHeroCard day-zero placeholder — replaces the '0 mm + tiny-fraction-of-a-fingernail' reading that made a fresh dashboard feel broken.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Pulse hasn't logged any cursor moves yet today. Move the mouse around — the number fills in within a minute." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Pulse 今天还没记录到光标移动。移动一下鼠标，数字会在一分钟内出现。" } }
+      }
+    },
     "Keystrokes + clicks per day": {
       "comment": "WeekTrendChart subtitle — explains what the y-axis is plotting so the chart is self-documenting.",
       "localizations": {
