@@ -6895,6 +6895,39 @@ struct SettingsView: View {
                 Text("Dashboard", bundle: .pulse)
             }
 
+            // Privacy promoted to second-from-top in A27. The
+            // section used to sit below Goals / Alerts / Recap,
+            // which buried the trust story under personalisation
+            // settings — and Privacy is the *first* concern users
+            // come to a Settings window with for an app that
+            // observes their input. Moving it up signals that
+            // Pulse takes the question seriously, and the two
+            // actions here ("Show what Pulse has recorded…" /
+            // "Clear data in a time range…") are the most
+            // affirmative answers to it.
+            Section {
+                Button(action: onOpenPrivacyAudit) {
+                    Text("Show what Pulse has recorded…", bundle: .pulse)
+                }
+                Button(role: .destructive) {
+                    isPresentingPurgeSheet = true
+                } label: {
+                    Text("Clear data in a time range…", bundle: .pulse)
+                }
+            } header: {
+                Text("Privacy", bundle: .pulse)
+            } footer: {
+                Text("Opens a window that lists the raw row counts and the full system-event log from the past hour — read live from Pulse's local data file.", bundle: .pulse)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .sheet(isPresented: $isPresentingPurgeSheet) {
+                RangePurgeSheet(
+                    onPurgeRange: onPurgeRange,
+                    onDismiss: { isPresentingPurgeSheet = false }
+                )
+            }
+
             Section {
                 ForEach(GoalPresets.all) { preset in
                     Toggle(isOn: Binding(
@@ -6962,29 +6995,6 @@ struct SettingsView: View {
                 Text("Year-to-date totals — keystrokes, mouse distance, top apps, longest focus session — rendered as a single page you can save as an image.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-            }
-
-            Section {
-                Button(action: onOpenPrivacyAudit) {
-                    Text("Show what Pulse has recorded…", bundle: .pulse)
-                }
-                Button(role: .destructive) {
-                    isPresentingPurgeSheet = true
-                } label: {
-                    Text("Clear data in a time range…", bundle: .pulse)
-                }
-            } header: {
-                Text("Privacy", bundle: .pulse)
-            } footer: {
-                Text("Opens a window that lists the raw row counts and the full system-event log from the past hour — read live from Pulse's local data file.", bundle: .pulse)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .sheet(isPresented: $isPresentingPurgeSheet) {
-                RangePurgeSheet(
-                    onPurgeRange: onPurgeRange,
-                    onDismiss: { isPresentingPurgeSheet = false }
-                )
             }
 
             Section {
