@@ -6649,7 +6649,7 @@ struct AppCombinationsCard: View {
                 Image(systemName: "square.stack.3d.up")
                     .foregroundStyle(PulseDesign.coral)
                     .opacity(0.85)
-                Text("App combinations today", bundle: .pulse)
+                Text("Apps you used together today", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
             Text("Apps you cycled through in the same 10-minute window.", bundle: .pulse)

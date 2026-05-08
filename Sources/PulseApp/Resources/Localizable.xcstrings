@@ -804,19 +804,19 @@
         }
       }
     },
-    "App combinations today": {
-      "comment": "F-14 AppCombinationsCard — card title. Replaces the older 'Work stacks today' which used the abstract metaphor 'stack'.",
+    "Apps you used together today": {
+      "comment": "F-14 AppCombinationsCard — card title. Replaces the older 'App combinations today' which led with the engineer-y noun 'combination'; the new phrasing reads as a question the user might ask themselves.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "App combinations today"
+            "value": "Apps you used together today"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "今日同时使用的 App 组合"
+            "value": "今天一起使用的 App"
           }
         }
       }
