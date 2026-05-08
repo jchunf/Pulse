@@ -363,6 +363,41 @@
         }
       }
     },
+    "a light breeze of switches": {
+      "comment": "ChaoticMomentCard weather tier — 3–5 switches in the busiest minute (mild multitasking).",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a light breeze of switches" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "一阵轻风般的切换" } }
+      }
+    },
+    "a gusty minute": {
+      "comment": "ChaoticMomentCard weather tier — 6–10 switches in the busiest minute.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a gusty minute" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "一阵阵风的一分钟" } }
+      }
+    },
+    "a small storm of switches": {
+      "comment": "ChaoticMomentCard weather tier — 11–20 switches in the busiest minute.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a small storm of switches" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "一场小型切换风暴" } }
+      }
+    },
+    "a full-blown thunderstorm": {
+      "comment": "ChaoticMomentCard weather tier — 21–40 switches in the busiest minute.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a full-blown thunderstorm" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "一场名副其实的雷暴" } }
+      }
+    },
+    "an all-out switching frenzy": {
+      "comment": "ChaoticMomentCard weather tier — 41+ switches in the busiest minute. Top of the ladder.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "an all-out switching frenzy" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "一场全面的切换狂潮" } }
+      }
+    },
     "a steady clicking day": {
       "comment": "SummaryCardsView Clicks tile narrative — playful pace tier for 500–1,999 clicks. Mirrors the KeyboardPeakCard.Tier ladder.",
       "localizations": {

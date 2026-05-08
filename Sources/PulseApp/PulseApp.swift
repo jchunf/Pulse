@@ -7051,6 +7051,13 @@ struct ChaoticMomentCard: View {
                         )
                     )
                     .font(.footnote.monospacedDigit())
+                    // Playful weather-tier descriptor escalates with
+                    // the switch count. Keeps the whimsical "tornado"
+                    // motif of the title icon and gives users a
+                    // qualitative read alongside the raw number.
+                    Text(Self.weatherTier(for: moment.switchCount), bundle: .pulse)
+                        .font(.footnote)
+                        .foregroundStyle(PulseDesign.coral.opacity(0.85))
                 }
             }
             CombinationPillFlow(
@@ -7059,6 +7066,24 @@ struct ChaoticMomentCard: View {
             )
         }
         .pulseFeaturedCard()
+    }
+
+    /// Maps the busiest minute's switch count to a "weather" label
+    /// — one localised line that escalates with intensity. The card
+    /// only renders when the count clears `minSwitches: 3` upstream
+    /// so the "light breeze" tier still has something to celebrate;
+    /// the top tier ("an all-out frenzy") deliberately doesn't reuse
+    /// the word "tornado" since the title icon is already
+    /// `tornado`. Same pattern KeyboardPeakCard.Tier and the new
+    /// `clicksNarrative` use.
+    static func weatherTier(for switches: Int) -> LocalizedStringKey {
+        switch switches {
+        case ..<6:    return "a light breeze of switches"
+        case ..<11:   return "a gusty minute"
+        case ..<21:   return "a small storm of switches"
+        case ..<41:   return "a full-blown thunderstorm"
+        default:      return "an all-out switching frenzy"
+        }
     }
 }
 
