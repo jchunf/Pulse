@@ -1431,6 +1431,23 @@
         }
       }
     },
+    "Patterns Pulse noticed in today's activity, compared to your usual rhythm.": {
+      "comment": "InsightsCard subtitle — explains what the rows are (anomaly / standout patterns surfaced by NarrativeEngine vs the user's rolling baseline) so first-time users know why each row appeared.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Patterns Pulse noticed in today's activity, compared to your usual rhythm."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse 在今天的活动里发现的模式，对比你的日常节奏。"
+          }
+        }
+      }
+    },
     "Paused": {
       "localizations": {
         "en": {

@@ -3459,11 +3459,23 @@ struct InsightsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "sparkles")
-                    .foregroundStyle(PulseDesign.coral)
-                Text("Today's insights", bundle: .pulse)
-                    .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: pre-A29 the card had a lone
+            // "Today's insights" title, leaving first-time users
+            // unsure where the rows came from. The subtitle now
+            // grounds the source: each row is something Pulse
+            // *noticed* against the user's recent rhythm, not a
+            // raw stat reproduced from elsewhere on the dashboard.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(PulseDesign.coral)
+                    Text("Today's insights", bundle: .pulse)
+                        .font(PulseDesign.cardTitleFont)
+                }
+                Text("Patterns Pulse noticed in today's activity, compared to your usual rhythm.", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             VStack(alignment: .leading, spacing: 14) {
                 ForEach(Array(insights.prefix(Self.visibleLimit))) { insight in
