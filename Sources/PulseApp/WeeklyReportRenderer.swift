@@ -41,7 +41,8 @@ enum WeeklyReportRenderer {
             generatedFooter: String.localizedStringWithFormat(
                 String(localized: "weekly.report.generated", bundle: .pulse),
                 formatDate(Date(), style: .medium)
-            )
+            ),
+            busiestDayHighlight: busiestDayHighlight(for: report)
         )
 
         let formatters = WeeklyReportHTMLRenderer.Formatters(
@@ -75,6 +76,31 @@ enum WeeklyReportRenderer {
     }
 
     // MARK: - Helpers
+
+    /// One-line "busiest day" highlight that the HTML renderer drops
+    /// inside the hero card right under the landmark sentence. Picks the
+    /// day in `report.days` with the largest sum of intentional events
+    /// (key presses + mouse clicks). Returns `nil` when every day in
+    /// the window is empty — the renderer suppresses the highlight slot
+    /// entirely in that case so a quiet week doesn't get a hollow
+    /// celebration.
+    private static func busiestDayHighlight(for report: WeeklyReport) -> String? {
+        guard let busiest = report.days
+            .max(by: { lhs, rhs in
+                (lhs.keyPresses + lhs.mouseClicks) < (rhs.keyPresses + rhs.mouseClicks)
+            }),
+            (busiest.keyPresses + busiest.mouseClicks) > 0
+        else {
+            return nil
+        }
+        let total = busiest.keyPresses + busiest.mouseClicks
+        let dayString = formatDayShort(busiest.day)
+        return String.localizedStringWithFormat(
+            String(localized: "Busiest day: %1$@ — %2$@ keystrokes + clicks combined.", bundle: .pulse),
+            dayString,
+            PulseFormat.integer(total)
+        )
+    }
 
     private static func formatDate(_ date: Date, style: DateFormatter.Style) -> String {
         let formatter = DateFormatter()

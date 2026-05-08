@@ -27,6 +27,12 @@ public struct WeeklyReportHTMLRenderer: Sendable {
         public let secondsHeader: String
         public let landmarkSentence: String
         public let generatedFooter: String
+        /// Optional one-line "highlight" the renderer splats inside the
+        /// hero block right under the landmark sentence — e.g.
+        /// "Busiest day: Wednesday with 12,450 events". `nil` (the
+        /// default) suppresses the line entirely so callers and tests
+        /// that don't compute one keep their existing behaviour.
+        public let busiestDayHighlight: String?
 
         public init(
             title: String,
@@ -42,7 +48,8 @@ public struct WeeklyReportHTMLRenderer: Sendable {
             appHeader: String,
             secondsHeader: String,
             landmarkSentence: String,
-            generatedFooter: String
+            generatedFooter: String,
+            busiestDayHighlight: String? = nil
         ) {
             self.title = title
             self.subtitle = subtitle
@@ -58,6 +65,7 @@ public struct WeeklyReportHTMLRenderer: Sendable {
             self.secondsHeader = secondsHeader
             self.landmarkSentence = landmarkSentence
             self.generatedFooter = generatedFooter
+            self.busiestDayHighlight = busiestDayHighlight
         }
     }
 
@@ -115,6 +123,22 @@ public struct WeeklyReportHTMLRenderer: Sendable {
             """
         }.joined(separator: "\n")
 
+        // The "highlight" line under the hero only renders when the
+        // caller supplies one — pre-A28 there was nothing between the
+        // landmark sentence and the KPI grid, so the report jumped
+        // straight from "you walked X km" to a stat dump. The new
+        // optional highlight slot lets the App-layer wrapper splat
+        // in a one-line story ("Busiest day: Wednesday with 12,450
+        // events") without forcing every test fixture to compute one.
+        let highlightHTML: String
+        if let highlight = strings.busiestDayHighlight, !highlight.isEmpty {
+            highlightHTML = """
+              <div class="highlight">\(escape(highlight))</div>
+            """
+        } else {
+            highlightHTML = ""
+        }
+
         return """
         <!DOCTYPE html>
         <html lang="en">
@@ -128,20 +152,36 @@ public struct WeeklyReportHTMLRenderer: Sendable {
               background: #0f1115; color: #e7eaef;
             }
             h1 { font-size: 28px; margin: 0 0 6px; }
-            h2 { font-size: 18px; margin: 24px 0 8px; color: #e7eaef; }
+            /* h2 picks up a coral accent to give the report a visible
+               rhythm — pre-A28 every section heading rendered in the
+               same off-white as body text, so the eye had no anchor
+               between the hero and the tables. */
+            h2 { font-size: 18px; margin: 28px 0 10px; color: #ff9b80; font-weight: 600; }
             p.subtitle { color: #9098a6; margin: 0 0 24px; }
             .hero {
               background: linear-gradient(135deg, rgba(255,127,80,0.18), rgba(255,127,80,0.04));
               border: 1px solid rgba(255,127,80,0.35);
+              border-left: 3px solid rgba(255,127,80,0.85);
               border-radius: 12px;
-              padding: 20px; margin: 24px 0;
+              padding: 22px 24px; margin: 24px 0;
             }
-            .hero .big { font-size: 44px; font-weight: 600; letter-spacing: -0.5px; }
+            .hero .big { font-size: 48px; font-weight: 600; letter-spacing: -0.5px; }
             .hero .sub { color: #c0c7d2; margin-top: 8px; }
+            /* Highlight callout sits between the landmark sentence and
+               the KPI grid. Coral text + slightly stronger weight so
+               it reads as the report's takeaway, not an afterthought. */
+            .hero .highlight {
+              color: #ff9b80;
+              font-size: 14px;
+              font-weight: 500;
+              margin-top: 14px;
+              padding-top: 12px;
+              border-top: 1px solid rgba(255,127,80,0.20);
+            }
             .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0; }
             .kpi { background: #171b22; border-radius: 8px; padding: 14px; }
             .kpi .label { color: #9098a6; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
-            .kpi .value { font-size: 22px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
+            .kpi .value { font-size: 22px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; color: #ff9b80; }
             table { width: 100%; border-collapse: collapse; background: #171b22; border-radius: 8px; overflow: hidden; }
             th, td { padding: 10px 14px; border-bottom: 1px solid #222831; text-align: left; font-size: 14px; }
             th { background: #1d222a; color: #9098a6; font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -156,6 +196,7 @@ public struct WeeklyReportHTMLRenderer: Sendable {
           <div class="hero">
             <div class="big">\(escape(formatters.distance(report.totalDistanceMillimeters)))</div>
             <div class="sub">\(escape(strings.landmarkSentence))</div>
+        \(highlightHTML)
           </div>
 
           <div class="kpis">

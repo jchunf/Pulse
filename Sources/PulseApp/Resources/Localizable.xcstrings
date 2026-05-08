@@ -631,6 +631,23 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "最忙的一天" } }
       }
     },
+    "Busiest day: %1$@ — %2$@ keystrokes + clicks combined.": {
+      "comment": "Weekly HTML report — one-line highlight inside the hero. %1$@ is a localized weekday + date, %2$@ is the formatted sum of keystrokes + clicks. Positional specifiers because zh-Hans reorders the clauses.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Busiest day: %1$@ — %2$@ keystrokes + clicks combined."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最忙的一天：%1$@ —— 按键 + 点击合计 %2$@ 次。"
+          }
+        }
+      }
+    },
     "%@ keystrokes + clicks combined.": {
       "comment": "F-24 YearWrappedView — busiest-day subtitle. %@ formatted total event count.",
       "localizations": {
