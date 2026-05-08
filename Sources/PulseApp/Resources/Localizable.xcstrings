@@ -4021,34 +4021,35 @@
         }
       }
     },
-    "All raw data stays inside ~/Library/Application Support/Pulse/. Nothing is ever uploaded.": {
+    "All raw data stays in Pulse's private folder on your Mac. Nothing is ever uploaded.": {
+      "comment": "Onboarding privacy pledge — storage location bullet. De-jargoned from the previous '~/Library/Application Support/Pulse/' filesystem path so users without macOS-internals knowledge can still parse the promise.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "All raw data stays inside ~/Library/Application Support/Pulse/. Nothing is ever uploaded."
+            "value": "All raw data stays in Pulse's private folder on your Mac. Nothing is ever uploaded."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "所有原始数据保留在 ~/Library/Application Support/Pulse/，永远不会上传。"
+            "value": "所有原始数据都保留在 Pulse 的本地私有文件夹里，永远不会上传。"
           }
         }
       }
     },
-    "No keystroke contents — only press counts. By default the key code is not stored either.": {
+    "No keystroke contents — only press counts. By default the key code itself isn't stored either.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No keystroke contents — only press counts. By default the key code is not stored either."
+            "value": "No keystroke contents — only press counts. By default the key code itself isn't stored either."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "不记录按键内容——只记录按键次数。默认情况下连键码也不存。"
+            "value": "不记录按键内容 —— 只记录按键次数。默认连键码本身也不存。"
           }
         }
       }
@@ -4070,18 +4071,19 @@
         }
       }
     },
-    "Window titles are SHA-256 hashed before being persisted.": {
+    "Window titles are hashed before they're written to disk, so Pulse can count app switches without storing what was on the screen.": {
+      "comment": "Onboarding privacy pledge — window-title hashing bullet. Reworded to explain *why* hashing is in the pipeline; the previous 'SHA-256 hashed' phrasing was technically precise but offered no narrative for users unfamiliar with the term.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Window titles are SHA-256 hashed before being persisted."
+            "value": "Window titles are hashed before they're written to disk, so Pulse can count app switches without storing what was on the screen."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "窗口标题在落盘前会被 SHA-256 哈希。"
+            "value": "窗口标题在写入磁盘前会先经过哈希，让 Pulse 可以统计 App 切换次数，但不会存下你屏幕上显示的内容。"
           }
         }
       }
