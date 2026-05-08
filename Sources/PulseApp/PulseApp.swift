@@ -4654,12 +4654,22 @@ struct ContinuityCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "square.grid.3x3.topleft.filled")
-                    .foregroundStyle(PulseDesign.sage)
-                    .opacity(hasAnyActivity ? 0.85 : 0.35)
-                Text("Continuity", bundle: .pulse)
-                    .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: "Continuity" alone is abstract —
+            // a new user has to read the whole card to learn that the
+            // streak counts days with at least 4 active hours. The
+            // subtitle now spells the qualification rule out so
+            // the streak number above is unambiguous.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "square.grid.3x3.topleft.filled")
+                        .foregroundStyle(PulseDesign.sage)
+                        .opacity(hasAnyActivity ? 0.85 : 0.35)
+                    Text("Continuity", bundle: .pulse)
+                        .font(PulseDesign.cardTitleFont)
+                }
+                Text("Days in a row with 4+ active hours", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             if let streak, hasAnyActivity {
                 filled(streak)
@@ -4679,10 +4689,24 @@ struct ContinuityCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(streak.currentStreak)")
-                        .font(PulseDesign.heroSecondaryFont)
-                        .monospacedDigit()
-                        .foregroundStyle(streak.currentStreak > 0 ? PulseDesign.sage : .secondary)
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("\(streak.currentStreak)")
+                            .font(PulseDesign.heroSecondaryFont)
+                            .monospacedDigit()
+                            .foregroundStyle(streak.currentStreak > 0 ? PulseDesign.sage : .secondary)
+                        // Milestone flame: subtle once the streak
+                        // crosses a full week, gains weight + colour
+                        // shift at fortnight + month thresholds. The
+                        // flame replaces nothing — the number stays
+                        // exactly where it was — so users with short
+                        // streaks see no visual change.
+                        if let tier = Self.milestoneTier(for: streak.currentStreak) {
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: tier.glyphSize, weight: .medium))
+                                .foregroundStyle(tier.glyphColor)
+                                .help(Text(tier.helpKey, bundle: .pulse))
+                        }
+                    }
                     Text("current streak", bundle: .pulse)
                         .font(PulseDesign.labelFont)
                         .tracking(0.3)
@@ -4818,6 +4842,52 @@ struct ContinuityCard: View {
             return PulseDesign.sage.opacity(0.75)
         } else {
             return PulseDesign.sage
+        }
+    }
+
+    /// Three-tier streak milestone — week / fortnight / month — that
+    /// drives the small flame the card now renders next to the streak
+    /// number. Returns `nil` for streaks under a week so users with
+    /// short runs see no visual change. Glyph size and colour escalate
+    /// at each tier so a 30-day streak feels measurably more
+    /// celebrated than a 7-day one.
+    static func milestoneTier(for streak: Int) -> StreakTier? {
+        switch streak {
+        case ..<7:    return nil
+        case 7..<14:  return .weekly
+        case 14..<30: return .fortnight
+        default:      return .monthly
+        }
+    }
+
+    /// Visual specification per milestone tier. Held alongside the
+    /// `milestoneTier` switch so a future 100-day tier or similar
+    /// drops in by adding one case + one entry here.
+    enum StreakTier {
+        case weekly, fortnight, monthly
+
+        var glyphSize: CGFloat {
+            switch self {
+            case .weekly:    return 16
+            case .fortnight: return 18
+            case .monthly:   return 22
+            }
+        }
+
+        var glyphColor: Color {
+            switch self {
+            case .weekly:    return PulseDesign.sage
+            case .fortnight: return PulseDesign.coral.opacity(0.85)
+            case .monthly:   return PulseDesign.coral
+            }
+        }
+
+        var helpKey: LocalizedStringKey {
+            switch self {
+            case .weekly:    return "A full week-long streak — keep going."
+            case .fortnight: return "Two weeks in a row — that's the new normal now."
+            case .monthly:   return "A whole month of qualifying days. Rare and earned."
+            }
         }
     }
 }

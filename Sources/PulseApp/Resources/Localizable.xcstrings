@@ -547,6 +547,34 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "和 Pulse 一起的天数" } }
       }
     },
+    "Days in a row with 4+ active hours": {
+      "comment": "ContinuityCard subtitle — explains the qualification rule the streak counter is built on.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Days in a row with 4+ active hours" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "连续保持每天活跃 4 小时以上" } }
+      }
+    },
+    "A full week-long streak — keep going.": {
+      "comment": "ContinuityCard milestone tooltip — first tier (current streak ≥ 7 days).",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "A full week-long streak — keep going." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已经连续一整周 —— 继续保持。" } }
+      }
+    },
+    "Two weeks in a row — that's the new normal now.": {
+      "comment": "ContinuityCard milestone tooltip — second tier (current streak ≥ 14 days).",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Two weeks in a row — that's the new normal now." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "连续两周 —— 这已经成了你的新常态。" } }
+      }
+    },
+    "A whole month of qualifying days. Rare and earned.": {
+      "comment": "ContinuityCard milestone tooltip — third tier (current streak ≥ 30 days).",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "A whole month of qualifying days. Rare and earned." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "整整一个月每天都达标 —— 难得，也是你应得的。" } }
+      }
+    },
     "Recording since %@.": {
       "comment": "F-24 YearWrappedView — days-active subtitle. %@ short date of first event in the year.",
       "localizations": {
