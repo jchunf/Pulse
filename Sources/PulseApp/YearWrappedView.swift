@@ -307,9 +307,10 @@ struct YearWrappedView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             } else {
-                Text("Not enough data yet.", bundle: .pulse)
-                    .font(.title3)
+                Text("Pulse needs a few more hours of recorded activity before it can pick out your peak. Check back at the end of a fuller day.", bundle: .pulse)
+                    .font(.body)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

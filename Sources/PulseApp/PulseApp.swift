@@ -1467,47 +1467,50 @@ struct HealthMenuView: View {
                     .buttonStyle(.plain)
                     .keyboardShortcut("q")
                 }
-                // Evenly distribute the secondary actions across the
-                // full row — first/last button sit flush with the main
-                // CTA edges above, matching their visual column. A
-                // trailing `Spacer()` left them clumped on the left,
-                // which read as an alignment bug against the wide
-                // row above.
-                HStack(spacing: 0) {
-                    Button(action: onShowBriefing) {
-                        Text("Yesterday's briefing", bundle: .pulse)
-                            .font(.footnote)
+                // Five secondary actions used to crowd one HStack with
+                // `.foregroundStyle(.secondary)` applied to every label.
+                // The result read as disabled meta-info rather than a
+                // toolbox — half the people the menu-bar was actually
+                // for missed that "Yesterday's briefing" was clickable.
+                // Reworked into two rows of icon+label chips: a leading
+                // SF Symbol gives each action a strong affordance, the
+                // text drops back to `.primary` so it looks alive, and
+                // splitting 5 actions across 2 rows fits the 360 pt
+                // popover without truncating labels in zh-Hans.
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 0) {
+                        menuBarSecondaryAction(
+                            titleKey: "Yesterday's briefing",
+                            systemImage: "sun.haze",
+                            action: onShowBriefing
+                        )
+                        Spacer(minLength: 8)
+                        menuBarSecondaryAction(
+                            titleKey: "Generate weekly report",
+                            systemImage: "calendar",
+                            action: onGenerateReport
+                        )
+                        Spacer(minLength: 8)
+                        menuBarSecondaryAction(
+                            titleKey: "Weekly PDF…",
+                            systemImage: "doc.richtext",
+                            action: onGenerateReportPDF
+                        )
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    Spacer(minLength: 8)
-                    Button(action: onGenerateReport) {
-                        Text("Generate weekly report", bundle: .pulse)
-                            .font(.footnote)
+                    HStack(spacing: 0) {
+                        menuBarSecondaryAction(
+                            titleKey: "Export data…",
+                            systemImage: "square.and.arrow.up",
+                            action: onExportData
+                        )
+                        Spacer(minLength: 8)
+                        menuBarSecondaryAction(
+                            titleKey: "Check for updates…",
+                            systemImage: "arrow.triangle.2.circlepath",
+                            action: onCheckForUpdates
+                        )
+                        Spacer(minLength: 0)
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    Spacer(minLength: 8)
-                    Button(action: onGenerateReportPDF) {
-                        Text("Weekly PDF…", bundle: .pulse)
-                            .font(.footnote)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    Spacer(minLength: 8)
-                    Button(action: onExportData) {
-                        Text("Export data…", bundle: .pulse)
-                            .font(.footnote)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    Spacer(minLength: 8)
-                    Button(action: onCheckForUpdates) {
-                        Text("Check for updates…", bundle: .pulse)
-                            .font(.footnote)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
                 }
             }
         }
@@ -1531,12 +1534,40 @@ struct HealthMenuView: View {
             return "Waiting for permissions."
         }
         if snapshot.isSilentlyFailing {
-            return "Collector idle — please open settings."
+            return "Pulse isn't writing — check Settings."
         }
         if snapshot.isRunning {
             return "Listening to your pulse."
         }
         return "Stopped."
+    }
+
+    /// One row of the secondary-actions area in `HealthMenuView`. The
+    /// row used to be five plain buttons with `.foregroundStyle(.secondary)`
+    /// applied to the label, which made them blend into the meta-info
+    /// surrounding them. The leading SF Symbol gives the action a
+    /// strong affordance, the label drops back to `.primary` so it
+    /// reads as live, and `.contentShape(.rect)` over the whole row
+    /// makes the click target the full label + icon, not just the
+    /// glyphs.
+    @ViewBuilder
+    private func menuBarSecondaryAction(
+        titleKey: LocalizedStringKey,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(PulseDesign.coral.opacity(0.85))
+                Text(titleKey, bundle: .pulse)
+                    .font(.footnote)
+                    .foregroundStyle(.primary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -1583,9 +1614,19 @@ struct PauseControlsView: View {
                     }
                     .font(.footnote)
                     .foregroundStyle(PulseDesign.amber)
-                    Text("Resumes \(PulseFormat.countdown(from: capturedAt, to: resumesAt))", bundle: .pulse)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    // The "Resumes in 14 m" countdown previously used
+                    // `capturedAt` from the HealthSnapshot, which only
+                    // refreshes when the model polls. If the user
+                    // popped the menu open and watched it, the
+                    // countdown sat frozen at the snapshot time.
+                    // `TimelineView(.periodic(by: 1))` re-evaluates
+                    // every second so the countdown actually counts
+                    // down — what the word "countdown" implies.
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Text("Resumes \(PulseFormat.countdown(from: context.date, to: resumesAt))", bundle: .pulse)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Spacer()
                 Button(action: onResume) {
@@ -1842,12 +1883,19 @@ struct DashboardView: View {
                 Text(verbatim: "Pulse \(Self.appVersion)")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                // `TimelineView` so the relative timestamp ticks
+                // forward without the sidebar needing its own
+                // refresh signal — without this the footer reads
+                // "Updated 1 m ago" indefinitely while the data
+                // pane keeps polling.
                 if let last = model.lastRefreshAt {
-                    Text("Updated \(PulseFormat.ago(from: last, to: Date()))", bundle: .pulse)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                        Text("Updated \(PulseFormat.ago(from: last, to: context.date))", bundle: .pulse)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
                 }
             }
             Spacer(minLength: 0)
@@ -2040,14 +2088,24 @@ struct DashboardView: View {
 
     // MARK: - Today pane subviews
 
+    /// Today pane header — locale-aware weekday + date as the
+    /// primary line ("Friday, May 8" / "5月8日 星期五") with a
+    /// `TimelineView` so both the date string (across midnight)
+    /// and the "Updated 5m ago" relative timestamp self-refresh
+    /// every 30 seconds without needing a separate timer or
+    /// observer plumbed through the model. The sidebar already
+    /// labels this section "Today"; the detail header now adds
+    /// the date so the view doesn't read as a tautology.
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Today", bundle: .pulse)
-                .font(.system(.largeTitle, design: .rounded, weight: .semibold))
-            if let last = model.lastRefreshAt {
-                Text("Updated \(PulseFormat.ago(from: last, to: Date()))", bundle: .pulse)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            VStack(alignment: .leading, spacing: 6) {
+                Text(context.date.formatted(.dateTime.weekday(.wide).month().day()))
+                    .font(.system(.largeTitle, design: .rounded, weight: .semibold))
+                if let last = model.lastRefreshAt {
+                    Text("Updated \(PulseFormat.ago(from: last, to: context.date))", bundle: .pulse)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -2682,15 +2740,28 @@ struct SummaryMetricCard: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
-            if showSparkline {
-                ZStack(alignment: .bottom) {
+            // Always reserve the 22pt chart slot so all six summary
+            // tiles line up to the same height, regardless of which
+            // ones have usable trend data. Tiles with data render
+            // the coral line + soft fill; tiles without (Active
+            // time today, or first-day installs where every series
+            // is < 2 points) render a thin warm-gray baseline so
+            // the slot reads as "chart will appear once Pulse has
+            // more days of data" rather than as a missing element
+            // that breaks the grid's rhythm.
+            ZStack(alignment: .bottom) {
+                if showSparkline {
                     Sparkline(points: series, closed: true)
                         .fill(PulseDesign.coral.opacity(0.10))
                     Sparkline(points: series, closed: false)
                         .stroke(PulseDesign.coral, style: StrokeStyle(lineWidth: 1.2, lineJoin: .round))
+                } else {
+                    Rectangle()
+                        .fill(PulseDesign.warmGray(0.18))
+                        .frame(height: 1)
                 }
-                .frame(height: 22)
             }
+            .frame(height: 22)
         }
         .padding(PulseDesign.cardPadding * 0.7)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -6769,7 +6840,7 @@ struct SettingsView: View {
             } header: {
                 Text("Privacy", bundle: .pulse)
             } footer: {
-                Text("Opens a window that lists the raw row counts and the full system-events ledger from the last hour — read live from your local SQLite.", bundle: .pulse)
+                Text("Opens a window that lists the raw row counts and the full system-event log from the past hour — read live from Pulse's local data file.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -6795,7 +6866,7 @@ struct SettingsView: View {
             } header: {
                 Text("About", bundle: .pulse)
             } footer: {
-                Text("Update checks are always manual. Pulse never pings GitHub on its own — see docs/05-privacy.md.", bundle: .pulse)
+                Text("Update checks are always manual. Pulse never reaches the network on its own.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -6813,7 +6884,7 @@ struct SettingsView: View {
             } header: {
                 Text("Diagnostics", bundle: .pulse)
             } footer: {
-                Text("Live counts straight from your local SQLite. Surfaces a warning if Pulse hasn't written anything in the past minute — the usual cause is a revoked permission.", bundle: .pulse)
+                Text("Live counts read straight from Pulse's local data file. A warning appears if Pulse hasn't written anything in the past minute — usually a sign that a permission was revoked.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -7224,7 +7295,7 @@ struct PrivacyAuditView: View {
             Text("What Pulse has recorded", bundle: .pulse)
                 .font(.system(.title2, design: .rounded, weight: .semibold))
             Text(
-                "Every count and row below is read live from your local SQLite — this window is the ground truth, not a summary we maintain separately.",
+                "Every count and row below is read live from Pulse's local data file — this window shows the raw truth, not a summary kept on the side.",
                 bundle: .pulse
             )
             .font(.footnote)
@@ -7299,9 +7370,18 @@ struct PrivacyAuditView: View {
                     .foregroundStyle(.secondary)
             }
             if snap.systemEvents.isEmpty {
-                Text("No events in this window.", bundle: .pulse)
+                // Pre-A26: "No events in this window." Clear to a
+                // developer; cryptic for an end user who's never met
+                // the term "system event". The new copy explains what
+                // the table *would* show (sleep / wake / lid open
+                // close / Focus mode flips) and why the window can
+                // be empty (you simply haven't done any of those in
+                // the past hour) — so the empty state reads as
+                // expected behaviour rather than a missing feature.
+                Text("No system events in the past hour. This table fills in when your Mac sleeps, wakes, locks, opens or closes the lid, or flips a Focus mode.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 4) {
@@ -7314,11 +7394,23 @@ struct PrivacyAuditView: View {
                                 Text(row.category)
                                     .font(.footnote.monospacedDigit())
                                     .frame(width: 144, alignment: .leading)
+                                // Payload was `.lineLimit(1) + .middle`,
+                                // so longer rows showed mid-string
+                                // ellipses ("Focus…enabled") that were
+                                // useless to the user — they couldn't
+                                // tell what was clipped without
+                                // copying the row out. `.lineLimit(2)`
+                                // lets the rare long payload wrap to a
+                                // second line; `.textSelection(.enabled)`
+                                // lets the user grab the literal value
+                                // for inspection without bouncing
+                                // through the database directly.
                                 Text(row.payload ?? "—")
                                     .font(.footnote.monospacedDigit())
                                     .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
+                                    .lineLimit(2)
+                                    .truncationMode(.tail)
+                                    .textSelection(.enabled)
                             }
                             .padding(.vertical, 1)
                         }
@@ -7336,8 +7428,16 @@ struct PrivacyAuditView: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 4) {
+            // Old footer ("the only potential exception is the
+            // future update checker, which will be opt-in") was
+            // written before Sparkle landed. Sparkle has been in
+            // the build for several releases now and the user
+            // should hear the truth, not a stale promise: the only
+            // outbound traffic is the GitHub Releases fetch they
+            // explicitly trigger via "Check for updates…", and it
+            // never happens on its own.
             Text(
-                "Pulse runs entirely on your Mac. It makes no outbound network calls (the only potential exception is the future update checker, which will be opt-in and point only at GitHub releases).",
+                "Pulse runs entirely on your Mac. The only outbound traffic is the GitHub Releases check that runs *only* when you click \"Check for updates…\" — never on a schedule, never in the background.",
                 bundle: .pulse
             )
             .font(.footnote)

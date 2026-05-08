@@ -427,18 +427,19 @@
         }
       }
     },
-    "Collector idle — please open settings.": {
+    "Pulse isn't writing — check Settings.": {
+      "comment": "Menu-bar status headline shown when the collector is silently failing — usually a revoked permission. Replaces the older internal 'Collector idle' phrasing.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Collector idle — please open settings."
+            "value": "Pulse isn't writing — check Settings."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "采集器空闲 — 请打开设置。"
+            "value": "Pulse 没有写入数据 — 请检查设置。"
           }
         }
       }
@@ -621,11 +622,11 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "你的活跃高峰时段。你在 24 小时中的 %lld 个小时段都活跃过。" } }
       }
     },
-    "Not enough data yet.": {
-      "comment": "F-24 YearWrappedView — empty-state placeholder when there's no rolled-up activity.",
+    "Pulse needs a few more hours of recorded activity before it can pick out your peak. Check back at the end of a fuller day.": {
+      "comment": "F-24 YearWrappedView rhythm card — empty-state placeholder shown when there's not enough rolled-up activity to identify a peak hour.",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Not enough data yet." } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "数据还不够。" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Pulse needs a few more hours of recorded activity before it can pick out your peak. Check back at the end of a fuller day." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Pulse 还需要再多记录几个小时的活动才能找出你的高峰时段。等忙完一整天再回来看看吧。" } }
       }
     },
     "Save as image…": {
@@ -728,19 +729,19 @@
         }
       }
     },
-    "Live counts straight from your local SQLite. Surfaces a warning if Pulse hasn't written anything in the past minute — the usual cause is a revoked permission.": {
+    "Live counts read straight from Pulse's local data file. A warning appears if Pulse hasn't written anything in the past minute — usually a sign that a permission was revoked.": {
       "comment": "Settings Diagnostics section footer — explains what the diagnostics card surfaces and why a user might see a warning there.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Live counts straight from your local SQLite. Surfaces a warning if Pulse hasn't written anything in the past minute — the usual cause is a revoked permission."
+            "value": "Live counts read straight from Pulse's local data file. A warning appears if Pulse hasn't written anything in the past minute — usually a sign that a permission was revoked."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "直接从你本地的 SQLite 实时统计。如果 Pulse 过去一分钟没写入任何东西，这里会显示警告 —— 常见原因是某个权限被撤销了。"
+            "value": "直接从 Pulse 的本地数据文件实时统计。如果过去一分钟 Pulse 没有写入任何东西，这里会出现警告 —— 通常意味着某项权限被撤销了。"
           }
         }
       }
@@ -3497,18 +3498,18 @@
         }
       }
     },
-    "Opens a window that lists the raw row counts and the full system-events ledger from the last hour — read live from your local SQLite.": {
+    "Opens a window that lists the raw row counts and the full system-event log from the past hour — read live from Pulse's local data file.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Opens a window that lists the raw row counts and the full system-events ledger from the last hour — read live from your local SQLite."
+            "value": "Opens a window that lists the raw row counts and the full system-event log from the past hour — read live from Pulse's local data file."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开一个窗口，列出过去一小时的原始行数和完整的系统事件账本——直接从本地 SQLite 实时读取。"
+            "value": "打开一个窗口，列出过去一小时的原始行数和完整的系统事件日志 —— 直接从 Pulse 的本地数据文件实时读取。"
           }
         }
       }
@@ -3529,18 +3530,18 @@
         }
       }
     },
-    "Every count and row below is read live from your local SQLite — this window is the ground truth, not a summary we maintain separately.": {
+    "Every count and row below is read live from Pulse's local data file — this window shows the raw truth, not a summary kept on the side.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Every count and row below is read live from your local SQLite — this window is the ground truth, not a summary we maintain separately."
+            "value": "Every count and row below is read live from Pulse's local data file — this window shows the raw truth, not a summary kept on the side."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "下面每一个计数和行都是直接从你本地的 SQLite 实时读出的——这个窗口就是事实本身，而不是另一份独立维护的摘要。"
+            "value": "下面每一个计数和行都是直接从 Pulse 的本地数据文件实时读出的 —— 这个窗口呈现的是原始事实，而不是另外维护的摘要。"
           }
         }
       }
@@ -3657,34 +3658,36 @@
         }
       }
     },
-    "No events in this window.": {
+    "No system events in the past hour. This table fills in when your Mac sleeps, wakes, locks, opens or closes the lid, or flips a Focus mode.": {
+      "comment": "Privacy audit — empty-state placeholder for the system events table. Explains both what a system event *is* and why the window can be legitimately empty.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No events in this window."
+            "value": "No system events in the past hour. This table fills in when your Mac sleeps, wakes, locks, opens or closes the lid, or flips a Focus mode."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这个时段内没有事件。"
+            "value": "过去一小时没有系统事件。当你的 Mac 进入或唤醒睡眠、锁定、合盖或开盖、切换专注模式时，这张表才会有内容。"
           }
         }
       }
     },
-    "Pulse runs entirely on your Mac. It makes no outbound network calls (the only potential exception is the future update checker, which will be opt-in and point only at GitHub releases).": {
+    "Pulse runs entirely on your Mac. The only outbound traffic is the GitHub Releases check that runs *only* when you click \"Check for updates…\" — never on a schedule, never in the background.": {
+      "comment": "Privacy audit footer — accurately describes the network behaviour of the shipping app: Sparkle update check is the only outbound call, and it's user-initiated.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pulse runs entirely on your Mac. It makes no outbound network calls (the only potential exception is the future update checker, which will be opt-in and point only at GitHub releases)."
+            "value": "Pulse runs entirely on your Mac. The only outbound traffic is the GitHub Releases check that runs *only* when you click \"Check for updates…\" — never on a schedule, never in the background."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pulse 完全运行在你的 Mac 本地，不会发起任何出站网络请求（未来若加入更新检查将是可选项，并且仅指向 GitHub Releases）。"
+            "value": "Pulse 完全运行在你的 Mac 本地。唯一的对外网络流量是「检查更新…」按钮触发的 GitHub Releases 查询 —— 仅在你主动点击时执行，绝不会按计划运行，也绝不会在后台静默触发。"
           }
         }
       }
@@ -3845,6 +3848,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "稳定心流——会话长度足以沉入真正的工作。"
+          }
+        }
+      }
+    },
+    "Step %lld of %lld": {
+      "comment": "Onboarding progress caption shown below the segmented progress bar (e.g. 'Step 3 of 5').",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Step %lld of %lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 步，共 %lld 步"
           }
         }
       }
@@ -4187,18 +4207,19 @@
         }
       }
     },
-    "macOS quits Pulse to apply the change. Reopen Pulse after — onboarding will resume here.": {
+    "macOS will close Pulse so the new permission takes effect — that's expected. Just reopen Pulse from your Applications folder; this onboarding will pick up right where it left off.": {
+      "comment": "Onboarding Input Monitoring step 4 — reassures the user that Pulse being force-quit is normal, not a crash, and tells them how to resume.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "macOS quits Pulse to apply the change. Reopen Pulse after — onboarding will resume here."
+            "value": "macOS will close Pulse so the new permission takes effect — that's expected. Just reopen Pulse from your Applications folder; this onboarding will pick up right where it left off."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "macOS 会退出 Pulse 以使设置生效。重新打开 Pulse 后，引导流程会回到这里。"
+            "value": "macOS 会关闭 Pulse 以让新权限生效 —— 这是预期行为，不是崩溃。从「应用程序」文件夹里重新打开 Pulse 即可，引导流程会接着上次的位置继续。"
           }
         }
       }
@@ -4267,18 +4288,19 @@
         }
       }
     },
-    "Pulse is now collecting your activity locally. Open the menu bar icon any time to pause, peek at today's numbers, or read the privacy ledger.": {
+    "Pulse is now collecting your activity locally. Open the menu bar icon any time to pause, peek at today's numbers, or browse what Pulse has recorded. Come back tomorrow morning — the first time you wake your Mac you'll see a one-page briefing of yesterday's run.": {
+      "comment": "Onboarding final-step copy — celebrates the setup and tells the user what to expect tomorrow (the first daily briefing).",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pulse is now collecting your activity locally. Open the menu bar icon any time to pause, peek at today's numbers, or read the privacy ledger."
+            "value": "Pulse is now collecting your activity locally. Open the menu bar icon any time to pause, peek at today's numbers, or browse what Pulse has recorded. Come back tomorrow morning — the first time you wake your Mac you'll see a one-page briefing of yesterday's run."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pulse 已经在本地采集你的活动了。任何时候点击菜单栏图标都能暂停、查看今日数据，或翻阅隐私账本。"
+            "value": "Pulse 已经开始在本地采集你的活动了。任何时候点击菜单栏图标都能暂停、查看今日数据，或浏览 Pulse 记录了什么。明早再来 —— 你下一次唤醒 Mac 时，会看到一页关于昨天的简报。"
           }
         }
       }
@@ -5193,19 +5215,19 @@
         }
       }
     },
-    "Update checks are always manual. Pulse never pings GitHub on its own — see docs/05-privacy.md.": {
+    "Update checks are always manual. Pulse never reaches the network on its own.": {
       "comment": "Settings About section footer — reinforces the user-initiated-only update promise.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Update checks are always manual. Pulse never pings GitHub on its own — see docs/05-privacy.md."
+            "value": "Update checks are always manual. Pulse never reaches the network on its own."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "检查更新永远是你手动点的。Pulse 不会自动联网 — 参见 docs/05-privacy.md。"
+            "value": "检查更新永远是你手动点的。Pulse 不会自动联网。"
           }
         }
       }

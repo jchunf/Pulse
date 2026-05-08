@@ -126,12 +126,30 @@ struct OnboardingView: View {
         .onDisappear { model.stopPollingPermissions() }
     }
 
+    /// Five segment-capsules above a small "Step X of Y" caption. The
+    /// caption replaces relying on the capsule fill alone — colour-blind
+    /// or peripheral-vision users had no way to tell which segment was
+    /// "current" and which were filled-in past steps. The localized
+    /// caption is also what VoiceOver reads, so the progress is now
+    /// accessible without depending on visual-only hints.
     private var progressBar: some View {
-        HStack(spacing: 6) {
-            ForEach(OnboardingModel.Step.allCases, id: \.self) { step in
-                Capsule()
-                    .fill(step.index <= model.step.index ? PulseDesign.coral : PulseDesign.warmGray(0.18))
-                    .frame(height: 3)
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                ForEach(OnboardingModel.Step.allCases, id: \.self) { step in
+                    Capsule()
+                        .fill(step.index <= model.step.index ? PulseDesign.coral : PulseDesign.warmGray(0.18))
+                        .frame(height: 3)
+                }
+            }
+            HStack {
+                Text(
+                    "Step \(model.step.index + 1) of \(OnboardingModel.Step.total)",
+                    bundle: .pulse
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                Spacer()
             }
         }
         .padding(.horizontal, 28)
@@ -336,7 +354,7 @@ private struct PermissionStep: View {
             instructionRow(number: 2, text: "Find **Pulse** in the list.")
             instructionRow(number: 3, text: "Toggle the switch on. macOS may ask for your password.")
             if permission == .inputMonitoring {
-                instructionRow(number: 4, text: "macOS quits Pulse to apply the change. Reopen Pulse after — onboarding will resume here.")
+                instructionRow(number: 4, text: "macOS will close Pulse so the new permission takes effect — that's expected. Just reopen Pulse from your Applications folder; this onboarding will pick up right where it left off.")
             }
         }
         .padding(16)
@@ -394,7 +412,7 @@ private struct ReadyStep: View {
             .padding(.bottom, 4)
             Text("You're set", bundle: .pulse)
                 .font(.system(.largeTitle, design: .rounded, weight: .semibold))
-            Text("Pulse is now collecting your activity locally. Open the menu bar icon any time to pause, peek at today's numbers, or read the privacy ledger.", bundle: .pulse)
+            Text("Pulse is now collecting your activity locally. Open the menu bar icon any time to pause, peek at today's numbers, or browse what Pulse has recorded. Come back tomorrow morning — the first time you wake your Mac you'll see a one-page briefing of yesterday's run.", bundle: .pulse)
                 .font(.body)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
