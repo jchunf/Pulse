@@ -6102,9 +6102,19 @@ struct ClipboardCard: View {
                 Text(PulseFormat.integer(count))
                     .font(PulseDesign.heroSecondaryFont)
                     .foregroundStyle(PulseDesign.coral)
-                Text("copies / cuts", bundle: .pulse)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("copies / cuts", bundle: .pulse)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    // Playful pace tier escalating with the day's
+                    // count. Same ladder pattern KeyboardPeak,
+                    // ChaoticMoment + clicks tile use, kept in one
+                    // line so the card's three "rows" (hero +
+                    // descriptor / privacy / sparkline) stay tidy.
+                    Text(Self.paceTier(for: count), bundle: .pulse)
+                        .font(.footnote)
+                        .foregroundStyle(PulseDesign.coral.opacity(0.85))
+                }
                 Spacer(minLength: 0)
             }
             // Privacy reassurance line. Pre-A30 this lived as a
@@ -6129,6 +6139,20 @@ struct ClipboardCard: View {
                 .frame(height: 44)
         }
         .pulseFeaturedCard()
+    }
+
+    /// Maps the day's pasteboard-change count to a playful pace tier.
+    /// The card is only shown when `count > 0` (parent guard), so the
+    /// floor tier still has something to celebrate. Same ladder
+    /// pattern as KeyboardPeak / ChaoticMoment / clicks tile.
+    static func paceTier(for count: Int) -> LocalizedStringKey {
+        switch count {
+        case ..<10:   return "a quiet pasteboard day"
+        case ..<30:   return "casual copy-paste flow"
+        case ..<80:   return "steady pasteboard work"
+        case ..<200:  return "a heavy copy-paste day"
+        default:      return "pasteboard at full throttle"
+        }
     }
 }
 

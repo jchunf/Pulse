@@ -363,6 +363,41 @@
         }
       }
     },
+    "a quiet pasteboard day": {
+      "comment": "ClipboardCard pace tier — 1–9 changes today.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a quiet pasteboard day" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "安静的剪贴板一天" } }
+      }
+    },
+    "casual copy-paste flow": {
+      "comment": "ClipboardCard pace tier — 10–29 changes today.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "casual copy-paste flow" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "随手剪贴的节奏" } }
+      }
+    },
+    "steady pasteboard work": {
+      "comment": "ClipboardCard pace tier — 30–79 changes today.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "steady pasteboard work" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "稳定的剪贴板工作日" } }
+      }
+    },
+    "a heavy copy-paste day": {
+      "comment": "ClipboardCard pace tier — 80–199 changes today.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "a heavy copy-paste day" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重度复制粘贴的一天" } }
+      }
+    },
+    "pasteboard at full throttle": {
+      "comment": "ClipboardCard pace tier — 200+ changes today. Top of the ladder.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "pasteboard at full throttle" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "剪贴板火力全开" } }
+      }
+    },
     "a light breeze of switches": {
       "comment": "ChaoticMomentCard weather tier — 3–5 switches in the busiest minute (mild multitasking).",
       "localizations": {
