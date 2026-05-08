@@ -3160,6 +3160,13 @@
         }
       }
     },
+    "Yesterday in numbers": {
+      "comment": "BriefingStatRow section heading — frames the five stat tiles as the day's recap.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Yesterday in numbers" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "昨天的数字" } }
+      }
+    },
     "Yesterday's briefing": {
       "localizations": {
         "en": {

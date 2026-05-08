@@ -7289,34 +7289,59 @@ struct DailyBriefingView: View {
     }()
 }
 
-/// Compact two-column stat list used inside the briefing window. Shares
-/// its formatters with `SummaryCardsView` so en / zh-Hans output lines
-/// up with the main dashboard.
+/// Stat block inside the briefing window. Pre-A27 this was a flat
+/// 5-row list of footnote-sized "label → number" pairs that read like
+/// a developer log next to the briefing's celebratory tone — same
+/// numbers, no visual lift. The stats now sit in a 2-column grid of
+/// little tiles, each with a small uppercase label and a `title3`
+/// coral number, so the user reads them as five distinct beats of
+/// "yesterday in numbers" instead of as a stat-table.
 struct BriefingStatRow: View {
 
     let summary: TodaySummary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            row("Keystrokes", PulseFormat.integer(summary.totalKeyPresses))
-            row("Clicks",     PulseFormat.integer(summary.totalMouseClicks))
-            row("Scrolls",    PulseFormat.integer(summary.totalScrollTicks))
-            row("Active time", PulseFormat.duration(seconds: summary.totalActiveSeconds))
-            row("Idle time",   PulseFormat.duration(seconds: summary.totalIdleSeconds))
+        let columns = [
+            GridItem(.flexible(), spacing: 12),
+            GridItem(.flexible(), spacing: 12)
+        ]
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Yesterday in numbers", bundle: .pulse)
+                .font(PulseDesign.labelFont)
+                .tracking(0.3)
+                .foregroundStyle(.secondary)
+            LazyVGrid(columns: columns, spacing: 12) {
+                tile("Keystrokes",  PulseFormat.integer(summary.totalKeyPresses))
+                tile("Clicks",      PulseFormat.integer(summary.totalMouseClicks))
+                tile("Scrolls",     PulseFormat.integer(summary.totalScrollTicks))
+                tile("Active time", PulseFormat.duration(seconds: summary.totalActiveSeconds))
+                tile("Idle time",   PulseFormat.duration(seconds: summary.totalIdleSeconds))
+            }
         }
         .pulseFeaturedCard()
     }
 
     @ViewBuilder
-    private func row(_ titleKey: LocalizedStringKey, _ value: String) -> some View {
-        HStack {
+    private func tile(_ titleKey: LocalizedStringKey, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
             Text(titleKey, bundle: .pulse)
-                .font(.footnote)
+                .font(.caption.weight(.medium))
+                .tracking(0.3)
                 .foregroundStyle(.secondary)
-            Spacer()
             Text(value)
-                .font(.footnote.monospacedDigit())
+                .font(.system(.title3, design: .rounded, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(PulseDesign.coral)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(PulseDesign.warmGray(0.05))
+        )
     }
 }
 
