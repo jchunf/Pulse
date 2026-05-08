@@ -6799,7 +6799,7 @@ struct SettingsView: View {
             } header: {
                 Text("Privacy", bundle: .pulse)
             } footer: {
-                Text("Opens a window that lists the raw row counts and the full system-events ledger from the last hour — read live from your local SQLite.", bundle: .pulse)
+                Text("Opens a window that lists the raw row counts and the full system-event log from the past hour — read live from Pulse's local data file.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -6825,7 +6825,7 @@ struct SettingsView: View {
             } header: {
                 Text("About", bundle: .pulse)
             } footer: {
-                Text("Update checks are always manual. Pulse never pings GitHub on its own — see docs/05-privacy.md.", bundle: .pulse)
+                Text("Update checks are always manual. Pulse never reaches the network on its own.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -6843,7 +6843,7 @@ struct SettingsView: View {
             } header: {
                 Text("Diagnostics", bundle: .pulse)
             } footer: {
-                Text("Live counts straight from your local SQLite. Surfaces a warning if Pulse hasn't written anything in the past minute — the usual cause is a revoked permission.", bundle: .pulse)
+                Text("Live counts read straight from Pulse's local data file. A warning appears if Pulse hasn't written anything in the past minute — usually a sign that a permission was revoked.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -7254,7 +7254,7 @@ struct PrivacyAuditView: View {
             Text("What Pulse has recorded", bundle: .pulse)
                 .font(.system(.title2, design: .rounded, weight: .semibold))
             Text(
-                "Every count and row below is read live from your local SQLite — this window is the ground truth, not a summary we maintain separately.",
+                "Every count and row below is read live from Pulse's local data file — this window shows the raw truth, not a summary kept on the side.",
                 bundle: .pulse
             )
             .font(.footnote)

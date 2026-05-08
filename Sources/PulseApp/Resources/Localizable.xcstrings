@@ -728,19 +728,19 @@
         }
       }
     },
-    "Live counts straight from your local SQLite. Surfaces a warning if Pulse hasn't written anything in the past minute — the usual cause is a revoked permission.": {
+    "Live counts read straight from Pulse's local data file. A warning appears if Pulse hasn't written anything in the past minute — usually a sign that a permission was revoked.": {
       "comment": "Settings Diagnostics section footer — explains what the diagnostics card surfaces and why a user might see a warning there.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Live counts straight from your local SQLite. Surfaces a warning if Pulse hasn't written anything in the past minute — the usual cause is a revoked permission."
+            "value": "Live counts read straight from Pulse's local data file. A warning appears if Pulse hasn't written anything in the past minute — usually a sign that a permission was revoked."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "直接从你本地的 SQLite 实时统计。如果 Pulse 过去一分钟没写入任何东西，这里会显示警告 —— 常见原因是某个权限被撤销了。"
+            "value": "直接从 Pulse 的本地数据文件实时统计。如果过去一分钟 Pulse 没有写入任何东西，这里会出现警告 —— 通常意味着某项权限被撤销了。"
           }
         }
       }
@@ -3497,18 +3497,18 @@
         }
       }
     },
-    "Opens a window that lists the raw row counts and the full system-events ledger from the last hour — read live from your local SQLite.": {
+    "Opens a window that lists the raw row counts and the full system-event log from the past hour — read live from Pulse's local data file.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Opens a window that lists the raw row counts and the full system-events ledger from the last hour — read live from your local SQLite."
+            "value": "Opens a window that lists the raw row counts and the full system-event log from the past hour — read live from Pulse's local data file."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开一个窗口，列出过去一小时的原始行数和完整的系统事件账本——直接从本地 SQLite 实时读取。"
+            "value": "打开一个窗口，列出过去一小时的原始行数和完整的系统事件日志 —— 直接从 Pulse 的本地数据文件实时读取。"
           }
         }
       }
@@ -3529,18 +3529,18 @@
         }
       }
     },
-    "Every count and row below is read live from your local SQLite — this window is the ground truth, not a summary we maintain separately.": {
+    "Every count and row below is read live from Pulse's local data file — this window shows the raw truth, not a summary kept on the side.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Every count and row below is read live from your local SQLite — this window is the ground truth, not a summary we maintain separately."
+            "value": "Every count and row below is read live from Pulse's local data file — this window shows the raw truth, not a summary kept on the side."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "下面每一个计数和行都是直接从你本地的 SQLite 实时读出的——这个窗口就是事实本身，而不是另一份独立维护的摘要。"
+            "value": "下面每一个计数和行都是直接从 Pulse 的本地数据文件实时读出的 —— 这个窗口呈现的是原始事实，而不是另外维护的摘要。"
           }
         }
       }
@@ -5193,19 +5193,19 @@
         }
       }
     },
-    "Update checks are always manual. Pulse never pings GitHub on its own — see docs/05-privacy.md.": {
+    "Update checks are always manual. Pulse never reaches the network on its own.": {
       "comment": "Settings About section footer — reinforces the user-initiated-only update promise.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Update checks are always manual. Pulse never pings GitHub on its own — see docs/05-privacy.md."
+            "value": "Update checks are always manual. Pulse never reaches the network on its own."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "检查更新永远是你手动点的。Pulse 不会自动联网 — 参见 docs/05-privacy.md。"
+            "value": "检查更新永远是你手动点的。Pulse 不会自动联网。"
           }
         }
       }
