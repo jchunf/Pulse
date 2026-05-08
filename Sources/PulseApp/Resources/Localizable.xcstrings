@@ -4543,6 +4543,48 @@
         }
       }
     },
+    "Today's fastest minute, in keystrokes per minute (KPM).": {
+      "comment": "F-12 KeyboardPeakCard subtitle — grounds the KPM acronym + the metric (today's peak minute by keystroke count) so users without unit literacy don't have to back-derive meaning from the tier-pace label below the hero.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Today's fastest minute, in keystrokes per minute (KPM)." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "今天打字最快的那一分钟，单位为按键/分钟（KPM）。" } }
+      }
+    },
+    "Today's pulse — distance, key presses, focus, goals.": {
+      "comment": "DashboardView sidebar tooltip — Today section help string (shown via .help() on hover, also read by VoiceOver).",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Today's pulse — distance, key presses, focus, goals." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "今日脉搏 —— 距离、按键、专注、目标。" } }
+      }
+    },
+    "Patterns over time — weekly trend, heatmap, chronotype, streak.": {
+      "comment": "DashboardView sidebar tooltip — Rhythm section help string.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Patterns over time — weekly trend, heatmap, chronotype, streak." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "随时间变化的模式 —— 周趋势、热力图、作息类型、连续记录。" } }
+      }
+    },
+    "Focus & rest — deepest focus session, posture, peak typing minute.": {
+      "comment": "DashboardView sidebar tooltip — Focus section help string.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Focus & rest — deepest focus session, posture, peak typing minute." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "专注与休息 —— 最深度的专注片段、会话姿势、键盘最高峰时刻。" } }
+      }
+    },
+    "Apps you used — ranking, switches, combinations, day timeline.": {
+      "comment": "DashboardView sidebar tooltip — Apps section help string.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Apps you used — ranking, switches, combinations, day timeline." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "你使用过的 App —— 排行、切换、组合、当日时间线。" } }
+      }
+    },
+    "Keyboard and mouse — heatmaps, hand balance, clipboard, shortcuts.": {
+      "comment": "DashboardView sidebar tooltip — Input section help string.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Keyboard and mouse — heatmaps, hand balance, clipboard, shortcuts." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "键盘与鼠标 —— 热力图、左右手平衡、剪贴板、快捷键。" } }
+      }
+    },
     "Today's pulse": {
       "localizations": {
         "en": {
