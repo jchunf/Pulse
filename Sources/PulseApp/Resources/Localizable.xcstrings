@@ -508,18 +508,36 @@
         }
       }
     },
-    "DB size": {
+    "Database size": {
+      "comment": "Menu-bar CountersView — disk footprint of Pulse's local database. Renamed from 'DB size' to use words a non-developer reads naturally.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "DB size"
+            "value": "Database size"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "库大小"
+            "value": "数据库大小"
+          }
+        }
+      }
+    },
+    "Database writes": {
+      "comment": "Menu-bar CountersView — total number of times Pulse has flushed its in-memory buffer to the on-disk database. Renamed from 'Total flushes' to drop the implementation term.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database writes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "数据库写入次数"
           }
         }
       }
@@ -557,6 +575,34 @@
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Keystrokes" } },
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "总按键数" } }
+      }
+    },
+    "Pulse hasn't logged any cursor moves yet today. Move the mouse around — the number fills in within a minute.": {
+      "comment": "MileageHeroCard day-zero placeholder — replaces the '0 mm + tiny-fraction-of-a-fingernail' reading that made a fresh dashboard feel broken.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Pulse hasn't logged any cursor moves yet today. Move the mouse around — the number fills in within a minute." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Pulse 今天还没记录到光标移动。移动一下鼠标，数字会在一分钟内出现。" } }
+      }
+    },
+    "Keystrokes + clicks per day": {
+      "comment": "WeekTrendChart subtitle — explains what the y-axis is plotting so the chart is self-documenting.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Keystrokes + clicks per day" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "每日按键 + 点击总和" } }
+      }
+    },
+    "less": {
+      "comment": "WeekHourlyHeatmap legend — left end of the colour-intensity scale strip ('less ▢▢▢▢▢ more').",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "less" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "较少" } }
+      }
+    },
+    "more": {
+      "comment": "WeekHourlyHeatmap legend — right end of the colour-intensity scale strip ('less ▢▢▢▢▢ more').",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "more" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "较多" } }
       }
     },
     "Roughly %@ words — about %@ a mid-length novel.": {
@@ -906,18 +952,19 @@
         }
       }
     },
-    "Key events (raw)": {
+    "Key presses": {
+      "comment": "Menu-bar CountersView — total live count of key presses Pulse has observed in this session. Renamed from 'Key events (raw)' to drop the developer phrasing.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Key events (raw)"
+            "value": "Key presses"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "按键事件（原始）"
+            "value": "按键次数"
           }
         }
       }
@@ -970,18 +1017,19 @@
         }
       }
     },
-    "Last write": {
+    "Last saved": {
+      "comment": "Menu-bar CountersView — relative timestamp of the most recent write to Pulse's local database. Renamed from 'Last write' for plain-language consistency.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Last write"
+            "value": "Last saved"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "最近写入"
+            "value": "最近一次保存"
           }
         }
       }
@@ -1114,18 +1162,19 @@
         }
       }
     },
-    "Mouse clicks (raw)": {
+    "Mouse clicks": {
+      "comment": "Menu-bar CountersView — total live count of mouse clicks Pulse has observed in this session. Renamed from 'Mouse clicks (raw)' to drop the redundant qualifier.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mouse clicks (raw)"
+            "value": "Mouse clicks"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "鼠标点击（原始）"
+            "value": "鼠标点击次数"
           }
         }
       }
@@ -1146,18 +1195,19 @@
         }
       }
     },
-    "Mouse moves (raw)": {
+    "Mouse moves": {
+      "comment": "Menu-bar CountersView — total live count of mouse-move samples Pulse has observed in this session. Renamed from 'Mouse moves (raw)' to drop the redundant qualifier.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mouse moves (raw)"
+            "value": "Mouse moves"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "鼠标移动（原始）"
+            "value": "鼠标移动次数"
           }
         }
       }
@@ -1256,6 +1306,34 @@
             "value": "打开 %@"
           }
         }
+      }
+    },
+    "Open Settings": {
+      "comment": "DashboardPermissionBanner — short button label that opens the relevant System Settings pane for a missing permission. The row already names the permission, so the button just says 'Open Settings'.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Open Settings" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开系统设置" } }
+      }
+    },
+    "Counts your keystrokes, clicks and scrolls system-wide. Pulse only counts the events — it never records what you type.": {
+      "comment": "DashboardPermissionBanner rationale for Input Monitoring. Mirrors the trust language the onboarding pledge uses.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Counts your keystrokes, clicks and scrolls system-wide. Pulse only counts the events — it never records what you type." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "用来统计你在系统里的按键、点击和滚轮次数。Pulse 只数次数 —— 永远不会记录你输入了什么。" } }
+      }
+    },
+    "Reads which app is in the foreground so Pulse can build your daily ranking. Window titles are hashed before storage.": {
+      "comment": "DashboardPermissionBanner rationale for Accessibility. Mirrors the trust language the onboarding pledge uses.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Reads which app is in the foreground so Pulse can build your daily ranking. Window titles are hashed before storage." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "用来读取当前前台是哪个 App，从而生成每日应用排行。窗口标题在写入磁盘前会做 SHA-256 哈希。" } }
+      }
+    },
+    "Required for one of Pulse's optional features.": {
+      "comment": "DashboardPermissionBanner generic rationale for Calendars / Location / Notifications — used as a fallback so future optional permissions still get a polite explanation in the banner.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Required for one of Pulse's optional features." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Pulse 某个可选功能需要这项权限。" } }
       }
     },
     "Open %@ settings": {
@@ -1990,22 +2068,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "连续活跃 %@ 还没休息（阈值：%@）。"
-          }
-        }
-      }
-    },
-    "Total flushes": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Total flushes"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "累计刷写"
           }
         }
       }
@@ -3098,6 +3160,13 @@
         }
       }
     },
+    "Yesterday in numbers": {
+      "comment": "BriefingStatRow section heading — frames the five stat tiles as the day's recap.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Yesterday in numbers" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "昨天的数字" } }
+      }
+    },
     "Yesterday's briefing": {
       "localizations": {
         "en": {
@@ -3965,34 +4034,35 @@
         }
       }
     },
-    "All raw data stays inside ~/Library/Application Support/Pulse/. Nothing is ever uploaded.": {
+    "All raw data stays in Pulse's private folder on your Mac. Nothing is ever uploaded.": {
+      "comment": "Onboarding privacy pledge — storage location bullet. De-jargoned from the previous '~/Library/Application Support/Pulse/' filesystem path so users without macOS-internals knowledge can still parse the promise.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "All raw data stays inside ~/Library/Application Support/Pulse/. Nothing is ever uploaded."
+            "value": "All raw data stays in Pulse's private folder on your Mac. Nothing is ever uploaded."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "所有原始数据保留在 ~/Library/Application Support/Pulse/，永远不会上传。"
+            "value": "所有原始数据都保留在 Pulse 的本地私有文件夹里，永远不会上传。"
           }
         }
       }
     },
-    "No keystroke contents — only press counts. By default the key code is not stored either.": {
+    "No keystroke contents — only press counts. By default the key code itself isn't stored either.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No keystroke contents — only press counts. By default the key code is not stored either."
+            "value": "No keystroke contents — only press counts. By default the key code itself isn't stored either."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "不记录按键内容——只记录按键次数。默认情况下连键码也不存。"
+            "value": "不记录按键内容 —— 只记录按键次数。默认连键码本身也不存。"
           }
         }
       }
@@ -4014,18 +4084,19 @@
         }
       }
     },
-    "Window titles are SHA-256 hashed before being persisted.": {
+    "Window titles are hashed before they're written to disk, so Pulse can count app switches without storing what was on the screen.": {
+      "comment": "Onboarding privacy pledge — window-title hashing bullet. Reworded to explain *why* hashing is in the pipeline; the previous 'SHA-256 hashed' phrasing was technically precise but offered no narrative for users unfamiliar with the term.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Window titles are SHA-256 hashed before being persisted."
+            "value": "Window titles are hashed before they're written to disk, so Pulse can count app switches without storing what was on the screen."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "窗口标题在落盘前会被 SHA-256 哈希。"
+            "value": "窗口标题在写入磁盘前会先经过哈希，让 Pulse 可以统计 App 切换次数，但不会存下你屏幕上显示的内容。"
           }
         }
       }

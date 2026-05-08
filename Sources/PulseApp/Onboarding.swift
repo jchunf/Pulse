@@ -262,12 +262,19 @@ private struct PledgeStep: View {
             Text("Before we ask for any permissions, here is what Pulse will and will not do — read it first.", bundle: .pulse)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+            // Bullet order is deliberate: lead with the strongest
+            // "what Pulse will *not* see" promises (the things the
+            // user is actually nervous about — keystrokes, clipboard,
+            // mic, camera) and then drop into the supporting
+            // mechanics (storage, hashing, updates). The pre-A27
+            // order led with the storage path, which buried the
+            // privacy ask the user is actually here to evaluate.
             VStack(alignment: .leading, spacing: 12) {
-                pledge("All raw data stays inside ~/Library/Application Support/Pulse/. Nothing is ever uploaded.")
-                pledge("No keystroke contents — only press counts. By default the key code is not stored either.")
+                pledge("No keystroke contents — only press counts. By default the key code itself isn't stored either.")
                 pledge("No clipboard content, no screen recording, no microphone, no camera, ever. (Pulse only reads the pasteboard's incrementing change counter to count copy/cut frequency — never the text or files on it.)")
-                pledge("Window titles are SHA-256 hashed before being persisted.")
-                pledge("Update checks only run when you click “Check for updates…”. Pulse fetches a Sparkle appcast from GitHub Releases at that moment and never on a schedule.")
+                pledge("All raw data stays in Pulse's private folder on your Mac. Nothing is ever uploaded.")
+                pledge("Window titles are hashed before they're written to disk, so Pulse can count app switches without storing what was on the screen.")
+                pledge("Update checks only run when you click “Check for updates…”. Pulse fetches the Sparkle appcast from GitHub Releases at that moment and never on a schedule.")
             }
             .padding(.vertical, 4)
             Toggle(isOn: $accepted) {

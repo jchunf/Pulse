@@ -2172,7 +2172,7 @@ struct DashboardPermissionBanner: View {
         if missing.isEmpty {
             EmptyView()
         } else {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(PulseDesign.amber)
@@ -2183,19 +2183,22 @@ struct DashboardPermissionBanner: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 8) {
+                // Each missing permission gets its own row: icon +
+                // name + one-line "why Pulse asks for this" rationale
+                // + Open System Settings button. Pre-A26b the banner
+                // listed the missing permissions as flat buttons in
+                // an HStack with no rationale, so users had to take
+                // it on faith that Pulse needed them — a hard sell
+                // for *Input Monitoring* in particular, the most
+                // sensitive macOS toggle. The rationale strings
+                // mirror the same trust language the onboarding
+                // pledge uses ("never the contents", "only the
+                // count", "hashed before storage") so the user
+                // doesn't get conflicting explanations from two
+                // surfaces.
+                VStack(alignment: .leading, spacing: 10) {
                     ForEach(missing, id: \.self) { permission in
-                        Button {
-                            if let url = permission.systemSettingsURL {
-                                NSWorkspace.shared.open(url)
-                            }
-                        } label: {
-                            Label {
-                                Text("Open \(localizedPermissionName(permission))", bundle: .pulse)
-                            } icon: {
-                                Image(systemName: "arrow.up.forward.app")
-                            }
-                        }
+                        permissionRow(permission)
                     }
                 }
             }
@@ -2209,6 +2212,69 @@ struct DashboardPermissionBanner: View {
                 RoundedRectangle(cornerRadius: PulseDesign.cardCornerRadius)
                     .strokeBorder(PulseDesign.amber.opacity(0.25), lineWidth: 0.5)
             )
+        }
+    }
+
+    @ViewBuilder
+    private func permissionRow(_ permission: Permission) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: Self.icon(for: permission))
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(PulseDesign.amber)
+                .frame(width: 24)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(localizedPermissionName(permission))
+                    .font(.subheadline.weight(.semibold))
+                Text(Self.rationaleKey(for: permission), bundle: .pulse)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Button {
+                if let url = permission.systemSettingsURL {
+                    NSWorkspace.shared.open(url)
+                }
+            } label: {
+                Label {
+                    Text("Open Settings", bundle: .pulse)
+                } icon: {
+                    Image(systemName: "arrow.up.forward.app")
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
+
+    /// SF Symbol per permission. Picked to telegraph the *kind* of
+    /// access being requested rather than the macOS pref-pane glyph
+    /// (the pref-pane glyphs are tiny and read as "system" rather
+    /// than as the input/observation domain Pulse uses them for).
+    private static func icon(for permission: Permission) -> String {
+        switch permission {
+        case .inputMonitoring: return "keyboard"
+        case .accessibility:   return "rectangle.on.rectangle"
+        case .calendars:       return "calendar"
+        case .location:        return "location"
+        case .notifications:   return "bell"
+        }
+    }
+
+    /// One-line "why Pulse asks for this" rationale per permission.
+    /// Returned as a `LocalizedStringKey` so the catalog handles
+    /// en + zh-Hans. Phrased to match the trust language the
+    /// onboarding pledge already uses so the user doesn't get
+    /// conflicting explanations from two surfaces.
+    private static func rationaleKey(for permission: Permission) -> LocalizedStringKey {
+        switch permission {
+        case .inputMonitoring:
+            return "Counts your keystrokes, clicks and scrolls system-wide. Pulse only counts the events — it never records what you type."
+        case .accessibility:
+            return "Reads which app is in the foreground so Pulse can build your daily ranking. Window titles are hashed before storage."
+        case .calendars, .location, .notifications:
+            return "Required for one of Pulse's optional features."
         }
     }
 }
@@ -2380,6 +2446,15 @@ struct MileageHeroCard: View {
     var body: some View {
         let meters = distanceMillimeters / 1_000.0
         let comparison = library.bestMatch(forMeters: meters)
+        // Day-zero installs (or first wake-up of a new day) hit
+        // this card with `distanceMillimeters == 0`. Pre-A27 the
+        // hero rendered "0 mm" + a `landmarkComparisonSentence`
+        // that resolved to "Less than 1% of a fingernail's width" —
+        // a sad, slightly absurd reading that made the dashboard
+        // feel broken on the first launch. Below 1 mm we now skip
+        // the hero number entirely and show a warmer placeholder
+        // line that tells the user what to do next.
+        let isQuietStart = distanceMillimeters < 1
 
         ZStack(alignment: .topTrailing) {
             // Concentric-circle heartbeat accent in the top-right,
@@ -2392,15 +2467,26 @@ struct MileageHeroCard: View {
                     .font(PulseDesign.labelFont)
                     .tracking(0.4)
                     .foregroundStyle(.secondary)
-                Text(PulseFormat.distance(millimeters: distanceMillimeters))
-                    .font(PulseDesign.heroFont)
-                    .monospacedDigit()
-                    .foregroundStyle(PulseDesign.coral)
-                Text(PulseFormat.landmarkComparisonSentence(for: comparison))
-                    .font(.title3)
-                    .foregroundStyle(.primary)
-                    .opacity(0.75)
-                    .fixedSize(horizontal: false, vertical: true)
+                if isQuietStart {
+                    Text("—")
+                        .font(PulseDesign.heroFont)
+                        .monospacedDigit()
+                        .foregroundStyle(PulseDesign.coral.opacity(0.45))
+                    Text("Pulse hasn't logged any cursor moves yet today. Move the mouse around — the number fills in within a minute.", bundle: .pulse)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text(PulseFormat.distance(millimeters: distanceMillimeters))
+                        .font(PulseDesign.heroFont)
+                        .monospacedDigit()
+                        .foregroundStyle(PulseDesign.coral)
+                    Text(PulseFormat.landmarkComparisonSentence(for: comparison))
+                        .font(.title3)
+                        .foregroundStyle(.primary)
+                        .opacity(0.75)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .pulseHeroCard()
@@ -2853,8 +2939,17 @@ struct WeekTrendChart: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Weekly trend", bundle: .pulse)
-                .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: the title used to stand alone
+            // ("Weekly trend"), which left users guessing at what the
+            // y-axis was actually counting. The subtitle now spells
+            // it out so the chart is self-documenting at a glance.
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Weekly trend", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+                Text("Keystrokes + clicks per day", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if points.allSatisfy({ $0.totalEvents == 0 }) {
                 Text("No rolled-up activity yet. Check back once hourly roll-ups have run.", bundle: .pulse)
                     .foregroundStyle(.secondary)
@@ -2976,14 +3071,46 @@ struct WeekHourlyHeatmap: View {
                 }
             }
             HStack(spacing: 2) {
-                Color.clear.frame(width: 52, height: 12)
+                Color.clear.frame(width: 52, height: 14)
                 ForEach(0..<24, id: \.self) { hour in
+                    // Pre-A26: `.font(.system(size: 9))`. Borderline
+                    // unreadable on Retina, especially in zh-Hans
+                    // builds where the hour ticks were the only
+                    // axis label. Bumped to caption2 + .medium so
+                    // the 24-hour anchors are scannable at the
+                    // dashboard's normal viewing distance.
                     Text(Self.hourLabels.contains(hour) ? "\(hour)" : "")
-                        .font(.system(size: 9).monospacedDigit())
+                        .font(.caption2.monospacedDigit().weight(.medium))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+            // Color-scale legend — "less □□□□□ more". Without
+            // a legend the user couldn't tell whether light coral
+            // meant "quiet hour" or "missing data"; the ramp is
+            // single-hue so there's no second-color disambiguation
+            // to read from. The legend is rendered with the same
+            // 5-step quantisation as `heatColor(intensity:)` so the
+            // strip is a literal sample of the cell-fill scale.
+            HStack(spacing: 6) {
+                Color.clear.frame(width: 52)
+                Text("less", bundle: .pulse)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                HStack(spacing: 2) {
+                    ForEach(0..<5, id: \.self) { step in
+                        let intensity = Double(step) / 4.0
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Self.heatColor(intensity: intensity))
+                            .frame(width: 14, height: 10)
+                    }
+                }
+                Text("more", bundle: .pulse)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Spacer()
+            }
+            .padding(.top, 6)
         }
     }
 
@@ -6549,18 +6676,27 @@ struct CountersView: View {
     let snapshot: HealthSnapshot
 
     var body: some View {
+        // Pre-A27 these labels read like syslog rows ("Mouse moves
+        // (raw)", "Key events (raw)", "Total flushes", "DB size",
+        // "Last write"). The "(raw)" qualifier was a relic from
+        // when the popover briefly showed both the in-memory buffer
+        // count *and* a rolled-up minute total side-by-side; only
+        // the live count survived the layout simplification, so the
+        // qualifier is now noise. The rest are renamed to the words
+        // an end user would actually use to describe what they see —
+        // keystrokes / database writes / last saved / database size.
         VStack(alignment: .leading, spacing: 4) {
-            row(labelKey: "Mouse moves (raw)",  value: snapshot.l0Counts.mouseMoves)
-            row(labelKey: "Mouse clicks (raw)", value: snapshot.l0Counts.mouseClicks)
-            row(labelKey: "Key events (raw)",   value: snapshot.l0Counts.keyEvents)
-            row(labelKey: "Total flushes",      value: snapshot.writer.totalFlushes)
+            row(labelKey: "Mouse moves",     value: snapshot.l0Counts.mouseMoves)
+            row(labelKey: "Mouse clicks",    value: snapshot.l0Counts.mouseClicks)
+            row(labelKey: "Key presses",     value: snapshot.l0Counts.keyEvents)
+            row(labelKey: "Database writes", value: snapshot.writer.totalFlushes)
             if let last = snapshot.lastWriteAt {
-                rowText(labelKey: "Last write", value: PulseFormat.ago(from: last, to: snapshot.capturedAt))
+                rowText(labelKey: "Last saved", value: PulseFormat.ago(from: last, to: snapshot.capturedAt))
             } else {
-                rowText(labelKey: "Last write", value: String(localized: "never", bundle: .pulse))
+                rowText(labelKey: "Last saved", value: String(localized: "never", bundle: .pulse))
             }
             if let bytes = snapshot.databaseFileSizeBytes {
-                rowText(labelKey: "DB size", value: PulseFormat.bytes(bytes))
+                rowText(labelKey: "Database size", value: PulseFormat.bytes(bytes))
             }
         }
         .font(.footnote)
@@ -6759,6 +6895,39 @@ struct SettingsView: View {
                 Text("Dashboard", bundle: .pulse)
             }
 
+            // Privacy promoted to second-from-top in A27. The
+            // section used to sit below Goals / Alerts / Recap,
+            // which buried the trust story under personalisation
+            // settings — and Privacy is the *first* concern users
+            // come to a Settings window with for an app that
+            // observes their input. Moving it up signals that
+            // Pulse takes the question seriously, and the two
+            // actions here ("Show what Pulse has recorded…" /
+            // "Clear data in a time range…") are the most
+            // affirmative answers to it.
+            Section {
+                Button(action: onOpenPrivacyAudit) {
+                    Text("Show what Pulse has recorded…", bundle: .pulse)
+                }
+                Button(role: .destructive) {
+                    isPresentingPurgeSheet = true
+                } label: {
+                    Text("Clear data in a time range…", bundle: .pulse)
+                }
+            } header: {
+                Text("Privacy", bundle: .pulse)
+            } footer: {
+                Text("Opens a window that lists the raw row counts and the full system-event log from the past hour — read live from Pulse's local data file.", bundle: .pulse)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .sheet(isPresented: $isPresentingPurgeSheet) {
+                RangePurgeSheet(
+                    onPurgeRange: onPurgeRange,
+                    onDismiss: { isPresentingPurgeSheet = false }
+                )
+            }
+
             Section {
                 ForEach(GoalPresets.all) { preset in
                     Toggle(isOn: Binding(
@@ -6826,29 +6995,6 @@ struct SettingsView: View {
                 Text("Year-to-date totals — keystrokes, mouse distance, top apps, longest focus session — rendered as a single page you can save as an image.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-            }
-
-            Section {
-                Button(action: onOpenPrivacyAudit) {
-                    Text("Show what Pulse has recorded…", bundle: .pulse)
-                }
-                Button(role: .destructive) {
-                    isPresentingPurgeSheet = true
-                } label: {
-                    Text("Clear data in a time range…", bundle: .pulse)
-                }
-            } header: {
-                Text("Privacy", bundle: .pulse)
-            } footer: {
-                Text("Opens a window that lists the raw row counts and the full system-event log from the past hour — read live from Pulse's local data file.", bundle: .pulse)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .sheet(isPresented: $isPresentingPurgeSheet) {
-                RangePurgeSheet(
-                    onPurgeRange: onPurgeRange,
-                    onDismiss: { isPresentingPurgeSheet = false }
-                )
             }
 
             Section {
@@ -7143,34 +7289,59 @@ struct DailyBriefingView: View {
     }()
 }
 
-/// Compact two-column stat list used inside the briefing window. Shares
-/// its formatters with `SummaryCardsView` so en / zh-Hans output lines
-/// up with the main dashboard.
+/// Stat block inside the briefing window. Pre-A27 this was a flat
+/// 5-row list of footnote-sized "label → number" pairs that read like
+/// a developer log next to the briefing's celebratory tone — same
+/// numbers, no visual lift. The stats now sit in a 2-column grid of
+/// little tiles, each with a small uppercase label and a `title3`
+/// coral number, so the user reads them as five distinct beats of
+/// "yesterday in numbers" instead of as a stat-table.
 struct BriefingStatRow: View {
 
     let summary: TodaySummary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            row("Keystrokes", PulseFormat.integer(summary.totalKeyPresses))
-            row("Clicks",     PulseFormat.integer(summary.totalMouseClicks))
-            row("Scrolls",    PulseFormat.integer(summary.totalScrollTicks))
-            row("Active time", PulseFormat.duration(seconds: summary.totalActiveSeconds))
-            row("Idle time",   PulseFormat.duration(seconds: summary.totalIdleSeconds))
+        let columns = [
+            GridItem(.flexible(), spacing: 12),
+            GridItem(.flexible(), spacing: 12)
+        ]
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Yesterday in numbers", bundle: .pulse)
+                .font(PulseDesign.labelFont)
+                .tracking(0.3)
+                .foregroundStyle(.secondary)
+            LazyVGrid(columns: columns, spacing: 12) {
+                tile("Keystrokes",  PulseFormat.integer(summary.totalKeyPresses))
+                tile("Clicks",      PulseFormat.integer(summary.totalMouseClicks))
+                tile("Scrolls",     PulseFormat.integer(summary.totalScrollTicks))
+                tile("Active time", PulseFormat.duration(seconds: summary.totalActiveSeconds))
+                tile("Idle time",   PulseFormat.duration(seconds: summary.totalIdleSeconds))
+            }
         }
         .pulseFeaturedCard()
     }
 
     @ViewBuilder
-    private func row(_ titleKey: LocalizedStringKey, _ value: String) -> some View {
-        HStack {
+    private func tile(_ titleKey: LocalizedStringKey, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
             Text(titleKey, bundle: .pulse)
-                .font(.footnote)
+                .font(.caption.weight(.medium))
+                .tracking(0.3)
                 .foregroundStyle(.secondary)
-            Spacer()
             Text(value)
-                .font(.footnote.monospacedDigit())
+                .font(.system(.title3, design: .rounded, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(PulseDesign.coral)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(PulseDesign.warmGray(0.05))
+        )
     }
 }
 
