@@ -493,22 +493,6 @@
       }
     },
     "Database size": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Database size"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "数据库大小"
-          }
-        }
-      }
-    },
-    "Database size": {
       "comment": "Menu-bar CountersView — disk footprint of Pulse's local database. Renamed from 'DB size' to use words a non-developer reads naturally.",
       "localizations": {
         "en": {
@@ -737,6 +721,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "每日活跃时长"
+          }
+        }
+      }
+    },
+    "Each ribbon goes from the app you left to the app you opened next; thicker ribbons mean more frequent switches.": {
+      "comment": "AppSankeyCard explainer caption — names the columns and the ribbon-thickness convention so first-time users can decode the diagram without a legend.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Each ribbon goes from the app you left to the app you opened next; thicker ribbons mean more frequent switches."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每条曲线都从你切走的 App 流向你切去的 App；越粗的曲线代表切换越频繁。"
           }
         }
       }
@@ -1013,6 +1014,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "最近汇总"
+          }
+        }
+      }
+    },
+    "Last %lld days vs the %lld days before that": {
+      "comment": "WeekOverWeekCard subtitle — explicitly names the comparison the row deltas are computed against. Both %lld are the same window length (e.g. 7 days).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last %1$lld days vs the %2$lld days before that"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近 %1$lld 天与之前的 %2$lld 天相比"
           }
         }
       }

@@ -3216,16 +3216,27 @@ struct WeekOverWeekCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("This week vs last", bundle: .pulse)
-                    .font(PulseDesign.cardTitleFont)
-                Spacer()
-                Text(
-                    "\(comparison.currentPeriodDayCount)-day window",
-                    bundle: .pulse
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            // Title + subtitle pair: pre-A28 the card showed an
+            // ambiguous "N-day window" caption. New users couldn't
+            // tell whether the +23% on a row meant "vs the 7 days
+            // before that" or "vs a rolling 14-day average". The
+            // subtitle now spells the comparison out explicitly so
+            // the row deltas read unambiguously.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("This week vs last", bundle: .pulse)
+                        .font(PulseDesign.cardTitleFont)
+                    Spacer()
+                    Text(
+                        "\(comparison.currentPeriodDayCount)-day window",
+                        bundle: .pulse
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                Text("Last \(comparison.currentPeriodDayCount) days vs the \(comparison.currentPeriodDayCount) days before that", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             VStack(spacing: 10) {
                 ForEach(comparison.rows, id: \.metric) { row in
@@ -5965,6 +5976,16 @@ struct AppSankeyCard: View {
                 Text("App switches today", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
+            // First-time users couldn't decode the Sankey shape:
+            // *what* are the columns, *what* does ribbon thickness
+            // mean? The card showed only a count subtitle ("N
+            // switches across M pairs"). New caption sentence
+            // names the columns and the ribbon convention so the
+            // diagram is parseable on first encounter.
+            Text("Each ribbon goes from the app you left to the app you opened next; thicker ribbons mean more frequent switches.", bundle: .pulse)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             subtitle
             SankeyDiagram(
                 layout: makeLayout(),
