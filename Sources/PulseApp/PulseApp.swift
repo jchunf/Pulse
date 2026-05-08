@@ -1467,47 +1467,50 @@ struct HealthMenuView: View {
                     .buttonStyle(.plain)
                     .keyboardShortcut("q")
                 }
-                // Evenly distribute the secondary actions across the
-                // full row — first/last button sit flush with the main
-                // CTA edges above, matching their visual column. A
-                // trailing `Spacer()` left them clumped on the left,
-                // which read as an alignment bug against the wide
-                // row above.
-                HStack(spacing: 0) {
-                    Button(action: onShowBriefing) {
-                        Text("Yesterday's briefing", bundle: .pulse)
-                            .font(.footnote)
+                // Five secondary actions used to crowd one HStack with
+                // `.foregroundStyle(.secondary)` applied to every label.
+                // The result read as disabled meta-info rather than a
+                // toolbox — half the people the menu-bar was actually
+                // for missed that "Yesterday's briefing" was clickable.
+                // Reworked into two rows of icon+label chips: a leading
+                // SF Symbol gives each action a strong affordance, the
+                // text drops back to `.primary` so it looks alive, and
+                // splitting 5 actions across 2 rows fits the 360 pt
+                // popover without truncating labels in zh-Hans.
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 0) {
+                        menuBarSecondaryAction(
+                            titleKey: "Yesterday's briefing",
+                            systemImage: "sun.haze",
+                            action: onShowBriefing
+                        )
+                        Spacer(minLength: 8)
+                        menuBarSecondaryAction(
+                            titleKey: "Generate weekly report",
+                            systemImage: "calendar",
+                            action: onGenerateReport
+                        )
+                        Spacer(minLength: 8)
+                        menuBarSecondaryAction(
+                            titleKey: "Weekly PDF…",
+                            systemImage: "doc.richtext",
+                            action: onGenerateReportPDF
+                        )
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    Spacer(minLength: 8)
-                    Button(action: onGenerateReport) {
-                        Text("Generate weekly report", bundle: .pulse)
-                            .font(.footnote)
+                    HStack(spacing: 0) {
+                        menuBarSecondaryAction(
+                            titleKey: "Export data…",
+                            systemImage: "square.and.arrow.up",
+                            action: onExportData
+                        )
+                        Spacer(minLength: 8)
+                        menuBarSecondaryAction(
+                            titleKey: "Check for updates…",
+                            systemImage: "arrow.triangle.2.circlepath",
+                            action: onCheckForUpdates
+                        )
+                        Spacer(minLength: 0)
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    Spacer(minLength: 8)
-                    Button(action: onGenerateReportPDF) {
-                        Text("Weekly PDF…", bundle: .pulse)
-                            .font(.footnote)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    Spacer(minLength: 8)
-                    Button(action: onExportData) {
-                        Text("Export data…", bundle: .pulse)
-                            .font(.footnote)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    Spacer(minLength: 8)
-                    Button(action: onCheckForUpdates) {
-                        Text("Check for updates…", bundle: .pulse)
-                            .font(.footnote)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
                 }
             }
         }
@@ -1531,12 +1534,40 @@ struct HealthMenuView: View {
             return "Waiting for permissions."
         }
         if snapshot.isSilentlyFailing {
-            return "Collector idle — please open settings."
+            return "Pulse isn't writing — check Settings."
         }
         if snapshot.isRunning {
             return "Listening to your pulse."
         }
         return "Stopped."
+    }
+
+    /// One row of the secondary-actions area in `HealthMenuView`. The
+    /// row used to be five plain buttons with `.foregroundStyle(.secondary)`
+    /// applied to the label, which made them blend into the meta-info
+    /// surrounding them. The leading SF Symbol gives the action a
+    /// strong affordance, the label drops back to `.primary` so it
+    /// reads as live, and `.contentShape(.rect)` over the whole row
+    /// makes the click target the full label + icon, not just the
+    /// glyphs.
+    @ViewBuilder
+    private func menuBarSecondaryAction(
+        titleKey: LocalizedStringKey,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(PulseDesign.coral.opacity(0.85))
+                Text(titleKey, bundle: .pulse)
+                    .font(.footnote)
+                    .foregroundStyle(.primary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

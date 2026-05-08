@@ -427,18 +427,19 @@
         }
       }
     },
-    "Collector idle — please open settings.": {
+    "Pulse isn't writing — check Settings.": {
+      "comment": "Menu-bar status headline shown when the collector is silently failing — usually a revoked permission. Replaces the older internal 'Collector idle' phrasing.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Collector idle — please open settings."
+            "value": "Pulse isn't writing — check Settings."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "采集器空闲 — 请打开设置。"
+            "value": "Pulse 没有写入数据 — 请检查设置。"
           }
         }
       }
