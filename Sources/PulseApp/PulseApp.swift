@@ -5946,14 +5946,28 @@ struct ClipboardCard: View {
                 Text(PulseFormat.integer(count))
                     .font(PulseDesign.heroSecondaryFont)
                     .foregroundStyle(PulseDesign.coral)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("copies / cuts", bundle: .pulse)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    Text("Frequency only — no content read.", bundle: .pulse)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
+                Text("copies / cuts", bundle: .pulse)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
+            // Privacy reassurance line. Pre-A30 this lived as a
+            // tiny `.caption2 + .tertiary` aside next to "copies /
+            // cuts", which made the most sensitive promise on the
+            // card the easiest to miss. Promoted to a full row
+            // with a lock glyph and `.footnote + .secondary` so the
+            // claim reads as a deliberate guarantee — clipboard
+            // monitoring is the #1 thing users worry about for
+            // an app that watches input, and the reassurance now
+            // matches that weight.
+            HStack(spacing: 6) {
+                Image(systemName: "lock.fill")
+                    .font(.caption)
+                    .foregroundStyle(PulseDesign.sage.opacity(0.85))
+                Text("Frequency only — Pulse never reads what's on the pasteboard.", bundle: .pulse)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             ClipboardHourlySparkline(hourly: hourly)
                 .frame(height: 44)
@@ -5993,12 +6007,25 @@ struct ShortcutLeaderboardCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "command.circle")
-                    .foregroundStyle(PulseDesign.coral)
-                    .opacity(0.85)
-                Text("Top shortcuts today", bundle: .pulse)
-                    .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: the leaderboard is capped at
+            // 5 in the query (`shortcutLeaderboard(..., limit: 5)`),
+            // matching `AppRankingChart`. Pre-A30 the title alone
+            // didn't anchor the cap, so a user looking at five
+            // rows couldn't tell whether ⌘S was missing because
+            // it didn't fire or because it ranked sixth. Same
+            // self-documenting subtitle treatment round 3 added
+            // to the AppRankingChart.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "command.circle")
+                        .foregroundStyle(PulseDesign.coral)
+                        .opacity(0.85)
+                    Text("Top shortcuts today", bundle: .pulse)
+                        .font(PulseDesign.cardTitleFont)
+                }
+                Text("Top 5 by count today", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             let maxCount = Double(rows.first?.count ?? 1)
             VStack(spacing: 8) {

@@ -1833,6 +1833,13 @@
         }
       }
     },
+    "Top 5 by count today": {
+      "comment": "ShortcutLeaderboardCard subtitle — anchors the hardcoded leaderboard cap (`shortcutLeaderboard(..., limit: 5)`) so users know whether a missing shortcut fell outside the visible threshold.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Top 5 by count today" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "今日按使用次数排前 5 名" } }
+      }
+    },
     "Top 5 by time today": {
       "comment": "AppRankingChart subtitle — anchors the cap so users know exactly how many rows the chart shows.",
       "localizations": {
@@ -5848,11 +5855,11 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "次复制 / 剪切" } }
       }
     },
-    "Frequency only — no content read.": {
-      "comment": "F-32 ClipboardCard — privacy reassurance.",
+    "Frequency only — Pulse never reads what's on the pasteboard.": {
+      "comment": "F-32 ClipboardCard — privacy reassurance, promoted from a tiny `.caption2 + tertiary` aside to a full row with a lock glyph because clipboard monitoring is the #1 privacy concern users have.",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Frequency only — no content read." } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "仅记录频率，从不读取内容" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Frequency only — Pulse never reads what's on the pasteboard." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "仅统计频率 —— Pulse 从不读取剪贴板里的内容。" } }
       }
     },
     "Hand balance · last 7 days": {
