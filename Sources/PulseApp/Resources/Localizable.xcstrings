@@ -3658,34 +3658,36 @@
         }
       }
     },
-    "No events in this window.": {
+    "No system events in the past hour. This table fills in when your Mac sleeps, wakes, locks, opens or closes the lid, or flips a Focus mode.": {
+      "comment": "Privacy audit — empty-state placeholder for the system events table. Explains both what a system event *is* and why the window can be legitimately empty.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No events in this window."
+            "value": "No system events in the past hour. This table fills in when your Mac sleeps, wakes, locks, opens or closes the lid, or flips a Focus mode."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这个时段内没有事件。"
+            "value": "过去一小时没有系统事件。当你的 Mac 进入或唤醒睡眠、锁定、合盖或开盖、切换专注模式时，这张表才会有内容。"
           }
         }
       }
     },
-    "Pulse runs entirely on your Mac. It makes no outbound network calls (the only potential exception is the future update checker, which will be opt-in and point only at GitHub releases).": {
+    "Pulse runs entirely on your Mac. The only outbound traffic is the GitHub Releases check that runs *only* when you click \"Check for updates…\" — never on a schedule, never in the background.": {
+      "comment": "Privacy audit footer — accurately describes the network behaviour of the shipping app: Sparkle update check is the only outbound call, and it's user-initiated.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pulse runs entirely on your Mac. It makes no outbound network calls (the only potential exception is the future update checker, which will be opt-in and point only at GitHub releases)."
+            "value": "Pulse runs entirely on your Mac. The only outbound traffic is the GitHub Releases check that runs *only* when you click \"Check for updates…\" — never on a schedule, never in the background."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pulse 完全运行在你的 Mac 本地，不会发起任何出站网络请求（未来若加入更新检查将是可选项，并且仅指向 GitHub Releases）。"
+            "value": "Pulse 完全运行在你的 Mac 本地。唯一的对外网络流量是「检查更新…」按钮触发的 GitHub Releases 查询 —— 仅在你主动点击时执行，绝不会按计划运行，也绝不会在后台静默触发。"
           }
         }
       }

@@ -7370,9 +7370,18 @@ struct PrivacyAuditView: View {
                     .foregroundStyle(.secondary)
             }
             if snap.systemEvents.isEmpty {
-                Text("No events in this window.", bundle: .pulse)
+                // Pre-A26: "No events in this window." Clear to a
+                // developer; cryptic for an end user who's never met
+                // the term "system event". The new copy explains what
+                // the table *would* show (sleep / wake / lid open
+                // close / Focus mode flips) and why the window can
+                // be empty (you simply haven't done any of those in
+                // the past hour) — so the empty state reads as
+                // expected behaviour rather than a missing feature.
+                Text("No system events in the past hour. This table fills in when your Mac sleeps, wakes, locks, opens or closes the lid, or flips a Focus mode.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 4) {
@@ -7385,11 +7394,23 @@ struct PrivacyAuditView: View {
                                 Text(row.category)
                                     .font(.footnote.monospacedDigit())
                                     .frame(width: 144, alignment: .leading)
+                                // Payload was `.lineLimit(1) + .middle`,
+                                // so longer rows showed mid-string
+                                // ellipses ("Focus…enabled") that were
+                                // useless to the user — they couldn't
+                                // tell what was clipped without
+                                // copying the row out. `.lineLimit(2)`
+                                // lets the rare long payload wrap to a
+                                // second line; `.textSelection(.enabled)`
+                                // lets the user grab the literal value
+                                // for inspection without bouncing
+                                // through the database directly.
                                 Text(row.payload ?? "—")
                                     .font(.footnote.monospacedDigit())
                                     .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
+                                    .lineLimit(2)
+                                    .truncationMode(.tail)
+                                    .textSelection(.enabled)
                             }
                             .padding(.vertical, 1)
                         }
@@ -7407,8 +7428,16 @@ struct PrivacyAuditView: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 4) {
+            // Old footer ("the only potential exception is the
+            // future update checker, which will be opt-in") was
+            // written before Sparkle landed. Sparkle has been in
+            // the build for several releases now and the user
+            // should hear the truth, not a stale promise: the only
+            // outbound traffic is the GitHub Releases fetch they
+            // explicitly trigger via "Check for updates…", and it
+            // never happens on its own.
             Text(
-                "Pulse runs entirely on your Mac. It makes no outbound network calls (the only potential exception is the future update checker, which will be opt-in and point only at GitHub releases).",
+                "Pulse runs entirely on your Mac. The only outbound traffic is the GitHub Releases check that runs *only* when you click \"Check for updates…\" — never on a schedule, never in the background.",
                 bundle: .pulse
             )
             .font(.footnote)
