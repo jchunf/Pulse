@@ -4632,12 +4632,23 @@ struct LidCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "laptopcomputer")
-                    .foregroundStyle(PulseDesign.sage)
-                    .opacity(todayOpens > 0 ? 0.85 : 0.45)
-                Text("MacBook lid", bundle: .pulse)
-                    .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: "MacBook lid" alone left users
+            // wondering why this number was on the dashboard at
+            // all. The subtitle now grounds the metric — each lid
+            // open is a session boundary on a notebook, so the
+            // count answers "how many times did I sit back down at
+            // my Mac today?".
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "laptopcomputer")
+                        .foregroundStyle(PulseDesign.sage)
+                        .opacity(todayOpens > 0 ? 0.85 : 0.45)
+                    Text("MacBook lid", bundle: .pulse)
+                        .font(PulseDesign.cardTitleFont)
+                }
+                Text("Each lid open marks a return to your Mac.", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -5644,12 +5655,19 @@ struct KeyboardRhythmCard: View {
                 Text("Typing tempo · last hour", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
+            // Pre-A30 the data subtitle was "Avg N KPM · peak M KPM",
+            // which assumed unit literacy users may not have. The
+            // reworded line embeds the unit ("keystrokes per minute")
+            // and the windowing rule ("when typing"), so a quiet
+            // 60-minute span doesn't read as "0 KPM = no typing"
+            // when in fact `avgKPMActive` only averages non-empty
+            // minutes.
             Text(
                 String.localizedStringWithFormat(
                     NSLocalizedString(
-                        "Avg %1$.0f KPM · peak %2$lld KPM",
+                        "Avg %1$.0f · peak %2$lld keystrokes per minute, when typing",
                         bundle: .pulse,
-                        comment: "F-19 KeyboardRhythmCard — subtitle. %1$.0f is average KPM across active minutes; %2$lld is peak KPM."
+                        comment: "F-19 KeyboardRhythmCard — subtitle. %1$.0f is average KPM across active minutes; %2$lld is peak KPM. 'when typing' explicitly states the active-minute windowing."
                     ),
                     rhythm.avgKPMActive,
                     Int64(rhythm.peakKPM)
@@ -5706,12 +5724,20 @@ struct MouseSpeedCard: View {
                 Text("Mouse speed · last hour", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
+            // Pre-A30 the subtitle was "Avg N mm/s · peak M mm/s",
+            // which required unit literacy a typical user doesn't
+            // have for mouse speed. The reworded line still uses
+            // mm/s but spells out "millimetres per second, while
+            // moving" so users who think in inches/sec or just
+            // "fast or slow" can still parse the magnitude. "While
+            // moving" matches `avgMmPerSecondActive`'s exclusion of
+            // stationary samples.
             Text(
                 String.localizedStringWithFormat(
                     NSLocalizedString(
-                        "Avg %1$.1f mm/s · peak %2$.1f mm/s",
+                        "Avg %1$.1f · peak %2$.1f millimetres per second, while moving",
                         bundle: .pulse,
-                        comment: "F-18 MouseSpeedCard — subtitle. %1$.1f is average mm/s across active minutes; %2$.1f is peak mm/s."
+                        comment: "F-18 MouseSpeedCard — subtitle. %1$.1f is average mm/s across active minutes; %2$.1f is peak mm/s. 'while moving' explicitly states the active-minute windowing."
                     ),
                     rhythm.avgMmPerSecondActive,
                     rhythm.peakMmPerSecond
@@ -6901,12 +6927,23 @@ struct ChaoticMomentCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "tornado")
-                    .foregroundStyle(PulseDesign.coral)
-                    .opacity(0.85)
-                Text("Busiest minute today", bundle: .pulse)
-                    .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: "Busiest minute today" alone
+            // could be misread as typing-busy or click-heavy. The
+            // metric is specifically *app-switch density*, so the
+            // subtitle now spells that out — keeps the playful
+            // "busiest" framing in the title while making the
+            // signal unambiguous on first read.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "tornado")
+                        .foregroundStyle(PulseDesign.coral)
+                        .opacity(0.85)
+                    Text("Busiest minute today", bundle: .pulse)
+                        .font(PulseDesign.cardTitleFont)
+                }
+                Text("Today's minute with the most app switches.", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(PulseFormat.integer(moment.switchCount))
