@@ -6676,18 +6676,27 @@ struct CountersView: View {
     let snapshot: HealthSnapshot
 
     var body: some View {
+        // Pre-A27 these labels read like syslog rows ("Mouse moves
+        // (raw)", "Key events (raw)", "Total flushes", "DB size",
+        // "Last write"). The "(raw)" qualifier was a relic from
+        // when the popover briefly showed both the in-memory buffer
+        // count *and* a rolled-up minute total side-by-side; only
+        // the live count survived the layout simplification, so the
+        // qualifier is now noise. The rest are renamed to the words
+        // an end user would actually use to describe what they see —
+        // keystrokes / database writes / last saved / database size.
         VStack(alignment: .leading, spacing: 4) {
-            row(labelKey: "Mouse moves (raw)",  value: snapshot.l0Counts.mouseMoves)
-            row(labelKey: "Mouse clicks (raw)", value: snapshot.l0Counts.mouseClicks)
-            row(labelKey: "Key events (raw)",   value: snapshot.l0Counts.keyEvents)
-            row(labelKey: "Total flushes",      value: snapshot.writer.totalFlushes)
+            row(labelKey: "Mouse moves",     value: snapshot.l0Counts.mouseMoves)
+            row(labelKey: "Mouse clicks",    value: snapshot.l0Counts.mouseClicks)
+            row(labelKey: "Key presses",     value: snapshot.l0Counts.keyEvents)
+            row(labelKey: "Database writes", value: snapshot.writer.totalFlushes)
             if let last = snapshot.lastWriteAt {
-                rowText(labelKey: "Last write", value: PulseFormat.ago(from: last, to: snapshot.capturedAt))
+                rowText(labelKey: "Last saved", value: PulseFormat.ago(from: last, to: snapshot.capturedAt))
             } else {
-                rowText(labelKey: "Last write", value: String(localized: "never", bundle: .pulse))
+                rowText(labelKey: "Last saved", value: String(localized: "never", bundle: .pulse))
             }
             if let bytes = snapshot.databaseFileSizeBytes {
-                rowText(labelKey: "DB size", value: PulseFormat.bytes(bytes))
+                rowText(labelKey: "Database size", value: PulseFormat.bytes(bytes))
             }
         }
         .font(.footnote)

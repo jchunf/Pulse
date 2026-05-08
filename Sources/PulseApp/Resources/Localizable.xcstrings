@@ -508,18 +508,36 @@
         }
       }
     },
-    "DB size": {
+    "Database size": {
+      "comment": "Menu-bar CountersView — disk footprint of Pulse's local database. Renamed from 'DB size' to use words a non-developer reads naturally.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "DB size"
+            "value": "Database size"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "库大小"
+            "value": "数据库大小"
+          }
+        }
+      }
+    },
+    "Database writes": {
+      "comment": "Menu-bar CountersView — total number of times Pulse has flushed its in-memory buffer to the on-disk database. Renamed from 'Total flushes' to drop the implementation term.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database writes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "数据库写入次数"
           }
         }
       }
@@ -934,18 +952,19 @@
         }
       }
     },
-    "Key events (raw)": {
+    "Key presses": {
+      "comment": "Menu-bar CountersView — total live count of key presses Pulse has observed in this session. Renamed from 'Key events (raw)' to drop the developer phrasing.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Key events (raw)"
+            "value": "Key presses"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "按键事件（原始）"
+            "value": "按键次数"
           }
         }
       }
@@ -998,18 +1017,19 @@
         }
       }
     },
-    "Last write": {
+    "Last saved": {
+      "comment": "Menu-bar CountersView — relative timestamp of the most recent write to Pulse's local database. Renamed from 'Last write' for plain-language consistency.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Last write"
+            "value": "Last saved"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "最近写入"
+            "value": "最近一次保存"
           }
         }
       }
@@ -1142,18 +1162,19 @@
         }
       }
     },
-    "Mouse clicks (raw)": {
+    "Mouse clicks": {
+      "comment": "Menu-bar CountersView — total live count of mouse clicks Pulse has observed in this session. Renamed from 'Mouse clicks (raw)' to drop the redundant qualifier.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mouse clicks (raw)"
+            "value": "Mouse clicks"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "鼠标点击（原始）"
+            "value": "鼠标点击次数"
           }
         }
       }
@@ -1174,18 +1195,19 @@
         }
       }
     },
-    "Mouse moves (raw)": {
+    "Mouse moves": {
+      "comment": "Menu-bar CountersView — total live count of mouse-move samples Pulse has observed in this session. Renamed from 'Mouse moves (raw)' to drop the redundant qualifier.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mouse moves (raw)"
+            "value": "Mouse moves"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "鼠标移动（原始）"
+            "value": "鼠标移动次数"
           }
         }
       }
@@ -2046,22 +2068,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "连续活跃 %@ 还没休息（阈值：%@）。"
-          }
-        }
-      }
-    },
-    "Total flushes": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Total flushes"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "累计刷写"
           }
         }
       }
