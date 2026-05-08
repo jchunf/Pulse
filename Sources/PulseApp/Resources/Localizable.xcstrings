@@ -1323,18 +1323,19 @@
         }
       }
     },
-    "No writes in the last minute — Pulse may have lost permission or stopped.": {
+    "No writes in the last minute — Pulse may have lost a permission. Open Settings → Diagnostics or recheck Input Monitoring + Accessibility under System Settings.": {
+      "comment": "DiagnosticsCard silent-failure warning. Reworded in A30 to give the user a concrete next step (where to look) instead of just naming the failure mode.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No writes in the last minute — Pulse may have lost permission or stopped."
+            "value": "No writes in the last minute — Pulse may have lost a permission. Open Settings → Diagnostics or recheck Input Monitoring + Accessibility under System Settings."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "过去一分钟没有新数据 — Pulse 可能已失去权限或已停止。"
+            "value": "过去一分钟没有新数据 —— Pulse 可能丢失了权限。打开「设置 → 诊断」，或在系统设置里重新确认「输入监控」和「辅助功能」。"
           }
         }
       }
@@ -1831,6 +1832,13 @@
             "value": "应用排行"
           }
         }
+      }
+    },
+    "Top 5 by count today": {
+      "comment": "ShortcutLeaderboardCard subtitle — anchors the hardcoded leaderboard cap (`shortcutLeaderboard(..., limit: 5)`) so users know whether a missing shortcut fell outside the visible threshold.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Top 5 by count today" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "今日按使用次数排前 5 名" } }
       }
     },
     "Top 5 by time today": {
@@ -4948,6 +4956,20 @@
         }
       }
     },
+    "Each lid open marks a return to your Mac.": {
+      "comment": "F-27 LidCard subtitle — grounds the lid-open count as a 'sessions returned' metric so desktop users understand why the card is on the dashboard at all.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Each lid open marks a return to your Mac." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "每次开盖都代表你回到 Mac 的一次。" } }
+      }
+    },
+    "Today's minute with the most app switches.": {
+      "comment": "F-21 ChaoticMomentCard subtitle — explicitly states that 'busiest' here measures app-switch density, not typing or click volume.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Today's minute with the most app switches." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "今天 App 切换最频繁的一分钟。" } }
+      }
+    },
     "MacBook lid": {
       "comment": "F-27 LidCard — card title.",
       "localizations": {
@@ -5795,14 +5817,14 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "打字节奏 · 最近一小时" } }
       }
     },
-    "Avg %1$.0f KPM · peak %2$lld KPM": {
-      "comment": "F-19 KeyboardRhythmCard — subtitle. %1$.0f is average KPM across active minutes, %2$lld is peak KPM.",
+    "Avg %1$.0f · peak %2$lld keystrokes per minute, when typing": {
+      "comment": "F-19 KeyboardRhythmCard — subtitle. %1$.0f is average KPM across active minutes; %2$lld is peak KPM. 'When typing' explicitly states the active-minute windowing so a quiet hour doesn't get misread as 'no typing'.",
       "localizations": {
         "en": {
-          "stringUnit": { "state": "translated", "value": "Avg %1$.0f KPM · peak %2$lld KPM" }
+          "stringUnit": { "state": "translated", "value": "Avg %1$.0f · peak %2$lld keystrokes per minute, when typing" }
         },
         "zh-Hans": {
-          "stringUnit": { "state": "translated", "value": "均速 %1$.0f KPM · 峰值 %2$lld KPM" }
+          "stringUnit": { "state": "translated", "value": "在你打字的分钟里，每分钟均速 %1$.0f 次 · 峰值 %2$lld 次" }
         }
       }
     },
@@ -5848,11 +5870,11 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "次复制 / 剪切" } }
       }
     },
-    "Frequency only — no content read.": {
-      "comment": "F-32 ClipboardCard — privacy reassurance.",
+    "Frequency only — Pulse never reads what's on the pasteboard.": {
+      "comment": "F-32 ClipboardCard — privacy reassurance, promoted from a tiny `.caption2 + tertiary` aside to a full row with a lock glyph because clipboard monitoring is the #1 privacy concern users have.",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Frequency only — no content read." } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "仅记录频率，从不读取内容" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Frequency only — Pulse never reads what's on the pasteboard." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "仅统计频率 —— Pulse 从不读取剪贴板里的内容。" } }
       }
     },
     "Hand balance · last 7 days": {
@@ -5873,14 +5895,14 @@
         }
       }
     },
-    "Avg %1$.1f mm/s · peak %2$.1f mm/s": {
-      "comment": "F-18 MouseSpeedCard — subtitle. %1$.1f is average mm/s across active minutes, %2$.1f is peak mm/s.",
+    "Avg %1$.1f · peak %2$.1f millimetres per second, while moving": {
+      "comment": "F-18 MouseSpeedCard — subtitle. %1$.1f is average mm/s across active minutes, %2$.1f is peak mm/s. 'While moving' explicitly states the active-minute windowing so users without unit literacy can still parse the metric.",
       "localizations": {
         "en": {
-          "stringUnit": { "state": "translated", "value": "Avg %1$.1f mm/s · peak %2$.1f mm/s" }
+          "stringUnit": { "state": "translated", "value": "Avg %1$.1f · peak %2$.1f millimetres per second, while moving" }
         },
         "zh-Hans": {
-          "stringUnit": { "state": "translated", "value": "均速 %1$.1f 毫米/秒 · 峰值 %2$.1f 毫米/秒" }
+          "stringUnit": { "state": "translated", "value": "在你移动鼠标的分钟里，均速 %1$.1f 毫米/秒 · 峰值 %2$.1f 毫米/秒" }
         }
       }
     },

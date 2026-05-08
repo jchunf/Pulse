@@ -3362,7 +3362,7 @@ struct DiagnosticsCard: View {
 
             if snapshot.isSilentlyFailing {
                 Label {
-                    Text("No writes in the last minute — Pulse may have lost permission or stopped.", bundle: .pulse)
+                    Text("No writes in the last minute — Pulse may have lost a permission. Open Settings → Diagnostics or recheck Input Monitoring + Accessibility under System Settings.", bundle: .pulse)
                 } icon: {
                     Image(systemName: "exclamationmark.circle.fill")
                 }
@@ -4632,12 +4632,23 @@ struct LidCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "laptopcomputer")
-                    .foregroundStyle(PulseDesign.sage)
-                    .opacity(todayOpens > 0 ? 0.85 : 0.45)
-                Text("MacBook lid", bundle: .pulse)
-                    .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: "MacBook lid" alone left users
+            // wondering why this number was on the dashboard at
+            // all. The subtitle now grounds the metric — each lid
+            // open is a session boundary on a notebook, so the
+            // count answers "how many times did I sit back down at
+            // my Mac today?".
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "laptopcomputer")
+                        .foregroundStyle(PulseDesign.sage)
+                        .opacity(todayOpens > 0 ? 0.85 : 0.45)
+                    Text("MacBook lid", bundle: .pulse)
+                        .font(PulseDesign.cardTitleFont)
+                }
+                Text("Each lid open marks a return to your Mac.", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -5644,12 +5655,19 @@ struct KeyboardRhythmCard: View {
                 Text("Typing tempo · last hour", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
+            // Pre-A30 the data subtitle was "Avg N KPM · peak M KPM",
+            // which assumed unit literacy users may not have. The
+            // reworded line embeds the unit ("keystrokes per minute")
+            // and the windowing rule ("when typing"), so a quiet
+            // 60-minute span doesn't read as "0 KPM = no typing"
+            // when in fact `avgKPMActive` only averages non-empty
+            // minutes.
             Text(
                 String.localizedStringWithFormat(
                     NSLocalizedString(
-                        "Avg %1$.0f KPM · peak %2$lld KPM",
+                        "Avg %1$.0f · peak %2$lld keystrokes per minute, when typing",
                         bundle: .pulse,
-                        comment: "F-19 KeyboardRhythmCard — subtitle. %1$.0f is average KPM across active minutes; %2$lld is peak KPM."
+                        comment: "F-19 KeyboardRhythmCard — subtitle. %1$.0f is average KPM across active minutes; %2$lld is peak KPM. 'when typing' explicitly states the active-minute windowing."
                     ),
                     rhythm.avgKPMActive,
                     Int64(rhythm.peakKPM)
@@ -5706,12 +5724,20 @@ struct MouseSpeedCard: View {
                 Text("Mouse speed · last hour", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
+            // Pre-A30 the subtitle was "Avg N mm/s · peak M mm/s",
+            // which required unit literacy a typical user doesn't
+            // have for mouse speed. The reworded line still uses
+            // mm/s but spells out "millimetres per second, while
+            // moving" so users who think in inches/sec or just
+            // "fast or slow" can still parse the magnitude. "While
+            // moving" matches `avgMmPerSecondActive`'s exclusion of
+            // stationary samples.
             Text(
                 String.localizedStringWithFormat(
                     NSLocalizedString(
-                        "Avg %1$.1f mm/s · peak %2$.1f mm/s",
+                        "Avg %1$.1f · peak %2$.1f millimetres per second, while moving",
                         bundle: .pulse,
-                        comment: "F-18 MouseSpeedCard — subtitle. %1$.1f is average mm/s across active minutes; %2$.1f is peak mm/s."
+                        comment: "F-18 MouseSpeedCard — subtitle. %1$.1f is average mm/s across active minutes; %2$.1f is peak mm/s. 'while moving' explicitly states the active-minute windowing."
                     ),
                     rhythm.avgMmPerSecondActive,
                     rhythm.peakMmPerSecond
@@ -5803,19 +5829,62 @@ struct KeyboardHeatmapCard: View {
     private var grid: some View {
         let byKey = Dictionary(uniqueKeysWithValues: keyCodes.map { ($0.keyCode, $0.count) })
         let maxCount = max(1, keyCodes.map(\.count).max() ?? 1)
-        return VStack(spacing: 4) {
-            ForEach(Self.rows.indices, id: \.self) { idx in
-                HStack(spacing: 4) {
-                    ForEach(Self.rows[idx], id: \.keyCode) { key in
-                        KeyboardHeatmapKey(
-                            label: key.label,
-                            count: byKey[key.keyCode] ?? 0,
-                            maxCount: maxCount
-                        )
+        return VStack(spacing: 8) {
+            VStack(spacing: 4) {
+                ForEach(Self.rows.indices, id: \.self) { idx in
+                    HStack(spacing: 4) {
+                        ForEach(Self.rows[idx], id: \.keyCode) { key in
+                            KeyboardHeatmapKey(
+                                label: key.label,
+                                count: byKey[key.keyCode] ?? 0,
+                                maxCount: maxCount
+                            )
+                        }
                     }
                 }
             }
+            // Color-intensity legend, matching the WeekHourlyHeatmap
+            // strip the round-2 polish landed on the Rhythm pane. The
+            // five legend cells use the same per-key tint formula as
+            // `KeyboardHeatmapKey`, so the strip is a literal sample
+            // of the live colour ramp — no second source of truth to
+            // drift. Without this, users could see the gradient but
+            // had no on-card hint that "warmer = more presses".
+            HStack(spacing: 6) {
+                Text("less", bundle: .pulse)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                HStack(spacing: 2) {
+                    ForEach(0..<5, id: \.self) { step in
+                        let intensity = Double(step) / 4.0
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Self.legendColor(intensity: intensity))
+                            .frame(width: 14, height: 10)
+                    }
+                }
+                Text("more", bundle: .pulse)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Spacer()
+            }
+            .padding(.top, 2)
         }
+    }
+
+    /// Mirrors the per-key tint computation in `KeyboardHeatmapKey.body`
+    /// so the legend strip below the grid samples the same ramp the
+    /// keys themselves render with. Kept inline (not promoted to a
+    /// shared helper on `KeyboardHeatmapKey`) so the two formulas
+    /// stay legibly side-by-side; if the per-key colour ever changes
+    /// shape, this entry updates with it.
+    private static func legendColor(intensity clamped: Double) -> Color {
+        let intensity = max(0, min(1, clamped))
+        return Color(
+            red:   (1.0 - intensity) * 0.55 + intensity * 0.95,
+            green: (1.0 - intensity) * 0.70 + intensity * 0.45,
+            blue:  (1.0 - intensity) * 0.55 + intensity * 0.35,
+            opacity: 0.25 + intensity * 0.65
+        )
     }
 
     private struct Key: Hashable {
@@ -5946,14 +6015,28 @@ struct ClipboardCard: View {
                 Text(PulseFormat.integer(count))
                     .font(PulseDesign.heroSecondaryFont)
                     .foregroundStyle(PulseDesign.coral)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("copies / cuts", bundle: .pulse)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    Text("Frequency only — no content read.", bundle: .pulse)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
+                Text("copies / cuts", bundle: .pulse)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
+            // Privacy reassurance line. Pre-A30 this lived as a
+            // tiny `.caption2 + .tertiary` aside next to "copies /
+            // cuts", which made the most sensitive promise on the
+            // card the easiest to miss. Promoted to a full row
+            // with a lock glyph and `.footnote + .secondary` so the
+            // claim reads as a deliberate guarantee — clipboard
+            // monitoring is the #1 thing users worry about for
+            // an app that watches input, and the reassurance now
+            // matches that weight.
+            HStack(spacing: 6) {
+                Image(systemName: "lock.fill")
+                    .font(.caption)
+                    .foregroundStyle(PulseDesign.sage.opacity(0.85))
+                Text("Frequency only — Pulse never reads what's on the pasteboard.", bundle: .pulse)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             ClipboardHourlySparkline(hourly: hourly)
                 .frame(height: 44)
@@ -5993,12 +6076,25 @@ struct ShortcutLeaderboardCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "command.circle")
-                    .foregroundStyle(PulseDesign.coral)
-                    .opacity(0.85)
-                Text("Top shortcuts today", bundle: .pulse)
-                    .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: the leaderboard is capped at
+            // 5 in the query (`shortcutLeaderboard(..., limit: 5)`),
+            // matching `AppRankingChart`. Pre-A30 the title alone
+            // didn't anchor the cap, so a user looking at five
+            // rows couldn't tell whether ⌘S was missing because
+            // it didn't fire or because it ranked sixth. Same
+            // self-documenting subtitle treatment round 3 added
+            // to the AppRankingChart.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "command.circle")
+                        .foregroundStyle(PulseDesign.coral)
+                        .opacity(0.85)
+                    Text("Top shortcuts today", bundle: .pulse)
+                        .font(PulseDesign.cardTitleFont)
+                }
+                Text("Top 5 by count today", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             let maxCount = Double(rows.first?.count ?? 1)
             VStack(spacing: 8) {
@@ -6831,12 +6927,23 @@ struct ChaoticMomentCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "tornado")
-                    .foregroundStyle(PulseDesign.coral)
-                    .opacity(0.85)
-                Text("Busiest minute today", bundle: .pulse)
-                    .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: "Busiest minute today" alone
+            // could be misread as typing-busy or click-heavy. The
+            // metric is specifically *app-switch density*, so the
+            // subtitle now spells that out — keeps the playful
+            // "busiest" framing in the title while making the
+            // signal unambiguous on first read.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "tornado")
+                        .foregroundStyle(PulseDesign.coral)
+                        .opacity(0.85)
+                    Text("Busiest minute today", bundle: .pulse)
+                        .font(PulseDesign.cardTitleFont)
+                }
+                Text("Today's minute with the most app switches.", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(PulseFormat.integer(moment.switchCount))
