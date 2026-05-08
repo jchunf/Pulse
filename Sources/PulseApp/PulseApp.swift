@@ -4153,22 +4153,49 @@ struct DayTimelineCard: View {
 
     @ViewBuilder
     private func bar(_ timeline: DayTimeline) -> some View {
-        GeometryReader { proxy in
-            let totalWidth = proxy.size.width
-            let daySpan: TimeInterval = 86_400
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.secondary.opacity(0.08))
-                ForEach(Array(timeline.segments.enumerated()), id: \.offset) { _, segment in
-                    let offset = segment.startedAt.timeIntervalSince(timeline.dayStart)
-                    let width = max(1, CGFloat(Double(segment.durationSeconds) / daySpan) * totalWidth)
-                    Self.color(for: segment.bundleId)
-                        .opacity(0.85)
-                        .frame(width: width)
-                        .offset(x: CGFloat(offset / daySpan) * totalWidth)
+        // `TimelineView(.periodic(by: 60))` re-evaluates every
+        // minute, which is plenty for a 24-hour-wide bar — the
+        // "now" needle moves about 0.07% of the bar's width per
+        // minute. SwiftUI hands us `context.date` so we don't have
+        // to thread Date.now through the model just to draw a
+        // single line.
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            GeometryReader { proxy in
+                let totalWidth = proxy.size.width
+                let daySpan: TimeInterval = 86_400
+                let nowOffset = context.date.timeIntervalSince(timeline.dayStart)
+                let nowIsToday = nowOffset >= 0 && nowOffset < daySpan
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.secondary.opacity(0.08))
+                    ForEach(Array(timeline.segments.enumerated()), id: \.offset) { _, segment in
+                        let offset = segment.startedAt.timeIntervalSince(timeline.dayStart)
+                        let width = max(1, CGFloat(Double(segment.durationSeconds) / daySpan) * totalWidth)
+                        Self.color(for: segment.bundleId)
+                            .opacity(0.85)
+                            .frame(width: width)
+                            .offset(x: CGFloat(offset / daySpan) * totalWidth)
+                    }
+                    // Pre-A29 the bar offered no "where are we now"
+                    // anchor — a user looking at a sparse afternoon
+                    // had to count from the 12 axis tick to figure
+                    // out whether the gap on the right was "evening
+                    // hasn't happened yet" or "evening was idle". A
+                    // 1.5 pt coral needle now marks the current
+                    // time, but only when the timeline's date range
+                    // actually contains the current moment (so
+                    // historical-day variants of this card don't
+                    // get a misleading marker).
+                    if nowIsToday {
+                        Rectangle()
+                            .fill(PulseDesign.coral.opacity(0.85))
+                            .frame(width: 1.5)
+                            .offset(x: CGFloat(nowOffset / daySpan) * totalWidth)
+                            .accessibilityHidden(true)
+                    }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
-            .clipShape(RoundedRectangle(cornerRadius: 6))
         }
     }
 
@@ -4176,8 +4203,13 @@ struct DayTimelineCard: View {
     private var axis: some View {
         HStack(spacing: 0) {
             ForEach(0..<24, id: \.self) { hour in
+                // Pre-A29 these ticks rendered at `system: 9` —
+                // the same below-readable size the chronotype +
+                // heatmap axis labels carried before. Bumped to
+                // `caption2 + medium` for consistency with the
+                // round-2 / round-3 axis-tick treatment.
                 Text(Self.hourLabels.contains(hour) ? "\(hour)" : "")
-                    .font(.system(size: 9).monospacedDigit())
+                    .font(.caption2.monospacedDigit().weight(.medium))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
