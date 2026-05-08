@@ -3850,6 +3850,23 @@
         }
       }
     },
+    "Step %lld of %lld": {
+      "comment": "Onboarding progress caption shown below the segmented progress bar (e.g. 'Step 3 of 5').",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Step %lld of %lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 步，共 %lld 步"
+          }
+        }
+      }
+    },
     "Short-form work — lots of 5-to-15-minute sessions today.": {
       "localizations": {
         "en": {
@@ -4188,18 +4205,19 @@
         }
       }
     },
-    "macOS quits Pulse to apply the change. Reopen Pulse after — onboarding will resume here.": {
+    "macOS will close Pulse so the new permission takes effect — that's expected. Just reopen Pulse from your Applications folder; this onboarding will pick up right where it left off.": {
+      "comment": "Onboarding Input Monitoring step 4 — reassures the user that Pulse being force-quit is normal, not a crash, and tells them how to resume.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "macOS quits Pulse to apply the change. Reopen Pulse after — onboarding will resume here."
+            "value": "macOS will close Pulse so the new permission takes effect — that's expected. Just reopen Pulse from your Applications folder; this onboarding will pick up right where it left off."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "macOS 会退出 Pulse 以使设置生效。重新打开 Pulse 后，引导流程会回到这里。"
+            "value": "macOS 会关闭 Pulse 以让新权限生效 —— 这是预期行为，不是崩溃。从「应用程序」文件夹里重新打开 Pulse 即可，引导流程会接着上次的位置继续。"
           }
         }
       }
@@ -4268,18 +4286,19 @@
         }
       }
     },
-    "Pulse is now collecting your activity locally. Open the menu bar icon any time to pause, peek at today's numbers, or read the privacy ledger.": {
+    "Pulse is now collecting your activity locally. Open the menu bar icon any time to pause, peek at today's numbers, or browse what Pulse has recorded. Come back tomorrow morning — the first time you wake your Mac you'll see a one-page briefing of yesterday's run.": {
+      "comment": "Onboarding final-step copy — celebrates the setup and tells the user what to expect tomorrow (the first daily briefing).",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pulse is now collecting your activity locally. Open the menu bar icon any time to pause, peek at today's numbers, or read the privacy ledger."
+            "value": "Pulse is now collecting your activity locally. Open the menu bar icon any time to pause, peek at today's numbers, or browse what Pulse has recorded. Come back tomorrow morning — the first time you wake your Mac you'll see a one-page briefing of yesterday's run."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pulse 已经在本地采集你的活动了。任何时候点击菜单栏图标都能暂停、查看今日数据，或翻阅隐私账本。"
+            "value": "Pulse 已经开始在本地采集你的活动了。任何时候点击菜单栏图标都能暂停、查看今日数据，或浏览 Pulse 记录了什么。明早再来 —— 你下一次唤醒 Mac 时，会看到一页关于昨天的简报。"
           }
         }
       }
