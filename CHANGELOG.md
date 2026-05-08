@@ -25,17 +25,22 @@ What's removed:
 
 - **Settings → About** loses the "Receive development builds" toggle.
   The "Check for updates…" button stays and queries the stable feed.
-- **`PulseUpdaterDelegate`** drops `feedURLString(for:)`,
-  `allowedChannels(for:)`, `versionComparator(for:)`, the
-  `AlwaysNewerComparator` class, the `forceNewer` flag + lock, and
-  every channel-routing constant. What stays: the
-  `didFinishUpdateCycleFor:error:` and `didAbortWithError:` hooks
-  that capture an abort error trace into `UserDefaults` for the
-  Diagnostics card. Useful for any future stable update that
-  misbehaves; invisible when nothing's wrong.
+- **`PulseUpdaterDelegate`** is deleted entirely. There's no longer
+  a custom delegate — `UpdateController` constructs the standard
+  Sparkle controller with `updaterDelegate: nil` and lets Sparkle's
+  defaults handle everything.
 - **`UpdateController`** drops `armCrossChannelCheck()`. Class is
-  now a 70-line wrapper over `SPUStandardUpdaterController` with
+  now a ~60-line wrapper over `SPUStandardUpdaterController` with
   one public method (`checkForUpdates()`).
+- **`BundleQuarantineStripper`** (added #157) and
+  **`BundleSigningInspector`** (added #158) are deleted along with
+  their `applicationDidFinishLaunching` invocations. They were
+  diagnostic tooling for a code path Pulse no longer exercises.
+- **`DiagnosticsCard`** drops the "Last update error" row, the
+  bundle path / quarantine status display, the "Codesign report
+  (Sparkle helpers)" disclosure group, the `quarantineStatusLine`
+  helper, and the `lastSparkleError` computed property. xcstrings
+  keys for those four labels are deleted from the catalog.
 - **`apple/Info.plist`** drops `SUDevFeedURL`. `SUFeedURL`,
   `SUPublicEDKey`, the three "no automatic checks" keys all stay.
 - **`.github/workflows/package.yml`** drops the
@@ -47,16 +52,9 @@ What's removed:
 
 What stays (intentionally):
 
-- The package.sh signing fixes from #155 / #156 / #159 — they
+- The `package.sh` signing fixes from #155 / #156 / #159 — they
   apply to stable updates too and only cost a few extra
   `codesign` invocations per build.
-- `BundleQuarantineStripper` (#157) — quarantine-strip on launch
-  is cheap, idempotent, and helps any non-notarized scenario.
-- `BundleSigningInspector` (#158) — runtime codesign snapshot in
-  Diagnostics. Cheap insurance for any future "Check for updates
-  is broken" report.
-- The captured Sparkle abort error display in the Diagnostics
-  card — same idea.
 
 xcstrings keys for the dropped UI strings ("Receive development
 builds", "Switch to latest …", channel captions) stay in the

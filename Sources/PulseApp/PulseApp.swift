@@ -274,30 +274,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
-        // Best-effort: strip macOS Gatekeeper's `com.apple.quarantine`
-        // attribute from this .app and every nested resource. Pulse is
-        // ad-hoc signed (no Developer ID, no notarization), so the
-        // quarantine attribute that lands on the bundle when the user
-        // downloads it from the browser propagates to Sparkle's
-        // `Installer.xpc` / `Updater.app` / `Autoupdate` helpers — and
-        // when Sparkle later tries to launch one of those helpers via
-        // XPC to install an update, Gatekeeper blocks the launch
-        // because the helper isn't notarized. The XPC channel never
-        // opens, Sparkle reports `SUSparkleErrorDomain #4005` ("remote
-        // port connection invalidated"), and the user-facing
-        // suggestion ("if Autoupdate is not adhoc signed…") sends
-        // everyone down a signing rabbit hole that isn't actually the
-        // cause. Stripping quarantine on every launch sidesteps this:
-        // by the time the user clicks Check for updates…, the helpers
-        // are clean.
-        BundleQuarantineStripper.strip(at: Bundle.main.bundlePath)
-        // Capture a verbatim `codesign -dv --verbose=4` snapshot of
-        // every Sparkle helper. Surfaces in Settings → Diagnostics so
-        // the dogfooder hitting #4005 can copy-paste actual signing
-        // info instead of us guessing what's wrong from the
-        // hard-coded Sparkle hint string. Cheap (a few exec calls
-        // on launch) and only meaningful when something's wrong.
-        BundleSigningInspector.captureReport(bundlePath: Bundle.main.bundlePath)
         Task { [weak self] in await self?.bootCollector() }
         startHealthPolling()
         registerWakeObserver()
@@ -3166,116 +3142,8 @@ struct DiagnosticsCard: View {
                         .lineLimit(3)
                 }
             }
-
-            if let (description, errorAt) = lastSparkleError {
-                Divider().overlay(PulseDesign.warmGray(0.12))
-                VStack(alignment: .leading, spacing: 4) {
-                    Label {
-                        Text("Last update error", bundle: .pulse)
-                    } icon: {
-                        Image(systemName: "arrow.down.circle.trianglebadge.exclamationmark")
-                    }
-                    .font(.footnote)
-                    .foregroundStyle(PulseDesign.amber)
-                    Text("\(PulseFormat.ago(from: errorAt, to: snapshot.capturedAt)): \(description)")
-                        .font(.footnote.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .lineLimit(6)
-                }
-            }
-
-            // Bundle path + quarantine strip count from the most
-            // recent launch. Surfaces for #4005 debugging — a
-            // `lastStripCount > 0` confirms quarantine *was* present
-            // and got cleared, which is the typical cause of the
-            // SUSparkleErrorDomain #4005 the dogfooder hit. A `0`
-            // count means the bundle was already clean and the
-            // residual error (if any) has a different root cause.
-            Divider().overlay(PulseDesign.warmGray(0.12))
-            VStack(alignment: .leading, spacing: 4) {
-                if let bundlePath = UserDefaults.standard.string(
-                    forKey: BundleQuarantineStripper.lastBundlePathKey
-                ) {
-                    Text(bundlePath)
-                        .font(.footnote.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .lineLimit(2)
-                }
-                Text(quarantineStatusLine(now: snapshot.capturedAt))
-                    .font(.footnote.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                if let codesignReport = UserDefaults.standard.string(
-                    forKey: BundleSigningInspector.lastReportKey
-                ), !codesignReport.isEmpty {
-                    DisclosureGroup {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            Text(codesignReport)
-                                .font(.system(.caption2, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                                .textSelection(.enabled)
-                                .lineLimit(nil)
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                        .frame(maxHeight: 200)
-                    } label: {
-                        Text("Codesign report (Sparkle helpers)", bundle: .pulse)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
         }
         .pulseFeaturedCard()
-    }
-
-    /// One-line summary of the quarantine-strip step run on the most
-    /// recent app launch. Either:
-    /// - "Quarantine: clean (0 paths) · Xs ago" — bundle was already
-    ///   free of `com.apple.quarantine`, or
-    /// - "Quarantine: stripped from N paths · Xs ago" — the launch
-    ///   removed the attribute from N descendants of the bundle
-    ///   (typical first launch after a fresh download).
-    private func quarantineStatusLine(now: Date) -> String {
-        let defaults = UserDefaults.standard
-        let count = defaults.integer(forKey: BundleQuarantineStripper.lastStripCountKey)
-        let prefix: String
-        if count == 0 {
-            prefix = String(
-                localized: "Quarantine: clean (0 paths)",
-                bundle: .pulse,
-                comment: "Diagnostics — quarantine strip ran and found nothing to remove."
-            )
-        } else {
-            prefix = String.localizedStringWithFormat(
-                NSLocalizedString(
-                    "Quarantine: stripped from %lld paths",
-                    bundle: .pulse,
-                    comment: "Diagnostics — quarantine strip ran and removed the attribute from N paths. %lld is the count."
-                ),
-                count
-            )
-        }
-        if let strippedAt = defaults.object(forKey: BundleQuarantineStripper.lastStripAtKey) as? Date {
-            return "\(prefix) · \(PulseFormat.ago(from: strippedAt, to: now))"
-        }
-        return prefix
-    }
-
-    /// Reads the most recent Sparkle abort error captured by
-    /// `PulseUpdaterDelegate.captureUpdateError(_:)`. Returns `nil` if
-    /// no error has been captured (or after a clean update cycle
-    /// cleared it). Read on every body re-evaluation; not reactive,
-    /// so the user closes + reopens Settings to refresh after running
-    /// a new check.
-    private var lastSparkleError: (description: String, at: Date)? {
-        let defaults = UserDefaults.standard
-        guard let desc = defaults.string(forKey: PulseUpdaterDelegate.lastUpdateErrorKey),
-              let date = defaults.object(forKey: PulseUpdaterDelegate.lastUpdateErrorAtKey) as? Date
-        else { return nil }
-        return (desc, date)
     }
 
     @ViewBuilder
