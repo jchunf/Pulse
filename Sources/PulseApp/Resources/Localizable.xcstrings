@@ -547,6 +547,34 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "和 Pulse 一起的天数" } }
       }
     },
+    "Days in a row with 4+ active hours": {
+      "comment": "ContinuityCard subtitle — explains the qualification rule the streak counter is built on.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Days in a row with 4+ active hours" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "连续保持每天活跃 4 小时以上" } }
+      }
+    },
+    "A full week-long streak — keep going.": {
+      "comment": "ContinuityCard milestone tooltip — first tier (current streak ≥ 7 days).",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "A full week-long streak — keep going." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已经连续一整周 —— 继续保持。" } }
+      }
+    },
+    "Two weeks in a row — that's the new normal now.": {
+      "comment": "ContinuityCard milestone tooltip — second tier (current streak ≥ 14 days).",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Two weeks in a row — that's the new normal now." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "连续两周 —— 这已经成了你的新常态。" } }
+      }
+    },
+    "A whole month of qualifying days. Rare and earned.": {
+      "comment": "ContinuityCard milestone tooltip — third tier (current streak ≥ 30 days).",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "A whole month of qualifying days. Rare and earned." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "整整一个月每天都达标 —— 难得，也是你应得的。" } }
+      }
+    },
     "Recording since %@.": {
       "comment": "F-24 YearWrappedView — days-active subtitle. %@ short date of first event in the year.",
       "localizations": {
@@ -776,19 +804,19 @@
         }
       }
     },
-    "App combinations today": {
-      "comment": "F-14 AppCombinationsCard — card title. Replaces the older 'Work stacks today' which used the abstract metaphor 'stack'.",
+    "Apps you used together today": {
+      "comment": "F-14 AppCombinationsCard — card title. Replaces the older 'App combinations today' which led with the engineer-y noun 'combination'; the new phrasing reads as a question the user might ask themselves.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "App combinations today"
+            "value": "Apps you used together today"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "今日同时使用的 App 组合"
+            "value": "今天一起使用的 App"
           }
         }
       }
@@ -1399,6 +1427,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "打开仪表盘"
+          }
+        }
+      }
+    },
+    "Patterns Pulse noticed in today's activity, compared to your usual rhythm.": {
+      "comment": "InsightsCard subtitle — explains what the rows are (anomaly / standout patterns surfaced by NarrativeEngine vs the user's rolling baseline) so first-time users know why each row appeared.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Patterns Pulse noticed in today's activity, compared to your usual rhythm."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulse 在今天的活动里发现的模式，对比你的日常节奏。"
           }
         }
       }
@@ -4695,6 +4740,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "今日洞察"
+          }
+        }
+      }
+    },
+    "Today's foreground time, grouped automatically by the kind of app you were in.": {
+      "comment": "FocusDonutCard subtitle — explains that the four donut categories (Communication / Creation / Browsing / Other) are auto-classified from each app's bundle id by AppCategoryClassifier, so users don't have to wonder which apps fell into which slice.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today's foreground time, grouped automatically by the kind of app you were in."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天的前台时间，按你使用的 App 类型自动分组。"
           }
         }
       }

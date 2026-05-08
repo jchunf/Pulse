@@ -3459,11 +3459,23 @@ struct InsightsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "sparkles")
-                    .foregroundStyle(PulseDesign.coral)
-                Text("Today's insights", bundle: .pulse)
-                    .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: pre-A29 the card had a lone
+            // "Today's insights" title, leaving first-time users
+            // unsure where the rows came from. The subtitle now
+            // grounds the source: each row is something Pulse
+            // *noticed* against the user's recent rhythm, not a
+            // raw stat reproduced from elsewhere on the dashboard.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(PulseDesign.coral)
+                    Text("Today's insights", bundle: .pulse)
+                        .font(PulseDesign.cardTitleFont)
+                }
+                Text("Patterns Pulse noticed in today's activity, compared to your usual rhythm.", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             VStack(alignment: .leading, spacing: 14) {
                 ForEach(Array(insights.prefix(Self.visibleLimit))) { insight in
@@ -3785,12 +3797,26 @@ struct FocusDonutCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "chart.pie")
-                    .foregroundStyle(PulseDesign.coral)
-                    .opacity(0.85)
-                Text("Focus breakdown", bundle: .pulse)
-                    .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: pre-A29 the card showed only
+            // a "Focus breakdown" title. The four donut segments —
+            // Communication / Creation / Browsing / Other — are
+            // auto-classified from each app's bundle id by
+            // `AppCategoryClassifier`, so a user looking at a
+            // slice labelled "Communication" had no on-card hint
+            // for which apps fell into it. The subtitle now grounds
+            // the categorisation source.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "chart.pie")
+                        .foregroundStyle(PulseDesign.coral)
+                        .opacity(0.85)
+                    Text("Focus breakdown", bundle: .pulse)
+                        .font(PulseDesign.cardTitleFont)
+                }
+                Text("Today's foreground time, grouped automatically by the kind of app you were in.", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             HStack(alignment: .top, spacing: 24) {
                 FocusDonutShape(donut: donut)
@@ -4153,22 +4179,49 @@ struct DayTimelineCard: View {
 
     @ViewBuilder
     private func bar(_ timeline: DayTimeline) -> some View {
-        GeometryReader { proxy in
-            let totalWidth = proxy.size.width
-            let daySpan: TimeInterval = 86_400
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.secondary.opacity(0.08))
-                ForEach(Array(timeline.segments.enumerated()), id: \.offset) { _, segment in
-                    let offset = segment.startedAt.timeIntervalSince(timeline.dayStart)
-                    let width = max(1, CGFloat(Double(segment.durationSeconds) / daySpan) * totalWidth)
-                    Self.color(for: segment.bundleId)
-                        .opacity(0.85)
-                        .frame(width: width)
-                        .offset(x: CGFloat(offset / daySpan) * totalWidth)
+        // `TimelineView(.periodic(by: 60))` re-evaluates every
+        // minute, which is plenty for a 24-hour-wide bar — the
+        // "now" needle moves about 0.07% of the bar's width per
+        // minute. SwiftUI hands us `context.date` so we don't have
+        // to thread Date.now through the model just to draw a
+        // single line.
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            GeometryReader { proxy in
+                let totalWidth = proxy.size.width
+                let daySpan: TimeInterval = 86_400
+                let nowOffset = context.date.timeIntervalSince(timeline.dayStart)
+                let nowIsToday = nowOffset >= 0 && nowOffset < daySpan
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.secondary.opacity(0.08))
+                    ForEach(Array(timeline.segments.enumerated()), id: \.offset) { _, segment in
+                        let offset = segment.startedAt.timeIntervalSince(timeline.dayStart)
+                        let width = max(1, CGFloat(Double(segment.durationSeconds) / daySpan) * totalWidth)
+                        Self.color(for: segment.bundleId)
+                            .opacity(0.85)
+                            .frame(width: width)
+                            .offset(x: CGFloat(offset / daySpan) * totalWidth)
+                    }
+                    // Pre-A29 the bar offered no "where are we now"
+                    // anchor — a user looking at a sparse afternoon
+                    // had to count from the 12 axis tick to figure
+                    // out whether the gap on the right was "evening
+                    // hasn't happened yet" or "evening was idle". A
+                    // 1.5 pt coral needle now marks the current
+                    // time, but only when the timeline's date range
+                    // actually contains the current moment (so
+                    // historical-day variants of this card don't
+                    // get a misleading marker).
+                    if nowIsToday {
+                        Rectangle()
+                            .fill(PulseDesign.coral.opacity(0.85))
+                            .frame(width: 1.5)
+                            .offset(x: CGFloat(nowOffset / daySpan) * totalWidth)
+                            .accessibilityHidden(true)
+                    }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
-            .clipShape(RoundedRectangle(cornerRadius: 6))
         }
     }
 
@@ -4176,8 +4229,13 @@ struct DayTimelineCard: View {
     private var axis: some View {
         HStack(spacing: 0) {
             ForEach(0..<24, id: \.self) { hour in
+                // Pre-A29 these ticks rendered at `system: 9` —
+                // the same below-readable size the chronotype +
+                // heatmap axis labels carried before. Bumped to
+                // `caption2 + medium` for consistency with the
+                // round-2 / round-3 axis-tick treatment.
                 Text(Self.hourLabels.contains(hour) ? "\(hour)" : "")
-                    .font(.system(size: 9).monospacedDigit())
+                    .font(.caption2.monospacedDigit().weight(.medium))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -4654,12 +4712,22 @@ struct ContinuityCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "square.grid.3x3.topleft.filled")
-                    .foregroundStyle(PulseDesign.sage)
-                    .opacity(hasAnyActivity ? 0.85 : 0.35)
-                Text("Continuity", bundle: .pulse)
-                    .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: "Continuity" alone is abstract —
+            // a new user has to read the whole card to learn that the
+            // streak counts days with at least 4 active hours. The
+            // subtitle now spells the qualification rule out so
+            // the streak number above is unambiguous.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "square.grid.3x3.topleft.filled")
+                        .foregroundStyle(PulseDesign.sage)
+                        .opacity(hasAnyActivity ? 0.85 : 0.35)
+                    Text("Continuity", bundle: .pulse)
+                        .font(PulseDesign.cardTitleFont)
+                }
+                Text("Days in a row with 4+ active hours", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             if let streak, hasAnyActivity {
                 filled(streak)
@@ -4679,10 +4747,24 @@ struct ContinuityCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(streak.currentStreak)")
-                        .font(PulseDesign.heroSecondaryFont)
-                        .monospacedDigit()
-                        .foregroundStyle(streak.currentStreak > 0 ? PulseDesign.sage : .secondary)
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("\(streak.currentStreak)")
+                            .font(PulseDesign.heroSecondaryFont)
+                            .monospacedDigit()
+                            .foregroundStyle(streak.currentStreak > 0 ? PulseDesign.sage : .secondary)
+                        // Milestone flame: subtle once the streak
+                        // crosses a full week, gains weight + colour
+                        // shift at fortnight + month thresholds. The
+                        // flame replaces nothing — the number stays
+                        // exactly where it was — so users with short
+                        // streaks see no visual change.
+                        if let tier = Self.milestoneTier(for: streak.currentStreak) {
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: tier.glyphSize, weight: .medium))
+                                .foregroundStyle(tier.glyphColor)
+                                .help(Text(tier.helpKey, bundle: .pulse))
+                        }
+                    }
                     Text("current streak", bundle: .pulse)
                         .font(PulseDesign.labelFont)
                         .tracking(0.3)
@@ -4818,6 +4900,52 @@ struct ContinuityCard: View {
             return PulseDesign.sage.opacity(0.75)
         } else {
             return PulseDesign.sage
+        }
+    }
+
+    /// Three-tier streak milestone — week / fortnight / month — that
+    /// drives the small flame the card now renders next to the streak
+    /// number. Returns `nil` for streaks under a week so users with
+    /// short runs see no visual change. Glyph size and colour escalate
+    /// at each tier so a 30-day streak feels measurably more
+    /// celebrated than a 7-day one.
+    static func milestoneTier(for streak: Int) -> StreakTier? {
+        switch streak {
+        case ..<7:    return nil
+        case 7..<14:  return .weekly
+        case 14..<30: return .fortnight
+        default:      return .monthly
+        }
+    }
+
+    /// Visual specification per milestone tier. Held alongside the
+    /// `milestoneTier` switch so a future 100-day tier or similar
+    /// drops in by adding one case + one entry here.
+    enum StreakTier {
+        case weekly, fortnight, monthly
+
+        var glyphSize: CGFloat {
+            switch self {
+            case .weekly:    return 16
+            case .fortnight: return 18
+            case .monthly:   return 22
+            }
+        }
+
+        var glyphColor: Color {
+            switch self {
+            case .weekly:    return PulseDesign.sage
+            case .fortnight: return PulseDesign.coral.opacity(0.85)
+            case .monthly:   return PulseDesign.coral
+            }
+        }
+
+        var helpKey: LocalizedStringKey {
+            switch self {
+            case .weekly:    return "A full week-long streak — keep going."
+            case .fortnight: return "Two weeks in a row — that's the new normal now."
+            case .monthly:   return "A whole month of qualifying days. Rare and earned."
+            }
         }
     }
 }
@@ -6521,7 +6649,7 @@ struct AppCombinationsCard: View {
                 Image(systemName: "square.stack.3d.up")
                     .foregroundStyle(PulseDesign.coral)
                     .opacity(0.85)
-                Text("App combinations today", bundle: .pulse)
+                Text("Apps you used together today", bundle: .pulse)
                     .font(PulseDesign.cardTitleFont)
             }
             Text("Apps you cycled through in the same 10-minute window.", bundle: .pulse)
