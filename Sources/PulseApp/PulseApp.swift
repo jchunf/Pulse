@@ -5803,19 +5803,62 @@ struct KeyboardHeatmapCard: View {
     private var grid: some View {
         let byKey = Dictionary(uniqueKeysWithValues: keyCodes.map { ($0.keyCode, $0.count) })
         let maxCount = max(1, keyCodes.map(\.count).max() ?? 1)
-        return VStack(spacing: 4) {
-            ForEach(Self.rows.indices, id: \.self) { idx in
-                HStack(spacing: 4) {
-                    ForEach(Self.rows[idx], id: \.keyCode) { key in
-                        KeyboardHeatmapKey(
-                            label: key.label,
-                            count: byKey[key.keyCode] ?? 0,
-                            maxCount: maxCount
-                        )
+        return VStack(spacing: 8) {
+            VStack(spacing: 4) {
+                ForEach(Self.rows.indices, id: \.self) { idx in
+                    HStack(spacing: 4) {
+                        ForEach(Self.rows[idx], id: \.keyCode) { key in
+                            KeyboardHeatmapKey(
+                                label: key.label,
+                                count: byKey[key.keyCode] ?? 0,
+                                maxCount: maxCount
+                            )
+                        }
                     }
                 }
             }
+            // Color-intensity legend, matching the WeekHourlyHeatmap
+            // strip the round-2 polish landed on the Rhythm pane. The
+            // five legend cells use the same per-key tint formula as
+            // `KeyboardHeatmapKey`, so the strip is a literal sample
+            // of the live colour ramp — no second source of truth to
+            // drift. Without this, users could see the gradient but
+            // had no on-card hint that "warmer = more presses".
+            HStack(spacing: 6) {
+                Text("less", bundle: .pulse)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                HStack(spacing: 2) {
+                    ForEach(0..<5, id: \.self) { step in
+                        let intensity = Double(step) / 4.0
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Self.legendColor(intensity: intensity))
+                            .frame(width: 14, height: 10)
+                    }
+                }
+                Text("more", bundle: .pulse)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Spacer()
+            }
+            .padding(.top, 2)
         }
+    }
+
+    /// Mirrors the per-key tint computation in `KeyboardHeatmapKey.body`
+    /// so the legend strip below the grid samples the same ramp the
+    /// keys themselves render with. Kept inline (not promoted to a
+    /// shared helper on `KeyboardHeatmapKey`) so the two formulas
+    /// stay legibly side-by-side; if the per-key colour ever changes
+    /// shape, this entry updates with it.
+    private static func legendColor(intensity clamped: Double) -> Color {
+        let intensity = max(0, min(1, clamped))
+        return Color(
+            red:   (1.0 - intensity) * 0.55 + intensity * 0.95,
+            green: (1.0 - intensity) * 0.70 + intensity * 0.45,
+            blue:  (1.0 - intensity) * 0.55 + intensity * 0.35,
+            opacity: 0.25 + intensity * 0.65
+        )
     }
 
     private struct Key: Hashable {
