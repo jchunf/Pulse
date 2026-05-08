@@ -1614,9 +1614,19 @@ struct PauseControlsView: View {
                     }
                     .font(.footnote)
                     .foregroundStyle(PulseDesign.amber)
-                    Text("Resumes \(PulseFormat.countdown(from: capturedAt, to: resumesAt))", bundle: .pulse)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    // The "Resumes in 14 m" countdown previously used
+                    // `capturedAt` from the HealthSnapshot, which only
+                    // refreshes when the model polls. If the user
+                    // popped the menu open and watched it, the
+                    // countdown sat frozen at the snapshot time.
+                    // `TimelineView(.periodic(by: 1))` re-evaluates
+                    // every second so the countdown actually counts
+                    // down — what the word "countdown" implies.
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Text("Resumes \(PulseFormat.countdown(from: context.date, to: resumesAt))", bundle: .pulse)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Spacer()
                 Button(action: onResume) {
