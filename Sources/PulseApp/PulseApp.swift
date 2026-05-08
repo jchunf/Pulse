@@ -4339,24 +4339,41 @@ private struct ChronotypeSparkline: View {
 
     var body: some View {
         let peak = max(1, hourly.max() ?? 1)
+        // Index of the highest-activity hour. The card subtitle
+        // already names the peak hour numerically; rendering the
+        // matching bar in full coral (vs. the 0.30–0.85 ramp the
+        // other 23 bars use) gives the user a one-glance visual
+        // anchor that matches the prose.
+        let peakIndex = hourly.enumerated()
+            .max(by: { $0.element < $1.element })?
+            .offset
         GeometryReader { geo in
             HStack(alignment: .bottom, spacing: 2) {
                 ForEach(0..<24, id: \.self) { hour in
                     let intensity = Double(hourly[hour]) / Double(peak)
+                    let isPeak = (hour == peakIndex && hourly[hour] > 0)
                     VStack(spacing: 2) {
                         RoundedRectangle(cornerRadius: 1.5)
-                            .fill(PulseDesign.coral.opacity(0.30 + intensity * 0.55))
+                            .fill(
+                                isPeak
+                                    ? PulseDesign.coral
+                                    : PulseDesign.coral.opacity(0.30 + intensity * 0.55)
+                            )
                             .frame(height: max(2, intensity * (geo.size.height - 12)))
                             .frame(maxHeight: .infinity, alignment: .bottom)
-                        // Show every 6th hour as a tick label so the
-                        // axis is readable but not crowded.
+                        // Pre-A28 the tick labels were `size: 9` — readable
+                        // on a 27" iMac, borderline on a 13" laptop. Bumped
+                        // to caption2 + medium so the 0/6/12/18 anchors are
+                        // scannable at the dashboard's normal viewing
+                        // distance, matching the hour-axis treatment in
+                        // the WeekHourlyHeatmap (round 2).
                         if hour % 6 == 0 {
                             Text("\(hour)")
-                                .font(.system(size: 9).monospacedDigit())
+                                .font(.caption2.monospacedDigit().weight(.medium))
                                 .foregroundStyle(.secondary)
                         } else {
                             Text(" ")
-                                .font(.system(size: 9))
+                                .font(.caption2)
                         }
                     }
                     .frame(maxWidth: .infinity)
