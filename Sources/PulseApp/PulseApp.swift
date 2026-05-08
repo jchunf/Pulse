@@ -1732,6 +1732,21 @@ struct DashboardView: View {
             case .input:  return "keyboard"
             }
         }
+
+        /// One-line tooltip shown via `.help(_:)` on each sidebar
+        /// row. Names a section's terse label ("Rhythm", "Focus")
+        /// is only obvious in retrospect; the help text gives a
+        /// first-time user a quick sense of what they'll find
+        /// inside before they click.
+        var helpKey: LocalizedStringKey {
+            switch self {
+            case .today:  return "Today's pulse — distance, key presses, focus, goals."
+            case .rhythm: return "Patterns over time — weekly trend, heatmap, chronotype, streak."
+            case .focus:  return "Focus & rest — deepest focus session, posture, peak typing minute."
+            case .apps:   return "Apps you used — ranking, switches, combinations, day timeline."
+            case .input:  return "Keyboard and mouse — heatmaps, hand balance, clipboard, shortcuts."
+            }
+        }
     }
 
     var body: some View {
@@ -1856,6 +1871,13 @@ struct DashboardView: View {
             .contentShape(RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
+        // Hover tooltip per section. The section labels ("Rhythm",
+        // "Focus", "Input") are short by design but only obvious to
+        // someone who's already used the app. The help text gives
+        // first-time users a one-line preview of what's inside
+        // before they click — and VoiceOver uses the same string,
+        // so screen-reader users get the same orientation.
+        .help(Text(section.helpKey, bundle: .pulse))
     }
 
     private var sidebarDivider: some View {
@@ -3980,12 +4002,23 @@ struct KeyboardPeakCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "keyboard")
-                    .foregroundStyle(PulseDesign.coral)
-                    .opacity(peak == nil ? 0.35 : 0.85)
-                Text("Peak typing minute", bundle: .pulse)
-                    .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: pre-A32 the card showed only
+            // "Peak typing minute" + the KPM hero. Users without
+            // unit literacy ("what is a KPM?") had to read the
+            // tier-pace label below the hero to back-derive the
+            // meaning. Subtitle now grounds the metric and the
+            // acronym in one line.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "keyboard")
+                        .foregroundStyle(PulseDesign.coral)
+                        .opacity(peak == nil ? 0.35 : 0.85)
+                    Text("Peak typing minute", bundle: .pulse)
+                        .font(PulseDesign.cardTitleFont)
+                }
+                Text("Today's fastest minute, in keystrokes per minute (KPM).", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             if let peak {
                 filled(peak)
