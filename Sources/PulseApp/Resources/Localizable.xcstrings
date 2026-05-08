@@ -559,6 +559,27 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "总按键数" } }
       }
     },
+    "Keystrokes + clicks per day": {
+      "comment": "WeekTrendChart subtitle — explains what the y-axis is plotting so the chart is self-documenting.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Keystrokes + clicks per day" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "每日按键 + 点击总和" } }
+      }
+    },
+    "less": {
+      "comment": "WeekHourlyHeatmap legend — left end of the colour-intensity scale strip ('less ▢▢▢▢▢ more').",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "less" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "较少" } }
+      }
+    },
+    "more": {
+      "comment": "WeekHourlyHeatmap legend — right end of the colour-intensity scale strip ('less ▢▢▢▢▢ more').",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "more" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "较多" } }
+      }
+    },
     "Roughly %@ words — about %@ a mid-length novel.": {
       "comment": "F-24 YearWrappedView — keystrokes narrative. %1$@ formatted word count, %2$@ multiplier like '0.3×' or '2×' or fallback phrase.",
       "localizations": {

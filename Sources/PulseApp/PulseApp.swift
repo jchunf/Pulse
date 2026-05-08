@@ -2919,8 +2919,17 @@ struct WeekTrendChart: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Weekly trend", bundle: .pulse)
-                .font(PulseDesign.cardTitleFont)
+            // Title + subtitle pair: the title used to stand alone
+            // ("Weekly trend"), which left users guessing at what the
+            // y-axis was actually counting. The subtitle now spells
+            // it out so the chart is self-documenting at a glance.
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Weekly trend", bundle: .pulse)
+                    .font(PulseDesign.cardTitleFont)
+                Text("Keystrokes + clicks per day", bundle: .pulse)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if points.allSatisfy({ $0.totalEvents == 0 }) {
                 Text("No rolled-up activity yet. Check back once hourly roll-ups have run.", bundle: .pulse)
                     .foregroundStyle(.secondary)
@@ -3042,14 +3051,46 @@ struct WeekHourlyHeatmap: View {
                 }
             }
             HStack(spacing: 2) {
-                Color.clear.frame(width: 52, height: 12)
+                Color.clear.frame(width: 52, height: 14)
                 ForEach(0..<24, id: \.self) { hour in
+                    // Pre-A26: `.font(.system(size: 9))`. Borderline
+                    // unreadable on Retina, especially in zh-Hans
+                    // builds where the hour ticks were the only
+                    // axis label. Bumped to caption2 + .medium so
+                    // the 24-hour anchors are scannable at the
+                    // dashboard's normal viewing distance.
                     Text(Self.hourLabels.contains(hour) ? "\(hour)" : "")
-                        .font(.system(size: 9).monospacedDigit())
+                        .font(.caption2.monospacedDigit().weight(.medium))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+            // Color-scale legend — "less □□□□□ more". Without
+            // a legend the user couldn't tell whether light coral
+            // meant "quiet hour" or "missing data"; the ramp is
+            // single-hue so there's no second-color disambiguation
+            // to read from. The legend is rendered with the same
+            // 5-step quantisation as `heatColor(intensity:)` so the
+            // strip is a literal sample of the cell-fill scale.
+            HStack(spacing: 6) {
+                Color.clear.frame(width: 52)
+                Text("less", bundle: .pulse)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                HStack(spacing: 2) {
+                    ForEach(0..<5, id: \.self) { step in
+                        let intensity = Double(step) / 4.0
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Self.heatColor(intensity: intensity))
+                            .frame(width: 14, height: 10)
+                    }
+                }
+                Text("more", bundle: .pulse)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Spacer()
+            }
+            .padding(.top, 6)
         }
     }
 
