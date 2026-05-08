@@ -2308,7 +2308,7 @@ struct CrashBeaconBanner: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Pulse exited unexpectedly last time", bundle: .pulse)
                     .font(.body.weight(.medium))
-                Text("A diagnostic report was saved by macOS. Open it to see the stack trace, or dismiss this banner — it won't reappear unless another crash happens.", bundle: .pulse)
+                Text("macOS saved a crash log when this happened. Open it if you want to see what went wrong (or share it for debugging), or dismiss this banner — it won't reappear unless another crash happens.", bundle: .pulse)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -4591,22 +4591,43 @@ struct ActivityWeightCard: View {
     @ViewBuilder
     private var subtitle: some View {
         if let peak, avgHours > 0 {
-            Text(
-                String.localizedStringWithFormat(
-                    NSLocalizedString(
-                        "Avg %1$.1f h/day · peak %2$.1f h on %3$@",
-                        bundle: .pulse,
-                        comment: "F-42 ActivityWeightCard — subtitle. %1$.1f is the average daily active hours, %2$.1f is the peak day's hours, %3$@ is a localized short date for the peak day."
-                    ),
-                    avgHours,
-                    peak.activeHours,
-                    Self.peakDateFormatter.string(from: peak.day)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(
+                    String.localizedStringWithFormat(
+                        NSLocalizedString(
+                            "Avg %1$.1f h/day · peak %2$.1f h on %3$@",
+                            bundle: .pulse,
+                            comment: "F-42 ActivityWeightCard — subtitle. %1$.1f is the average daily active hours, %2$.1f is the peak day's hours, %3$@ is a localized short date for the peak day."
+                        ),
+                        avgHours,
+                        peak.activeHours,
+                        Self.peakDateFormatter.string(from: peak.day)
+                    )
                 )
-            )
-            .font(PulseDesign.labelFont)
-            .tracking(0.3)
-            .foregroundStyle(.secondary)
+                .font(PulseDesign.labelFont)
+                .tracking(0.3)
+                .foregroundStyle(.secondary)
+                if let delta = weekOverWeekDelta() {
+                    DeltaChip(deltaFraction: delta)
+                }
+            }
         }
+    }
+
+    /// Computes the user's last-7-days average vs the 7 days before
+    /// that, returning a fractional change suitable for `DeltaChip`.
+    /// Returns `nil` when the trailing windows are too sparse for a
+    /// meaningful comparison (under 14 points, or zero baseline) so a
+    /// week-one user doesn't see a misleading 100% chip on Day 8.
+    private func weekOverWeekDelta() -> Double? {
+        guard points.count >= 14 else { return nil }
+        let recent = points.suffix(7)
+        let prior = points.dropLast(7).suffix(7)
+        guard prior.count == 7 else { return nil }
+        let recentSum = recent.reduce(0.0) { $0 + $1.activeHours }
+        let priorSum = prior.reduce(0.0) { $0 + $1.activeHours }
+        guard priorSum > 0 else { return nil }
+        return (recentSum - priorSum) / priorSum
     }
 
     private static let peakDateFormatter: DateFormatter = {
@@ -5595,6 +5616,21 @@ struct HandBalanceCard: View {
             .foregroundStyle(.secondary)
             HandBalanceBar(balance: balance)
                 .frame(height: 18)
+            // Layout disclaimer. The classification is a static
+            // map from key codes to "left half" / "right half"
+            // anchored on the US-QWERTY layout — Dvorak / Colemak
+            // / international layouts will produce technically
+            // accurate counts that don't match the user's
+            // physical hands. Pre-A31 the card said nothing about
+            // this; users who noticed the asymmetry on a
+            // non-QWERTY keyboard had no way to tell whether it
+            // was a real signal or a layout artifact. The
+            // footnote sets expectations without forcing a
+            // disabled state on layouts we can't verify.
+            Text("Based on US-QWERTY key positions — bars may not reflect physical hands on Dvorak or Colemak.", bundle: .pulse)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .pulseFeaturedCard()
     }
