@@ -13,6 +13,58 @@ import PulseCore
 /// `Localizable.xcstrings`.
 enum PulseFormat {
 
+    // MARK: - Cached formatters
+    //
+    // Pre-A34 every helper allocated a fresh `RelativeDateTimeFormatter`
+    // / `DateComponentsFormatter` per call. Both are heavyweight to
+    // construct (locale binding, calendar setup, ICU table lookup), and
+    // call sites are dense — the dashboard header + sidebar footer
+    // re-evaluate inside `TimelineView(.periodic(by: 30))`, the menu-bar
+    // pause countdown re-evaluates every second, and the dashboard
+    // refresh path formats dozens of durations per tick.
+    //
+    // The formatters are configured once and reused; `locale` is set to
+    // `.autoupdatingCurrent` so live system-locale changes still take
+    // effect without invalidating the cache. All call sites in
+    // `PulseFormat` originate on the main thread (UI rendering /
+    // SwiftUI view bodies); the underlying formatters are read-only
+    // after construction, so no synchronisation is needed.
+
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.locale = .autoupdatingCurrent
+        f.unitsStyle = .abbreviated
+        f.dateTimeStyle = .numeric
+        return f
+    }()
+
+    /// Three pre-configured `DateComponentsFormatter`s, one per the
+    /// `allowedUnits` shape `duration(seconds:)` selects from. Each
+    /// is read-only after init so the static-let pattern is safe.
+    private static let durationSecondsFormatter: DateComponentsFormatter = {
+        let f = DateComponentsFormatter()
+        f.unitsStyle = .abbreviated
+        f.maximumUnitCount = 2
+        f.allowedUnits = [.second]
+        return f
+    }()
+
+    private static let durationMinutesFormatter: DateComponentsFormatter = {
+        let f = DateComponentsFormatter()
+        f.unitsStyle = .abbreviated
+        f.maximumUnitCount = 2
+        f.allowedUnits = [.minute]
+        return f
+    }()
+
+    private static let durationHourMinuteFormatter: DateComponentsFormatter = {
+        let f = DateComponentsFormatter()
+        f.unitsStyle = .abbreviated
+        f.maximumUnitCount = 2
+        f.allowedUnits = [.hour, .minute]
+        return f
+    }()
+
     // MARK: - Relative time
 
     /// "5s ago" / "5 秒前". Falls back to the localised "just now" for
@@ -22,10 +74,7 @@ enum PulseFormat {
         if seconds < 1 {
             return String(localized: "just now", defaultValue: "just now", bundle: .pulse)
         }
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        formatter.dateTimeStyle = .numeric
-        return formatter.localizedString(for: instant, relativeTo: now)
+        return relativeFormatter.localizedString(for: instant, relativeTo: now)
     }
 
     // MARK: - Countdown ("in 15m", "15 分钟后")
@@ -34,24 +83,19 @@ enum PulseFormat {
     /// `RelativeDateTimeFormatter` so the tense (in/ago) comes out right
     /// in every supported locale.
     static func countdown(from now: Date, to target: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        formatter.dateTimeStyle = .numeric
-        return formatter.localizedString(for: target, relativeTo: now)
+        return relativeFormatter.localizedString(for: target, relativeTo: now)
     }
 
     // MARK: - Durations ("2h 15m" / "2小时 15分钟")
 
     static func duration(seconds: Int) -> String {
-        let formatter = DateComponentsFormatter()
-        formatter.unitsStyle = .abbreviated
-        formatter.maximumUnitCount = 2
+        let formatter: DateComponentsFormatter
         if seconds < 60 {
-            formatter.allowedUnits = [.second]
+            formatter = durationSecondsFormatter
         } else if seconds < 3_600 {
-            formatter.allowedUnits = [.minute]
+            formatter = durationMinutesFormatter
         } else {
-            formatter.allowedUnits = [.hour, .minute]
+            formatter = durationHourMinuteFormatter
         }
         return formatter.string(from: TimeInterval(seconds)) ?? "\(seconds)"
     }
