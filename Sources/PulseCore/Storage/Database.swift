@@ -1,14 +1,24 @@
 import Foundation
 import GRDB
 
-/// Thin wrapper around a GRDB `DatabaseQueue` that enforces our defaults
-/// (WAL mode, secure delete off for speed, foreign keys on). Callers should
-/// obtain the queue via this type rather than instantiating GRDB directly.
+/// Thin wrapper around a GRDB connection that enforces our defaults
+/// (WAL mode, secure delete off for speed, foreign keys on). The
+/// production on-disk path uses `DatabasePool` so concurrent
+/// readers (e.g. the dashboard refresh and the menu-bar health
+/// snapshot) don't serialize behind each other; the in-memory test
+/// path uses `DatabaseQueue` because GRDB's `DatabasePool`
+/// requires a real file path on disk for WAL semantics.
+///
+/// The `queue` property is typed as `any DatabaseWriter` to abstract
+/// over both — every read/write site only ever calls `.read { db in }`
+/// or `.write { db in }`, both of which the protocol declares.
+/// `DatabaseWriter` is itself `Sendable` in GRDB 6+, so this struct
+/// inherits the property's Sendability without needing `@unchecked`.
 public struct PulseDatabase: Sendable {
 
-    public let queue: DatabaseQueue
+    public let queue: any DatabaseWriter
 
-    public init(queue: DatabaseQueue) {
+    public init(queue: any DatabaseWriter) {
         self.queue = queue
     }
 
@@ -48,10 +58,15 @@ public struct PulseDatabase: Sendable {
             try db.execute(sql: "PRAGMA cache_size = -65536")
             try db.execute(sql: "PRAGMA mmap_size = 268435456")
         }
-        let queue = try DatabaseQueue(path: url.path, configuration: configuration)
+        // Production uses `DatabasePool`: WAL-backed readers can run
+        // concurrently with the writer (and with each other), so the
+        // dashboard's refresh path doesn't serialize behind any
+        // simultaneous menu-bar / writer activity. Round 14 of the
+        // perf push.
+        let pool = try DatabasePool(path: url.path, configuration: configuration)
         let migrator = try Migrator.bundled()
-        _ = try migrator.migrate(queue)
-        return PulseDatabase(queue: queue)
+        _ = try migrator.migrate(pool)
+        return PulseDatabase(queue: pool)
     }
 
     /// Open an in-memory database. Intended for tests.
