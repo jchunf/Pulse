@@ -29,6 +29,26 @@ public final class CGEventTapSource: EventSource, @unchecked Sendable {
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var handler: (@Sendable (DomainEvent) -> Void)?
+    /// Cached value of `pulse.collection.captureKeycodes`. Pre-A34 the
+    /// `keyDown` branch read this from `UserDefaults.standard` *on every
+    /// keystroke* — the hottest path in the entire app, since this code
+    /// runs once per user key press and `UserDefaults.bool(forKey:)`
+    /// internally takes its own locks and parses plist storage. With
+    /// the cache in place the read collapses to a memory load under
+    /// the existing `lock` we already take to copy `handler`, so a
+    /// hundred-thousand-keystroke day saves a hundred thousand
+    /// UserDefaults round-trips.
+    private var captureKeycodesCache: Bool = false
+    /// Notification observer that keeps `captureKeycodesCache` in
+    /// sync with the Settings toggle. Registered in `start()`,
+    /// torn down in `stop()` / `deinit`.
+    private var defaultsObserver: NSObjectProtocol?
+
+    /// UserDefaults key string. Mirrored verbatim from
+    /// `PulsePreferenceKey.captureKeycodes` (PulseApp owns that
+    /// constant; PulsePlatform doesn't depend on PulseApp, so the
+    /// string is duplicated here).
+    private static let captureKeycodesKey = "pulse.collection.captureKeycodes"
 
     public init(
         permissions: PermissionService,
@@ -86,6 +106,26 @@ public final class CGEventTapSource: EventSource, @unchecked Sendable {
 
         self.tap = tap
         self.runLoopSource = source
+
+        // Seed the cache + register a UserDefaults observer so the
+        // Settings → "keyboard heatmap" toggle invalidates the cache
+        // immediately. The notification fires on `.main`; `handle()`
+        // also runs on the main runloop (CFMachPort callback), so
+        // both writes and reads serialize naturally.
+        self.captureKeycodesCache = UserDefaults.standard.bool(
+            forKey: Self.captureKeycodesKey
+        )
+        self.defaultsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: UserDefaults.standard,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            let newValue = UserDefaults.standard.bool(forKey: Self.captureKeycodesKey)
+            self.lock.lock()
+            self.captureKeycodesCache = newValue
+            self.lock.unlock()
+        }
     }
 
     public func stop() {
@@ -96,6 +136,10 @@ public final class CGEventTapSource: EventSource, @unchecked Sendable {
         }
         if let source = self.runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
+        }
+        if let observer = self.defaultsObserver {
+            NotificationCenter.default.removeObserver(observer)
+            self.defaultsObserver = nil
         }
         self.tap = nil
         self.runLoopSource = nil
@@ -113,12 +157,21 @@ public final class CGEventTapSource: EventSource, @unchecked Sendable {
         if let runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         }
+        if let observer = defaultsObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     private func handle(type: CGEventType, event: CGEvent) {
+        // Single lock acquisition pulls both the handler closure and
+        // the cached `captureKeycodes` flag — same number of lock
+        // takes as the original (one), with the UserDefaults read
+        // collapsed out of the per-event hot path entirely.
         let handlerCopy: (@Sendable (DomainEvent) -> Void)?
+        let captureKeycodes: Bool
         lock.lock()
         handlerCopy = self.handler
+        captureKeycodes = self.captureKeycodesCache
         lock.unlock()
         guard let handler = handlerCopy else { return }
 
@@ -138,14 +191,14 @@ public final class CGEventTapSource: EventSource, @unchecked Sendable {
         case .keyDown:
             // D-K2 keycode capture is opt-in per Q-06. When the user
             // flips the "Enable keyboard heatmap" toggle in Settings,
-            // `UserDefaults.pulse.collection.captureKeycodes` becomes
-            // true and we fold the raw keycode into `.keyPress`. When
-            // off, the event still flows through so total keystroke
-            // counts keep working, but the keycode field stays nil.
+            // `pulse.collection.captureKeycodes` becomes true and we
+            // fold the raw keycode into `.keyPress`. When off, the
+            // event still flows through so total keystroke counts
+            // keep working, but the keycode field stays nil. The
+            // flag is read from `captureKeycodesCache` (kept in
+            // sync via UserDefaults.didChangeNotification at start
+            // time) instead of being re-read on every key press.
             let keyCode = UInt16(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeycode))
-            let captureKeycodes = UserDefaults.standard.bool(
-                forKey: "pulse.collection.captureKeycodes"
-            )
             handler(.keyPress(keyCode: captureKeycodes ? keyCode : nil, at: now))
 
             // D-K3 shortcut detection is independent of D-K2: we
