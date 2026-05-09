@@ -971,119 +971,147 @@ final class DashboardModel: ObservableObject {
         continuityDays: Int,
         weekOverWeekDays: Int,
         calendar: Calendar
-    ) throws -> RawSnapshot {
-        let summary = try store.todaySummary(start: dayStart, end: dayEnd, capUntil: now)
-        let heatmap = try store.hourlyHeatmap(endingAt: now, days: heatmapDays)
-        let trend = try store.dailyTrend(endingAt: now, days: trendDays)
-        let comparisonTrend = try store.dailyTrend(endingAt: now, days: weekOverWeekDays)
-        let focus = try store.longestFocusSegment(on: dayStart, now: now)
-        let posture = try store.sessionPosture(on: dayStart, now: now)
-        let switches = try store.appSwitchCount(on: dayStart, capUntil: now)
-        let continuity = try store.continuityStreak(endingAt: now, days: continuityDays)
-        let lidToday = try store.dailyLidOpens(on: dayStart, capUntil: now)
-        let lidTrend = try store.lidOpensTrend(endingAt: now, days: trendDays)
-        let restDay = try store.restSegments(on: dayStart, capUntil: now)
-        let timeline = try store.dayTimeline(on: dayStart, capUntil: now)
-        let keyPeak = try store.peakKeyPressMinute(start: dayStart, capUntil: now)
-        let passive = try store.passiveConsumption(on: dayStart, capUntil: now)
-        let shortcuts = try store.shortcutLeaderboard(start: dayStart, end: dayEnd, limit: 5)
-        // F-13 — top foreground app-switch pairs for today. Same
-        // window as shortcuts/timeline ("today through now").
-        let appTransitions = (try? store.appTransitions(start: dayStart, end: now, limit: 12)) ?? []
-        // F-14 — work stacks for today, 10-minute buckets, top 6.
-        let appCombinations = (try? store.appCombinations(
+    ) async throws -> RawSnapshot {
+        // Round 14 swapped the production DB to `DatabasePool`, which
+        // unblocks GRDB's WAL-backed concurrent readers — multiple
+        // `database.queue.read { ... }` calls now actually run in
+        // parallel across the pool's reader connections. Round 15
+        // takes advantage by kicking off each independent dashboard
+        // query as an `async let`. Each `async let` becomes a child
+        // Task; the parent gathers them with `try await` at the end.
+        // The Swift runtime's cooperative pool spreads them across
+        // available CPU cores, so the wall-clock cost of a refresh
+        // tick collapses from "sum of all query times" to "max of
+        // all query times" (modulo pool reader concurrency limits
+        // and SQL contention).
+        //
+        // The `try?` queries below intentionally don't propagate
+        // throws — a single-table miss reduces the affected card
+        // rather than blanking the whole snapshot. With `async let`
+        // we encode the same shape: the right-hand side already
+        // swallows errors, so the `await` just retrieves the
+        // recovered value.
+        async let summary           = try store.todaySummary(start: dayStart, end: dayEnd, capUntil: now)
+        async let heatmap           = try store.hourlyHeatmap(endingAt: now, days: heatmapDays)
+        async let trend             = try store.dailyTrend(endingAt: now, days: trendDays)
+        async let comparisonTrend   = try store.dailyTrend(endingAt: now, days: weekOverWeekDays)
+        async let focus             = try store.longestFocusSegment(on: dayStart, now: now)
+        async let posture           = try store.sessionPosture(on: dayStart, now: now)
+        async let switches          = try store.appSwitchCount(on: dayStart, capUntil: now)
+        async let continuity        = try store.continuityStreak(endingAt: now, days: continuityDays)
+        async let lidToday          = try store.dailyLidOpens(on: dayStart, capUntil: now)
+        async let lidTrend          = try store.lidOpensTrend(endingAt: now, days: trendDays)
+        async let restDay           = try store.restSegments(on: dayStart, capUntil: now)
+        async let timeline          = try store.dayTimeline(on: dayStart, capUntil: now)
+        async let keyPeak           = try store.peakKeyPressMinute(start: dayStart, capUntil: now)
+        async let passive           = try store.passiveConsumption(on: dayStart, capUntil: now)
+        async let shortcuts         = try store.shortcutLeaderboard(start: dayStart, end: dayEnd, limit: 5)
+        async let keyCodes          = try store.keyCodeDistribution(endingAt: now, days: 7)
+        // F-09 — limit 200 so the "other" slice is accurate.
+        async let allAppsToday      = try store.appUsageRanking(
+            start: dayStart,
+            end: dayEnd,
+            capUntil: now,
+            limit: 200
+        )
+        // Histograms feed the per-display snapshot loops further
+        // down; they fan out before the loops run.
+        async let trajectoryHistograms = try store.mouseDensity(endingAt: now, days: trajectoryDays)
+        async let clickHistograms      = try store.mouseClickDensity(endingAt: now, days: trajectoryDays)
+
+        // The `try?` queries' values are non-throwing once recovered,
+        // so they're hoisted into `async let` exactly the same way —
+        // the closure just runs the recovery inline.
+        async let appTransitionsLet: [AppTransition] = (try? store.appTransitions(start: dayStart, end: now, limit: 12)) ?? []
+        async let appCombinationsLet: [AppCombination] = (try? store.appCombinations(
             start: dayStart,
             end: now,
             bucketSeconds: 600,
             minSize: 2,
             limit: 6
         )) ?? []
-        // F-21 — today's busiest 60-second window. Threshold 3 so
-        // we only call out a "moment" when the user genuinely flipped
-        // between apps multiple times in a minute.
-        let chaoticMoment = try? store.busiestMultitaskingMinute(
+        async let chaoticMomentLet: ChaoticMoment? = try? store.busiestMultitaskingMinute(
             start: dayStart,
             end: now,
             minSwitches: 3
         )
-        // F-40 — chronotype across the past 14 days.
-        let chronotype = try? store.chronotype(endingAt: now, days: 14)
-        // F-42 — 30-day daily active-hours curve.
-        let activityWeight = (try? store.activityWeight(endingAt: now, days: 30)) ?? []
-        // F-19 — last-60-minute typing-cadence sparkline.
-        let keyboardRhythm = (try? store.keyboardRhythm(endingAt: now, minutes: 60)) ?? KeyboardRhythm(samples: [])
-        // F-18 — last-60-minute mouse-speed sparkline.
-        let mouseSpeedRhythm = (try? store.mouseSpeed(endingAt: now, minutes: 60)) ?? MouseSpeedRhythm(samples: [])
-        let keyCodes = try store.keyCodeDistribution(endingAt: now, days: 7)
-        // F-37 — today's Focus / DND seconds + fraction.
-        let focusSeconds = (try? store.dailyFocusSeconds(on: dayStart, capUntil: now)) ?? 0
-        let focusFraction = (try? store.focusFractionToday(on: dayStart, capUntil: now)) ?? 0
-        // F-32 — today's clipboard-change count + hour-of-day distribution.
-        let clipboardCount = (try? store.dailyClipboardChanges(on: dayStart, capUntil: now)) ?? 0
-        let clipboardHourly = (try? store.hourlyClipboardChanges(on: dayStart, capUntil: now)) ?? Array(repeating: 0, count: 24)
-        // F-20 — left/right hand balance. Nil-out when classifiedTotal is
-        // too small (a 30-keystroke fluke shouldn't read as "right 80%").
-        let handBalance: HandBalance? = {
+        async let chronotypeLet: Chronotype? = try? store.chronotype(endingAt: now, days: 14)
+        async let activityWeightLet: [ActivityWeightPoint] = (try? store.activityWeight(endingAt: now, days: 30)) ?? []
+        async let keyboardRhythmLet: KeyboardRhythm = (try? store.keyboardRhythm(endingAt: now, minutes: 60)) ?? KeyboardRhythm(samples: [])
+        async let mouseSpeedRhythmLet: MouseSpeedRhythm = (try? store.mouseSpeed(endingAt: now, minutes: 60)) ?? MouseSpeedRhythm(samples: [])
+        async let focusSecondsLet: Int = (try? store.dailyFocusSeconds(on: dayStart, capUntil: now)) ?? 0
+        async let focusFractionLet: Double = (try? store.focusFractionToday(on: dayStart, capUntil: now)) ?? 0
+        async let clipboardCountLet: Int = (try? store.dailyClipboardChanges(on: dayStart, capUntil: now)) ?? 0
+        async let clipboardHourlyLet: [Int] = (try? store.hourlyClipboardChanges(on: dayStart, capUntil: now)) ?? Array(repeating: 0, count: 24)
+        async let handBalanceLet: HandBalance? = {
             guard let raw = try? store.handBalance(endingAt: now, days: 7) else { return nil }
             return raw.classifiedTotal >= 200 ? raw : nil
         }()
-        // F-09 — limit 200 so the "other" slice is accurate.
-        let allAppsToday = try store.appUsageRanking(
-            start: dayStart,
-            end: dayEnd,
-            capUntil: now,
-            limit: 200
-        )
-        // F-04 / F-16 — pre-binned density tables, one PK lookup per
-        // tile for the display snapshot.
-        let trajectoryHistograms = try store.mouseDensity(endingAt: now, days: trajectoryDays)
-        var trajectoryTiles: [MouseTrajectoryTileData] = []
-        trajectoryTiles.reserveCapacity(trajectoryHistograms.count)
-        for histogram in trajectoryHistograms {
-            let snapshot = try? store.latestDisplaySnapshot(displayId: histogram.displayId)
-            trajectoryTiles.append(MouseTrajectoryTileData(histogram: histogram, snapshot: snapshot))
-        }
-        let clickHistograms = try store.mouseClickDensity(endingAt: now, days: trajectoryDays)
-        var clickTiles: [MouseTrajectoryTileData] = []
-        clickTiles.reserveCapacity(clickHistograms.count)
-        for histogram in clickHistograms {
-            let snapshot = try? store.latestDisplaySnapshot(displayId: histogram.displayId)
-            clickTiles.append(MouseTrajectoryTileData(histogram: histogram, snapshot: snapshot))
-        }
-        // A27 — past-days longest-focus history for the deep-focus
-        // insight rule. Pre-A35 the call site looped per-day, calling
-        // `longestFocusSegment(on:)` `trendDays - 1` times — that
-        // opened `trendDays - 1` separate read transactions and ran
-        // `3 × (trendDays - 1)` SELECTs on every refresh tick.
-        // `longestFocusDurationsForPreviousDays` folds the lot into
-        // one transaction + three SELECTs total, with the per-day
-        // interval split + activity verification done in pure Swift.
-        // `try?` so a transient DB error reduces the history rather
-        // than blanking the whole insights row.
-        let pastLongestFocus: [Int] = (
+        async let pastLongestFocusLet: [Int] = (
             (try? store.longestFocusDurationsForPreviousDays(
                 endingAt: dayStart,
                 days: trendDays - 1
             )) ?? []
         ).compactMap { $0 }
-        let lifetimeMm = (try? store.lifetimeMouseDistanceMillimeters()) ?? 0
+        async let lifetimeMmLet: Double = (try? store.lifetimeMouseDistanceMillimeters()) ?? 0
 
+        // Phase 2 — the per-display snapshot loops. They depend on
+        // the histogram results above so they run after those
+        // resolve; we await the histograms inline and run the
+        // per-display lookups serially (1–3 displays per loop,
+        // small fixed cost).
+        let trajectoryHistogramsResolved = try await trajectoryHistograms
+        var trajectoryTiles: [MouseTrajectoryTileData] = []
+        trajectoryTiles.reserveCapacity(trajectoryHistogramsResolved.count)
+        for histogram in trajectoryHistogramsResolved {
+            let snapshot = try? store.latestDisplaySnapshot(displayId: histogram.displayId)
+            trajectoryTiles.append(MouseTrajectoryTileData(histogram: histogram, snapshot: snapshot))
+        }
+        let clickHistogramsResolved = try await clickHistograms
+        var clickTiles: [MouseTrajectoryTileData] = []
+        clickTiles.reserveCapacity(clickHistogramsResolved.count)
+        for histogram in clickHistogramsResolved {
+            let snapshot = try? store.latestDisplaySnapshot(displayId: histogram.displayId)
+            clickTiles.append(MouseTrajectoryTileData(histogram: histogram, snapshot: snapshot))
+        }
+
+        // Phase 3 — gather every other `async let` result. Throwing
+        // queries propagate via `try await`; recovered queries just
+        // `await`.
+        let appTransitions    = await appTransitionsLet
+        let appCombinations   = await appCombinationsLet
+        let chaoticMoment     = await chaoticMomentLet
+        let chronotype        = await chronotypeLet
+        let activityWeight    = await activityWeightLet
+        let keyboardRhythm    = await keyboardRhythmLet
+        let mouseSpeedRhythm  = await mouseSpeedRhythmLet
+        let focusSeconds      = await focusSecondsLet
+        let focusFraction     = await focusFractionLet
+        let clipboardCount    = await clipboardCountLet
+        let clipboardHourly   = await clipboardHourlyLet
+        let handBalance       = await handBalanceLet
+        let pastLongestFocus  = await pastLongestFocusLet
+        let lifetimeMm        = await lifetimeMmLet
+
+        // Throwing async-lets propagate through `try await`. The
+        // recovered ones above are already resolved into plain `let`
+        // bindings, so they pass into the RawSnapshot init as-is.
         return RawSnapshot(
-            summary: summary,
-            heatmap: heatmap,
-            trend: trend,
-            comparisonTrend: comparisonTrend,
-            focus: focus,
-            posture: posture,
-            switches: switches,
-            continuity: continuity,
-            lidToday: lidToday,
-            lidTrend: lidTrend,
-            restDay: restDay,
-            timeline: timeline,
-            keyPeak: keyPeak,
-            passive: passive,
-            shortcuts: shortcuts,
+            summary: try await summary,
+            heatmap: try await heatmap,
+            trend: try await trend,
+            comparisonTrend: try await comparisonTrend,
+            focus: try await focus,
+            posture: try await posture,
+            switches: try await switches,
+            continuity: try await continuity,
+            lidToday: try await lidToday,
+            lidTrend: try await lidTrend,
+            restDay: try await restDay,
+            timeline: try await timeline,
+            keyPeak: try await keyPeak,
+            passive: try await passive,
+            shortcuts: try await shortcuts,
             appTransitions: appTransitions,
             appCombinations: appCombinations,
             chaoticMoment: chaoticMoment,
@@ -1091,13 +1119,13 @@ final class DashboardModel: ObservableObject {
             activityWeight: activityWeight,
             keyboardRhythm: keyboardRhythm,
             mouseSpeedRhythm: mouseSpeedRhythm,
-            keyCodes: keyCodes,
+            keyCodes: try await keyCodes,
             focusSeconds: focusSeconds,
             focusFraction: focusFraction,
             clipboardCount: clipboardCount,
             clipboardHourly: clipboardHourly,
             handBalance: handBalance,
-            allAppsToday: allAppsToday,
+            allAppsToday: try await allAppsToday,
             trajectoryTiles: trajectoryTiles,
             clickTiles: clickTiles,
             pastLongestFocus: pastLongestFocus,
@@ -1127,7 +1155,7 @@ final class DashboardModel: ObservableObject {
         // cost per refresh is the @Published applies below.
         let result: Result<RawSnapshot, Error> = await Task.detached(priority: .userInitiated) {
             do {
-                let raw = try Self.gatherRawSnapshot(
+                let raw = try await Self.gatherRawSnapshot(
                     store: store,
                     now: now,
                     dayStart: dayStart,
