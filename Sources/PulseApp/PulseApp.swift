@@ -3094,7 +3094,7 @@ struct WeekTrendChart: View {
                     AxisMarks(values: .stride(by: .day)) { value in
                         if let date = value.as(Date.self) {
                             AxisValueLabel {
-                                Text(shortDay(date))
+                                Text(PulseFormat.shortWeekday(date))
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
@@ -3107,15 +3107,6 @@ struct WeekTrendChart: View {
         .pulseFeaturedCard()
     }
 
-    /// Short weekday name ("Mon" / "周一") via `DateFormatter` using
-    /// `Locale.current`, so the chart x-axis reads correctly under both
-    /// English and Chinese system settings.
-    private func shortDay(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = .current
-        formatter.setLocalizedDateFormatFromTemplate("EEE")
-        return formatter.string(from: date)
-    }
 }
 
 /// 24h × Nd activity heatmap (F-03). Days run top → bottom with today on
@@ -3838,8 +3829,8 @@ struct DeepFocusCard: View {
                 .monospacedDigit()
                 .foregroundStyle(PulseDesign.coral)
             let app = Self.displayNameCache.name(for: segment.bundleId)
-            let start = Self.clockTime(segment.startedAt)
-            let end = Self.clockTime(segment.endedAt)
+            let start = PulseFormat.clockTime(segment.startedAt)
+            let end = PulseFormat.clockTime(segment.endedAt)
             Text("\(app) · \(start) – \(end)", bundle: .pulse)
                 .font(.body)
                 .foregroundStyle(.primary)
@@ -3862,13 +3853,6 @@ struct DeepFocusCard: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.vertical, 4)
-    }
-
-    private static func clockTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = .current
-        formatter.setLocalizedDateFormatFromTemplate("HH:mm")
-        return formatter.string(from: date)
     }
 }
 
@@ -4107,7 +4091,7 @@ struct KeyboardPeakCard: View {
                     .font(.body)
                     .foregroundStyle(.secondary)
             }
-            Text("at \(Self.clockTime(peak.minuteStart))", bundle: .pulse)
+            Text("at \(PulseFormat.clockTime(peak.minuteStart))", bundle: .pulse)
                 .font(.body)
                 .foregroundStyle(.primary)
                 .opacity(0.8)
@@ -4123,13 +4107,6 @@ struct KeyboardPeakCard: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.vertical, 4)
-    }
-
-    private static func clockTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = .current
-        formatter.setLocalizedDateFormatFromTemplate("HH:mm")
-        return formatter.string(from: date)
     }
 }
 
@@ -4551,15 +4528,25 @@ private struct ChronotypeSparkline: View {
     let hourly: [Int]
 
     var body: some View {
-        let peak = max(1, hourly.max() ?? 1)
-        // Index of the highest-activity hour. The card subtitle
-        // already names the peak hour numerically; rendering the
-        // matching bar in full coral (vs. the 0.30–0.85 ramp the
-        // other 23 bars use) gives the user a one-glance visual
-        // anchor that matches the prose.
-        let peakIndex = hourly.enumerated()
-            .max(by: { $0.element < $1.element })?
-            .offset
+        // Single pass over the 24 hourly values to find both the
+        // peak value (for the height-normalisation denominator) and
+        // the peak's index (for the full-coral visual highlight).
+        // Pre-A36 this used `hourly.max()` *and* `hourly.enumerated()
+        // .max(by:)` — two independent O(24) scans, the second of
+        // which allocated an `EnumeratedSequence` iterator. The body
+        // re-evaluates whenever `chronotype` updates (per refresh
+        // tick); the fold drops the per-render iteration count
+        // roughly in half.
+        var peakValue: Int = 0
+        var peakOffset: Int = -1
+        for (idx, value) in hourly.enumerated() {
+            if value > peakValue {
+                peakValue = value
+                peakOffset = idx
+            }
+        }
+        let peak = max(1, peakValue)
+        let peakIndex: Int? = (peakValue > 0) ? peakOffset : nil
         GeometryReader { geo in
             HStack(alignment: .bottom, spacing: 2) {
                 ForEach(0..<24, id: \.self) { hour in
@@ -7991,8 +7978,8 @@ struct BriefingFocusRow: View {
 
     var body: some View {
         let app = Self.displayNameCache.name(for: segment.bundleId)
-        let start = Self.clockTime(segment.startedAt)
-        let end = Self.clockTime(segment.endedAt)
+        let start = PulseFormat.clockTime(segment.startedAt)
+        let end = PulseFormat.clockTime(segment.endedAt)
         VStack(alignment: .leading, spacing: 6) {
             Text("Deep focus today", bundle: .pulse)
                 .font(PulseDesign.labelFont)
@@ -8012,13 +7999,6 @@ struct BriefingFocusRow: View {
             RoundedRectangle(cornerRadius: PulseDesign.cardCornerRadius)
                 .fill(PulseDesign.coral.opacity(0.06))
         )
-    }
-
-    private static func clockTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = .current
-        formatter.setLocalizedDateFormatFromTemplate("HH:mm")
-        return formatter.string(from: date)
     }
 }
 
@@ -8195,7 +8175,7 @@ struct PrivacyAuditView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(Array(snap.systemEvents.enumerated()), id: \.offset) { _, row in
                             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                                Text(PrivacyAuditView.clockTime(row.timestamp))
+                                Text(PulseFormat.clockTimeWithSeconds(row.timestamp))
                                     .font(.footnote.monospacedDigit())
                                     .foregroundStyle(.secondary)
                                     .frame(width: 68, alignment: .leading)
@@ -8252,13 +8232,6 @@ struct PrivacyAuditView: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
-    }
-
-    private static func clockTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = .current
-        formatter.setLocalizedDateFormatFromTemplate("HH:mm:ss")
-        return formatter.string(from: date)
     }
 
     private static func rangeDescription(_ snap: PrivacyAuditSnapshot) -> String {
