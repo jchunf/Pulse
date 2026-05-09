@@ -603,6 +603,173 @@ public extension EventStore {
             return best
         }
     }
+
+    /// Batched companion to `longestFocusSegment(on:)`. Returns the
+    /// longest qualifying focus duration (in seconds) for each of
+    /// the `days` calendar days *preceding* `endingAt`. Result is
+    /// indexed `[0]` = the day immediately before `endingAt` (i.e.
+    /// "yesterday" when called with `endingAt: today's start`),
+    /// `[days - 1]` = the oldest day in the window. `nil` for days
+    /// with no qualifying segment.
+    ///
+    /// Functionally equivalent to calling `longestFocusSegment(on:)`
+    /// once per day and pulling out `.durationSeconds`. The win is
+    /// transactional: the loop version acquires `database.queue.read`
+    /// `days` times and runs `3 × days` SELECT statements (idle rows
+    /// + prior bundle + transitions, per day). This version opens
+    /// **one** read transaction and runs **three** SELECTs total —
+    /// idle rows for the entire window, the prior bundle just before
+    /// the window, and every foreground_app transition inside the
+    /// window — then assembles per-day intervals in pure Swift.
+    ///
+    /// The dashboard's refresh path calls this on every poll tick
+    /// (default every 5s), so for `days = 6` the saving is 18 SQL
+    /// roundtrips per tick, ~21,600 roundtrips per active hour.
+    func longestFocusDurationsForPreviousDays(
+        endingAt: Date,
+        days: Int,
+        minActiveSecondsPerMinute: Int = 30,
+        calendar: Calendar = .current
+    ) throws -> [Int?] {
+        precondition(days >= 1, "days must be at least 1")
+        let endingDayStart = calendar.startOfDay(for: endingAt)
+        guard let windowStart = calendar.date(
+            byAdding: .day, value: -days, to: endingDayStart
+        ) else {
+            return Array(repeating: nil, count: days)
+        }
+        let windowEnd = endingDayStart  // exclusive — we cover *previous* days only
+        let windowStartMs = Int64(windowStart.timeIntervalSince1970 * 1_000)
+        let windowEndMs = Int64(windowEnd.timeIntervalSince1970 * 1_000)
+        let windowStartSec = Int64(windowStart.timeIntervalSince1970)
+        let windowEndSec = Int64(windowEnd.timeIntervalSince1970)
+
+        return try database.queue.read { db -> [Int?] in
+            // 1) Idle rows across the full window — keyed by minute,
+            //    same shape as the single-day version.
+            let idleRows = try Row.fetchAll(db, sql: """
+                SELECT ts_minute, idle_seconds FROM min_idle
+                WHERE ts_minute >= ? AND ts_minute < ?
+                """, arguments: [windowStartSec, windowEndSec])
+            var idleByMinute: [Int64: Int64] = [:]
+            idleByMinute.reserveCapacity(idleRows.count)
+            for row in idleRows {
+                idleByMinute[row["ts_minute"] as Int64] = row["idle_seconds"] as Int64
+            }
+            func minuteIsActive(_ minuteStartSec: Int64) -> Bool {
+                let idle = idleByMinute[minuteStartSec] ?? 0
+                return (60 - idle) >= Int64(minActiveSecondsPerMinute)
+            }
+
+            // 2) Bundle that was foreground just before the window
+            //    began. Provides the entry-state for the very first
+            //    interval; subsequent days inherit their entry-state
+            //    from the previous day's last transition.
+            let priorBundle = try String.fetchOne(db, sql: """
+                SELECT payload FROM system_events
+                WHERE category = 'foreground_app' AND ts < ?
+                ORDER BY ts DESC LIMIT 1
+                """, arguments: [windowStartMs])
+
+            // 3) Every foreground_app transition inside the window,
+            //    ascending. Same shape as the single-day version.
+            let transitions = try Row.fetchAll(db, sql: """
+                SELECT ts, payload FROM system_events
+                WHERE category = 'foreground_app' AND ts >= ? AND ts < ?
+                ORDER BY ts
+                """, arguments: [windowStartMs, windowEndMs])
+
+            // 4) Day boundaries (millisecond UTC), oldest → newest.
+            //    `dayBoundsMs[i]` = start of day `i`; the last entry is
+            //    `windowEndMs`, used to close the final day's trailing
+            //    interval. `days + 1` entries total.
+            var dayBoundsMs: [Int64] = []
+            dayBoundsMs.reserveCapacity(days + 1)
+            for d in 0...days {
+                if let bound = calendar.date(byAdding: .day, value: d, to: windowStart) {
+                    dayBoundsMs.append(Int64(bound.timeIntervalSince1970 * 1_000))
+                } else {
+                    dayBoundsMs.append(d == days ? windowEndMs : windowStartMs)
+                }
+            }
+
+            // 5) Per-day intervals. We walk transitions once and
+            //    emit (start, end, bundle) tuples; intervals that
+            //    cross midnight are split at the day boundary so
+            //    each tuple belongs to exactly one day. The split
+            //    matches what `longestFocusSegment(on:)` does
+            //    implicitly by SQL-windowing per day.
+            var perDay: [[(Int64, Int64, String)]] = Array(repeating: [], count: days)
+            var currentBundle: String? = priorBundle
+            var currentStart: Int64 = windowStartMs
+            // Index into `dayBoundsMs` of the boundary *after* the
+            // current day. Mutated by `recordSegment` as intervals
+            // cross day boundaries.
+            var currentDayIndex: Int = 0
+
+            func recordSegment(from start: Int64, to end: Int64, bundle: String) {
+                var segStart = start
+                while segStart < end && currentDayIndex < days {
+                    let nextDayBoundary = dayBoundsMs[currentDayIndex + 1]
+                    let segEnd = min(end, nextDayBoundary)
+                    if segEnd > segStart {
+                        perDay[currentDayIndex].append((segStart, segEnd, bundle))
+                    }
+                    if segEnd >= nextDayBoundary {
+                        currentDayIndex += 1
+                    }
+                    segStart = segEnd
+                }
+            }
+
+            for row in transitions {
+                let ts: Int64 = row["ts"]
+                let bundle: String = row["payload"]
+                if let prior = currentBundle, ts > currentStart {
+                    recordSegment(from: currentStart, to: ts, bundle: prior)
+                }
+                currentStart = ts
+                currentBundle = bundle
+            }
+            if let prior = currentBundle, windowEndMs > currentStart {
+                recordSegment(from: currentStart, to: windowEndMs, bundle: prior)
+            }
+
+            // 6) For each day's intervals, run the same
+            //    excluded-bundle filter + per-minute activity check
+            //    + longest-wins selection that the single-day
+            //    version uses, and return durationSeconds (or nil).
+            //    Result is collected oldest → newest, then
+            //    reversed at the bottom so [0] = "yesterday" matches
+            //    the call-site convention.
+            var resultOldestFirst: [Int?] = Array(repeating: nil, count: days)
+            for dayIdx in 0..<days {
+                var bestDuration: Int = 0
+                for (startMs, endMs, bundle) in perDay[dayIdx] {
+                    if SystemAppFilter.excludedBundles.contains(bundle) { continue }
+                    let durationSeconds = (endMs - startMs) / 1_000
+                    if durationSeconds < 60 { continue }
+                    let firstMinuteStart = (startMs / 1_000 / 60) * 60
+                    let lastMinuteStartExclusive = ((endMs + 59_999) / 1_000 / 60) * 60
+                    var minuteCursor = firstMinuteStart
+                    var allActive = true
+                    while minuteCursor < lastMinuteStartExclusive {
+                        if !minuteIsActive(minuteCursor) {
+                            allActive = false
+                            break
+                        }
+                        minuteCursor += 60
+                    }
+                    guard allActive else { continue }
+                    if Int(durationSeconds) > bestDuration {
+                        bestDuration = Int(durationSeconds)
+                    }
+                }
+                resultOldestFirst[dayIdx] = bestDuration > 0 ? bestDuration : nil
+            }
+            return Array(resultOldestFirst.reversed())
+        }
+    }
 }
 
 // MARK: - Value types

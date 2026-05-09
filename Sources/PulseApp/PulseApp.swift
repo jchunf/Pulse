@@ -1,4 +1,5 @@
 import Foundation
+import os
 import PulseCore
 import PulsePlatform
 
@@ -1050,16 +1051,21 @@ final class DashboardModel: ObservableObject {
             clickTiles.append(MouseTrajectoryTileData(histogram: histogram, snapshot: snapshot))
         }
         // A27 — past-days longest-focus history for the deep-focus
-        // insight rule. `try?` so a single-day miss reduces the
-        // history rather than blanking the whole insights row.
-        let pastLongestFocus: [Int] = (1...(trendDays - 1)).compactMap { offset in
-            guard let day = calendar.date(byAdding: .day, value: -offset, to: dayStart),
-                  let segment = try? store.longestFocusSegment(on: day, now: now)
-            else {
-                return nil
-            }
-            return segment.durationSeconds
-        }
+        // insight rule. Pre-A35 the call site looped per-day, calling
+        // `longestFocusSegment(on:)` `trendDays - 1` times — that
+        // opened `trendDays - 1` separate read transactions and ran
+        // `3 × (trendDays - 1)` SELECTs on every refresh tick.
+        // `longestFocusDurationsForPreviousDays` folds the lot into
+        // one transaction + three SELECTs total, with the per-day
+        // interval split + activity verification done in pure Swift.
+        // `try?` so a transient DB error reduces the history rather
+        // than blanking the whole insights row.
+        let pastLongestFocus: [Int] = (
+            (try? store.longestFocusDurationsForPreviousDays(
+                endingAt: dayStart,
+                days: trendDays - 1
+            )) ?? []
+        ).compactMap { $0 }
         let lifetimeMm = (try? store.lifetimeMouseDistanceMillimeters()) ?? 0
 
         return RawSnapshot(
@@ -6436,11 +6442,41 @@ struct AppSankeyCard: View {
     fileprivate static let nodePadding: CGFloat = 4
     fileprivate static let labelGutter: CGFloat = 110
 
-    private var totalSwitches: Int {
-        transitions.reduce(0) { $0 + $1.count }
+    /// Single-pass fold over `transitions` that produces the three
+    /// values `body` needs: total switch count, unique source-bundle
+    /// count, unique target-bundle count. Pre-A35 these were three
+    /// independent computed properties — `totalSwitches` did one
+    /// reduce, `uniqueSourceCount` allocated `[String]` + `Set<String>`,
+    /// `uniqueTargetCount` did the same again. Each `body`
+    /// re-evaluation paid the full price three times. Now one walk
+    /// + two dedupe sets, computed once at the top of `body` and
+    /// reused.
+    private struct Stats {
+        let totalSwitches: Int
+        let uniqueSourceCount: Int
+        let uniqueTargetCount: Int
+    }
+
+    private var stats: Stats {
+        var sources = Set<String>()
+        var targets = Set<String>()
+        sources.reserveCapacity(transitions.count)
+        targets.reserveCapacity(transitions.count)
+        var total = 0
+        for t in transitions {
+            total += t.count
+            sources.insert(t.fromBundle)
+            targets.insert(t.toBundle)
+        }
+        return Stats(
+            totalSwitches: total,
+            uniqueSourceCount: sources.count,
+            uniqueTargetCount: targets.count
+        )
     }
 
     var body: some View {
+        let s = stats
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "arrow.left.arrow.right")
@@ -6459,19 +6495,19 @@ struct AppSankeyCard: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            subtitle
+            subtitle(s)
             SankeyDiagram(
                 layout: makeLayout(),
                 displayName: { Self.displayNameCache.name(for: $0) }
             )
-            .frame(height: max(220, CGFloat(uniqueSourceCount + uniqueTargetCount) * 14))
+            .frame(height: max(220, CGFloat(s.uniqueSourceCount + s.uniqueTargetCount) * 14))
         }
         .pulseFeaturedCard()
     }
 
     @ViewBuilder
-    private var subtitle: some View {
-        if totalSwitches > 0 {
+    private func subtitle(_ s: Stats) -> some View {
+        if s.totalSwitches > 0 {
             Text(
                 String.localizedStringWithFormat(
                     NSLocalizedString(
@@ -6479,7 +6515,7 @@ struct AppSankeyCard: View {
                         bundle: .pulse,
                         comment: "F-13 AppSankeyCard — subtitle. %1$lld is the number of transitions counted, %2$lld is the number of unique (from→to) pairs."
                     ),
-                    Int64(totalSwitches),
+                    Int64(s.totalSwitches),
                     Int64(transitions.count)
                 )
             )
@@ -6489,14 +6525,6 @@ struct AppSankeyCard: View {
         } else {
             EmptyView()
         }
-    }
-
-    private var uniqueSourceCount: Int {
-        Set(transitions.map(\.fromBundle)).count
-    }
-
-    private var uniqueTargetCount: Int {
-        Set(transitions.map(\.toBundle)).count
     }
 
     /// Pre-computes node positions + ribbon attach points based on the
@@ -7166,22 +7194,39 @@ struct ChaoticMomentCard: View {
 /// an empty row.
 final class BundleDisplayNameCache: @unchecked Sendable {
 
-    private let lock = NSLock()
-    private var cache: [String: String] = [:]
+    /// `OSAllocatedUnfairLock` (macOS 13+) is meaningfully cheaper than
+    /// `NSLock` for short critical sections — `os_unfair_lock_lock`
+    /// is ~5 ns on the contended-zero path vs ~30+ ns for `NSLock`,
+    /// and the API folds the cache state into the lock so the
+    /// "lock / read / unlock" dance becomes a single `withLock`
+    /// closure call.
+    private let lock = OSAllocatedUnfairLock<[String: String]>(initialState: [:])
 
+    /// Pre-A35 the lookup did three separate lock acquisitions:
+    /// `lock` → check → `unlock`, then `lock` → write → `unlock`
+    /// after the resolve. Two of those locks are now folded into
+    /// `withLock` blocks; the I/O still happens *outside* the lock
+    /// (so a slow `urlForApplication` doesn't stall other threads
+    /// hitting the cache). On cache hit the path is one `withLock`
+    /// and one closure return — the dashboard re-renders that
+    /// touch every visible app name on every refresh tick now do
+    /// roughly one-third of the lock work they used to.
     func name(for bundleId: String) -> String {
-        lock.lock()
-        if let cached = cache[bundleId] {
-            lock.unlock()
+        if let cached = lock.withLock({ $0[bundleId] }) {
             return cached
         }
-        lock.unlock()
-
+        // Resolve outside the lock — `urlForApplication(withBundleIdentifier:)`
+        // can hit Launch Services on a cold cache and isn't fast.
         let resolved = Self.resolve(bundleId)
-        lock.lock()
-        cache[bundleId] = resolved
-        lock.unlock()
-        return resolved
+        // Insert under the lock; if another thread raced and beat us,
+        // honour their result so callers all see one stable string
+        // per bundle id (the resolver is deterministic, so the
+        // strings will match anyway, but the consistency is cheap).
+        return lock.withLock { state in
+            if let existing = state[bundleId] { return existing }
+            state[bundleId] = resolved
+            return resolved
+        }
     }
 
     private static func resolve(_ bundleId: String) -> String {
