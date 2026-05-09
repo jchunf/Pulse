@@ -3124,13 +3124,82 @@ struct WeekHourlyHeatmap: View {
 
     private static let minOpacity: Double = 0.06
     private static let maxOpacity: Double = 0.95
-    private static let hourLabels = [0, 6, 12, 18]
+    /// `Set<Int>` so the per-cell `.contains(hour)` membership check
+    /// in the axis row is O(1). Pre-A34 this was an `[Int]` — 24
+    /// linear scans across a 4-element array per body render, on a
+    /// path that re-evaluates whenever `cells` changes (every
+    /// 5-second refresh tick by default).
+    private static let hourLabels: Set<Int> = [0, 6, 12, 18]
+
+    /// Shared `DateFormatter` for the weekday axis labels. Pre-A34
+    /// `shortDayName(_:)` allocated a fresh `DateFormatter` per
+    /// `dayLabel(for:)` invocation — *up to 30 formatters per body
+    /// render* on a 30-day heatmap, every refresh tick. Now
+    /// configured once with `.autoupdatingCurrent` so live
+    /// system-locale changes still flow through; reads after init
+    /// are safe from the main thread (where SwiftUI bodies run).
+    private static let weekdayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = .autoupdatingCurrent
+        f.setLocalizedDateFormatFromTemplate("EEE")
+        return f
+    }()
+
+    /// Single-pass derived view of `cells` — the keyed lookup, the
+    /// max-activity ceiling, the hour-of-day argmax for the insight
+    /// footer, and the formatted weekday labels are *all* computed
+    /// from one walk over `cells`. Pre-A34 the body did three
+    /// independent O(n) scans (`indexed()`, `cells.map(\.activityCount).max()`,
+    /// and `peakHour()`) plus 30 DateFormatter allocations; now it's
+    /// one pass + a tight 28-iteration loop for the day labels.
+    private struct Aggregate {
+        let lookup: [Int: Int]
+        let maxActivity: Int
+        let peakHour: Int?
+        /// Pre-rendered weekday labels keyed by `dayOffset`. `0` and
+        /// `1` are deliberately absent — those slots render the
+        /// localised "Today" / "Yday" Text directly.
+        let dayLabels: [Int: String]
+    }
+
+    private var aggregate: Aggregate {
+        var lookup: [Int: Int] = [:]
+        lookup.reserveCapacity(cells.count)
+        var maxActivity = 1
+        var byHour: [Int: Int] = [:]
+        byHour.reserveCapacity(24)
+        for cell in cells {
+            lookup[Self.cellKey(day: cell.dayOffset, hour: cell.hour)] = cell.activityCount
+            if cell.activityCount > maxActivity { maxActivity = cell.activityCount }
+            byHour[cell.hour, default: 0] += cell.activityCount
+        }
+        let peak = byHour.max(by: { $0.value < $1.value })?.key
+
+        var dayLabels: [Int: String] = [:]
+        if days > 2 {
+            let now = Date()
+            let calendar = Calendar.current
+            for dayOffset in 2..<days {
+                if let date = calendar.date(byAdding: .day, value: -dayOffset, to: now) {
+                    dayLabels[dayOffset] = Self.weekdayFormatter.string(from: date)
+                }
+            }
+        }
+
+        return Aggregate(
+            lookup: lookup,
+            maxActivity: maxActivity,
+            peakHour: peak,
+            dayLabels: dayLabels
+        )
+    }
 
     var body: some View {
+        let agg = aggregate
         VStack(alignment: .leading, spacing: 14) {
             headlineText.font(PulseDesign.cardTitleFont)
-            content
-            insightFooter
+            content(agg: agg)
+            insightFooter(agg: agg)
         }
         .pulseFeaturedCard()
     }
@@ -3146,17 +3215,15 @@ struct WeekHourlyHeatmap: View {
     }
 
     @ViewBuilder
-    private var content: some View {
-        let lookup = indexed(cells)
-        let maxActivity = max(cells.map(\.activityCount).max() ?? 1, 1)
+    private func content(agg: Aggregate) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             ForEach(0..<days, id: \.self) { dayOffset in
                 HStack(spacing: 2) {
-                    dayLabel(for: dayOffset)
+                    dayLabel(for: dayOffset, dayName: agg.dayLabels[dayOffset] ?? "")
                         .frame(width: 52, alignment: .trailing)
                     ForEach(0..<24, id: \.self) { hour in
-                        let activity = lookup[cellKey(day: dayOffset, hour: hour)] ?? 0
-                        let intensity = Double(activity) / Double(maxActivity)
+                        let activity = agg.lookup[Self.cellKey(day: dayOffset, hour: hour)] ?? 0
+                        let intensity = Double(activity) / Double(agg.maxActivity)
                         RoundedRectangle(cornerRadius: 2)
                             .fill(Self.heatColor(intensity: intensity))
                             .frame(height: 16)
@@ -3208,8 +3275,8 @@ struct WeekHourlyHeatmap: View {
     }
 
     @ViewBuilder
-    private var insightFooter: some View {
-        if let peak = peakHour() {
+    private func insightFooter(agg: Aggregate) -> some View {
+        if let peak = agg.peakHour {
             let descriptorKey = Self.descriptorKey(forHour: peak)
             let hourString = String(format: "%02d:00", peak)
             HStack(spacing: 6) {
@@ -3222,16 +3289,6 @@ struct WeekHourlyHeatmap: View {
             .foregroundStyle(.secondary)
             .padding(.top, 4)
         }
-    }
-
-    /// Aggregate activity by hour-of-day across all cells; return the hour
-    /// with the highest total. `nil` when there's nothing to summarise.
-    private func peakHour() -> Int? {
-        var byHour: [Int: Int] = [:]
-        for cell in cells {
-            byHour[cell.hour, default: 0] += cell.activityCount
-        }
-        return byHour.max(by: { $0.value < $1.value })?.key
     }
 
     /// Map a peak hour to a localised "morning / afternoon / evening /
@@ -3258,7 +3315,7 @@ struct WeekHourlyHeatmap: View {
     }
 
     @ViewBuilder
-    private func dayLabel(for dayOffset: Int) -> some View {
+    private func dayLabel(for dayOffset: Int, dayName: String) -> some View {
         switch dayOffset {
         case 0:
             Text("Today", bundle: .pulse)
@@ -3269,30 +3326,14 @@ struct WeekHourlyHeatmap: View {
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.secondary)
         default:
-            Text(shortDayName(dayOffset))
+            Text(dayName)
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.secondary)
         }
     }
 
-    private func shortDayName(_ dayOffset: Int) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = .current
-        formatter.setLocalizedDateFormatFromTemplate("EEE")
-        let date = Calendar.current.date(byAdding: .day, value: -dayOffset, to: Date()) ?? Date()
-        return formatter.string(from: date)
-    }
-
-    private func cellKey(day: Int, hour: Int) -> Int {
+    private static func cellKey(day: Int, hour: Int) -> Int {
         day * 24 + hour
-    }
-
-    private func indexed(_ cells: [HeatmapCell]) -> [Int: Int] {
-        var result: [Int: Int] = [:]
-        for cell in cells {
-            result[cellKey(day: cell.dayOffset, hour: cell.hour)] = cell.activityCount
-        }
-        return result
     }
 }
 
@@ -4189,7 +4230,11 @@ struct DayTimelineCard: View {
 
     private static let displayNameCache = BundleDisplayNameCache()
     private static let barHeight: CGFloat = 32
-    private static let hourLabels = [0, 6, 12, 18]
+    /// `Set<Int>` (was `[Int]`) so the `.contains(hour)` membership
+    /// check inside the 24-cell axis ForEach is O(1) instead of a
+    /// linear scan over a 4-element array per cell. Same pattern as
+    /// `WeekHourlyHeatmap.hourLabels` after the round-9 perf pass.
+    private static let hourLabels: Set<Int> = [0, 6, 12, 18]
 
     private static let palette: [Color] = [
         PulseDesign.sage,
