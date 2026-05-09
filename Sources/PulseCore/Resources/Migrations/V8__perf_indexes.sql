@@ -1,0 +1,62 @@
+-- V8 — composite indexes for hot read-side query shapes.
+--
+-- Round 12 of the multi-round perf push. Two access patterns
+-- weren't covered by indexes the V1 schema shipped with, so SQLite
+-- was either scanning a low-cardinality category index and
+-- residual-filtering the timestamp, or worse, falling back to a
+-- full-table scan in the case where the existing PK didn't
+-- align with the query's filter shape.
+--
+-- 1) `system_events.category = ? AND ts >= ? AND ts < ?`
+--
+--    Hit by every focus-mode / app-transition / clipboard-change /
+--    lid-open / app-combination / busiest-minute / day-timeline
+--    query — basically every read that consumes the system-events
+--    log scoped to a date window. The V1 schema has separate
+--    `idx_system_events_ts` and `idx_system_events_category`
+--    indexes; SQLite picks one and does a residual filter on the
+--    other. Because `category` is low-cardinality (a small set of
+--    string constants like 'foreground_app' / 'focus_on'), the
+--    `idx_system_events_category` route degrades to roughly
+--    "scan-all-rows-of-this-category, filter by ts" — and
+--    'foreground_app' rows can be the bulk of the table on an
+--    active install.
+--
+--    A composite `(category, ts)` lets the planner b-tree-seek to
+--    the (category, start_ts) tuple and stream forward until
+--    end_ts, with no residual filter. The existing single-column
+--    indexes are kept for now — `idx_system_events_ts` still has a
+--    use case in queries that filter by ts only — but the new
+--    composite is what the hot category+ts queries will pick up.
+--
+-- 2) `display_snapshots WHERE display_id = ? ORDER BY ts DESC LIMIT 1`
+--
+--    Hit per-display in the trajectory-tile assembly path during
+--    every dashboard refresh, plus the per-display histogram pair
+--    in `gatherRawSnapshot`. The V1 PK is `(ts, display_id)`, which
+--    is wrong order for this access pattern — SQLite can't seek to
+--    the rightmost (display_id = X) row by ts and has to scan all
+--    snapshots and filter. With usually only 1–3 displays per
+--    user this is small in absolute terms, but the per-display
+--    loops are tight.
+--
+--    `(display_id, ts)` lets the planner seek to the bottom of
+--    `display_id = X` and read backwards once. A LIMIT 1 then
+--    completes in a single index lookup.
+--
+-- Both indexes use IF NOT EXISTS so re-applying the migration is
+-- a no-op (the migrator is idempotent in spirit; this makes it
+-- idempotent in fact for these statements).
+--
+-- Write impact: both target tables are written infrequently —
+-- `system_events` rows only on focus-mode flips / lid events / app
+-- switches / clipboard changes (a few per minute peak), and
+-- `display_snapshots` only when display config changes. The extra
+-- index updates per write are noise compared to the dashboard's
+-- per-tick read savings.
+
+CREATE INDEX IF NOT EXISTS idx_system_events_category_ts
+    ON system_events(category, ts);
+
+CREATE INDEX IF NOT EXISTS idx_display_snapshots_display_id_ts
+    ON display_snapshots(display_id, ts);

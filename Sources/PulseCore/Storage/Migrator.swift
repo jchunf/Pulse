@@ -98,7 +98,8 @@ enum BundledMigrations {
         "V4__mouse_density.sql",
         "V5__shortcuts.sql",
         "V6__key_codes.sql",
-        "V7__click_density.sql"
+        "V7__click_density.sql",
+        "V8__perf_indexes.sql"
     ]
 
     /// Parses a filename of the form `V{int}__{name}.sql` into (version, name).
