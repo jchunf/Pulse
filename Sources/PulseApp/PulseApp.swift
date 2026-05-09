@@ -1531,6 +1531,17 @@ struct HealthMenuView: View {
                             action: onGenerateReportPDF
                         )
                     }
+                    // Row 2 has only two items, so the layout
+                    // is "flush-left, flush-right" via a single
+                    // expanding `Spacer` between them — same
+                    // shape as the chip row above ("Open
+                    // Dashboard" / "Quit Pulse"). Round 4's
+                    // initial layout had a trailing
+                    // `Spacer(minLength: 0)` here too, which
+                    // SwiftUI expanded equally with the inner
+                    // spacer and parked both items in the
+                    // left-half of the row, leaving the right
+                    // side awkwardly empty.
                     HStack(spacing: 0) {
                         menuBarSecondaryAction(
                             titleKey: "Export data…",
@@ -1543,7 +1554,6 @@ struct HealthMenuView: View {
                             systemImage: "arrow.triangle.2.circlepath",
                             action: onCheckForUpdates
                         )
-                        Spacer(minLength: 0)
                     }
                 }
             }
@@ -6413,8 +6423,22 @@ struct AppRankingChart: View {
                     // "微信开发者工具") truncate cleanly with a
                     // tail ellipsis instead of pushing the bar
                     // chart sideways or wrapping unpredictably.
+                    //
+                    // Round 3 introduced this with `centered: true`
+                    // — the wrong dial. `centered:` applies to
+                    // *quantitative* axes (it centres the label
+                    // between two grid lines); on a categorical
+                    // y-axis it pushed the label *into the chart
+                    // area* on top of the bar, where it overlapped
+                    // the bar's trailing duration annotation for
+                    // any short row (e.g. "Google Chrome   26 分钟"
+                    // colliding with the "Google Chrome" name).
+                    // The default placement (no `centered:`) puts
+                    // the label in the leading gutter, vertically
+                    // aligned with the bar — what the layout
+                    // actually wants.
                     AxisMarks(position: .leading) { value in
-                        AxisValueLabel(centered: true) {
+                        AxisValueLabel {
                             if let label = value.as(String.self) {
                                 Text(label)
                                     .font(.footnote)
