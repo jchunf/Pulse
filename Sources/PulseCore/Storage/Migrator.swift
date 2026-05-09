@@ -71,11 +71,15 @@ public struct Migrator: Sendable {
     /// The highest version this migrator will bring a database to.
     public var targetVersion: Int { steps.last?.version ?? 0 }
 
-    /// Apply any outstanding migrations to the given database queue.
+    /// Apply any outstanding migrations to the given database writer.
     /// Returns the version the database is now at.
+    ///
+    /// Typed as `any DatabaseWriter` (both `DatabaseQueue` and
+    /// `DatabasePool` conform) so the production on-disk path can
+    /// migrate a Pool while the in-memory test path stays on a Queue.
     @discardableResult
-    public func migrate(_ dbQueue: DatabaseQueue) throws -> Int {
-        try dbQueue.write { db in
+    public func migrate(_ writer: any DatabaseWriter) throws -> Int {
+        try writer.write { db in
             let current = try Int.fetchOne(db, sql: "PRAGMA user_version") ?? 0
             for step in steps where step.version > current {
                 try db.execute(sql: step.sql)
