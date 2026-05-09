@@ -25,17 +25,54 @@ public enum AppCategory: String, Sendable, CaseIterable, Equatable {
 
 public enum AppCategoryClassifier {
 
+    /// Process-wide classification cache. The classifier is hot —
+    /// `FocusDonutBuilder.build` calls `category(for:)` once per row
+    /// in the per-refresh `appUsageRanking` (limit 200), so a default
+    /// dashboard tick can fire 200 classifier lookups every 5 seconds.
+    /// Each uncached lookup does a `bundleId.lowercased()` (one
+    /// String allocation) followed by up to ~120 `hasPrefix(_:)`
+    /// comparisons across the rule table. With the cache, the second
+    /// dashboard tick onward sees one dictionary lookup per bundle.
+    /// `NSLock` (not the Darwin-only `os_unfair_lock`) keeps
+    /// PulseCore portable for the Linux smoke build.
+    private static let cacheLock = NSLock()
+    nonisolated(unsafe) private static var cache: [String: AppCategory] = [:]
+
     /// The canonical entry point. Walks a fixed table of bundleId
     /// prefixes in stable order; the first matching row wins. Callers
     /// pass the bundle active on the event.
+    ///
+    /// Cache fast path: hit returns under one `NSLock` acquire.
+    /// Miss path runs the prefix walk *outside* the lock so a slow
+    /// classification (shouldn't happen — the rule table is fixed)
+    /// can't stall other threads, then takes the lock once more to
+    /// insert. Re-check on insert so a parallel resolve doesn't
+    /// double-store; the result is deterministic so the eventual
+    /// stored value is identical regardless of which thread's
+    /// resolve wins the race.
     public static func category(for bundleId: String) -> AppCategory {
+        cacheLock.lock()
+        if let cached = cache[bundleId] {
+            cacheLock.unlock()
+            return cached
+        }
+        cacheLock.unlock()
+
         let id = bundleId.lowercased()
-        for entry in Self.rules {
-            for prefix in entry.prefixes where id.hasPrefix(prefix) {
-                return entry.category
+        var found: AppCategory = .other
+        outer: for entry in Self.rules {
+            for prefix in entry.prefixes {
+                if id.hasPrefix(prefix) {
+                    found = entry.category
+                    break outer
+                }
             }
         }
-        return .other
+
+        cacheLock.lock()
+        cache[bundleId] = found
+        cacheLock.unlock()
+        return found
     }
 
     /// The bundle-prefix → category table. Editable at call site for

@@ -65,6 +65,52 @@ enum PulseFormat {
         return f
     }()
 
+    /// Wallclock formatters used across the dashboard — pre-A36 each
+    /// card that needed an HH:mm rendering had its *own* private
+    /// `clockTime(_:)` static that allocated a fresh `DateFormatter`
+    /// per call (DeepFocusCard, BriefingFocusRow, ChaoticMomentCard,
+    /// PrivacyAudit row clock-time, all duplicates of the same
+    /// shape). Centralised here as cached statics with
+    /// `.autoupdatingCurrent` so live system-locale changes still
+    /// flow through.
+
+    private static let clockHHmmFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = .autoupdatingCurrent
+        f.setLocalizedDateFormatFromTemplate("HH:mm")
+        return f
+    }()
+
+    private static let clockHHmmssFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = .autoupdatingCurrent
+        f.setLocalizedDateFormatFromTemplate("HH:mm:ss")
+        return f
+    }()
+
+    private static let shortWeekdayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = .autoupdatingCurrent
+        f.setLocalizedDateFormatFromTemplate("EEE")
+        return f
+    }()
+
+    /// "14:32" — wallclock HH:mm.
+    static func clockTime(_ date: Date) -> String {
+        clockHHmmFormatter.string(from: date)
+    }
+
+    /// "14:32:05" — wallclock HH:mm:ss. Used by the privacy-audit
+    /// system-event log.
+    static func clockTimeWithSeconds(_ date: Date) -> String {
+        clockHHmmssFormatter.string(from: date)
+    }
+
+    /// "Mon" / "周一" — locale-aware short weekday.
+    static func shortWeekday(_ date: Date) -> String {
+        shortWeekdayFormatter.string(from: date)
+    }
+
     // MARK: - Relative time
 
     /// "5s ago" / "5 秒前". Falls back to the localised "just now" for
