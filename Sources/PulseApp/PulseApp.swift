@@ -1050,16 +1050,21 @@ final class DashboardModel: ObservableObject {
             clickTiles.append(MouseTrajectoryTileData(histogram: histogram, snapshot: snapshot))
         }
         // A27 — past-days longest-focus history for the deep-focus
-        // insight rule. `try?` so a single-day miss reduces the
-        // history rather than blanking the whole insights row.
-        let pastLongestFocus: [Int] = (1...(trendDays - 1)).compactMap { offset in
-            guard let day = calendar.date(byAdding: .day, value: -offset, to: dayStart),
-                  let segment = try? store.longestFocusSegment(on: day, now: now)
-            else {
-                return nil
-            }
-            return segment.durationSeconds
-        }
+        // insight rule. Pre-A35 the call site looped per-day, calling
+        // `longestFocusSegment(on:)` `trendDays - 1` times — that
+        // opened `trendDays - 1` separate read transactions and ran
+        // `3 × (trendDays - 1)` SELECTs on every refresh tick.
+        // `longestFocusDurationsForPreviousDays` folds the lot into
+        // one transaction + three SELECTs total, with the per-day
+        // interval split + activity verification done in pure Swift.
+        // `try?` so a transient DB error reduces the history rather
+        // than blanking the whole insights row.
+        let pastLongestFocus: [Int] = (
+            (try? store.longestFocusDurationsForPreviousDays(
+                endingAt: dayStart,
+                days: trendDays - 1
+            )) ?? []
+        ).compactMap { $0 }
         let lifetimeMm = (try? store.lifetimeMouseDistanceMillimeters()) ?? 0
 
         return RawSnapshot(
