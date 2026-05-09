@@ -6442,11 +6442,41 @@ struct AppSankeyCard: View {
     fileprivate static let nodePadding: CGFloat = 4
     fileprivate static let labelGutter: CGFloat = 110
 
-    private var totalSwitches: Int {
-        transitions.reduce(0) { $0 + $1.count }
+    /// Single-pass fold over `transitions` that produces the three
+    /// values `body` needs: total switch count, unique source-bundle
+    /// count, unique target-bundle count. Pre-A35 these were three
+    /// independent computed properties — `totalSwitches` did one
+    /// reduce, `uniqueSourceCount` allocated `[String]` + `Set<String>`,
+    /// `uniqueTargetCount` did the same again. Each `body`
+    /// re-evaluation paid the full price three times. Now one walk
+    /// + two dedupe sets, computed once at the top of `body` and
+    /// reused.
+    private struct Stats {
+        let totalSwitches: Int
+        let uniqueSourceCount: Int
+        let uniqueTargetCount: Int
+    }
+
+    private var stats: Stats {
+        var sources = Set<String>()
+        var targets = Set<String>()
+        sources.reserveCapacity(transitions.count)
+        targets.reserveCapacity(transitions.count)
+        var total = 0
+        for t in transitions {
+            total += t.count
+            sources.insert(t.fromBundle)
+            targets.insert(t.toBundle)
+        }
+        return Stats(
+            totalSwitches: total,
+            uniqueSourceCount: sources.count,
+            uniqueTargetCount: targets.count
+        )
     }
 
     var body: some View {
+        let s = stats
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "arrow.left.arrow.right")
@@ -6465,19 +6495,19 @@ struct AppSankeyCard: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            subtitle
+            subtitle(s)
             SankeyDiagram(
                 layout: makeLayout(),
                 displayName: { Self.displayNameCache.name(for: $0) }
             )
-            .frame(height: max(220, CGFloat(uniqueSourceCount + uniqueTargetCount) * 14))
+            .frame(height: max(220, CGFloat(s.uniqueSourceCount + s.uniqueTargetCount) * 14))
         }
         .pulseFeaturedCard()
     }
 
     @ViewBuilder
-    private var subtitle: some View {
-        if totalSwitches > 0 {
+    private func subtitle(_ s: Stats) -> some View {
+        if s.totalSwitches > 0 {
             Text(
                 String.localizedStringWithFormat(
                     NSLocalizedString(
@@ -6485,7 +6515,7 @@ struct AppSankeyCard: View {
                         bundle: .pulse,
                         comment: "F-13 AppSankeyCard — subtitle. %1$lld is the number of transitions counted, %2$lld is the number of unique (from→to) pairs."
                     ),
-                    Int64(totalSwitches),
+                    Int64(s.totalSwitches),
                     Int64(transitions.count)
                 )
             )
@@ -6495,14 +6525,6 @@ struct AppSankeyCard: View {
         } else {
             EmptyView()
         }
-    }
-
-    private var uniqueSourceCount: Int {
-        Set(transitions.map(\.fromBundle)).count
-    }
-
-    private var uniqueTargetCount: Int {
-        Set(transitions.map(\.toBundle)).count
     }
 
     /// Pre-computes node positions + ribbon attach points based on the
