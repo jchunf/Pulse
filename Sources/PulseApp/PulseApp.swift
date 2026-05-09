@@ -4527,16 +4527,15 @@ struct ChronotypeCard: View {
 private struct ChronotypeSparkline: View {
     let hourly: [Int]
 
-    var body: some View {
-        // Single pass over the 24 hourly values to find both the
-        // peak value (for the height-normalisation denominator) and
-        // the peak's index (for the full-coral visual highlight).
-        // Pre-A36 this used `hourly.max()` *and* `hourly.enumerated()
-        // .max(by:)` — two independent O(24) scans, the second of
-        // which allocated an `EnumeratedSequence` iterator. The body
-        // re-evaluates whenever `chronotype` updates (per refresh
-        // tick); the fold drops the per-render iteration count
-        // roughly in half.
+    /// Single pass over the 24 hourly values, producing both the
+    /// peak value (height-normalisation denominator) and the peak's
+    /// index (full-coral visual highlight). Lives in a non-ViewBuilder
+    /// computed property because `body`'s `@ViewBuilder` context can't
+    /// host `for` loops — pre-A36 the body did two separate
+    /// O(24) scans (`hourly.max()` *and* `hourly.enumerated().max(by:)`)
+    /// purely because each was an expression rather than control
+    /// flow. Folded here, called once at the top of `body`.
+    private var peakStats: (peak: Int, peakIndex: Int?) {
         var peakValue: Int = 0
         var peakOffset: Int = -1
         for (idx, value) in hourly.enumerated() {
@@ -4545,8 +4544,13 @@ private struct ChronotypeSparkline: View {
                 peakOffset = idx
             }
         }
-        let peak = max(1, peakValue)
-        let peakIndex: Int? = (peakValue > 0) ? peakOffset : nil
+        return (max(1, peakValue), peakValue > 0 ? peakOffset : nil)
+    }
+
+    var body: some View {
+        let stats = peakStats
+        let peak = stats.peak
+        let peakIndex = stats.peakIndex
         GeometryReader { geo in
             HStack(alignment: .bottom, spacing: 2) {
                 ForEach(0..<24, id: \.self) { hour in
