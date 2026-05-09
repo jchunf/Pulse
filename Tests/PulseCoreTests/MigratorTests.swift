@@ -28,10 +28,28 @@ struct MigratorTests {
         }
     }
 
-    @Test("bundled migrator loads up to V7")
+    @Test("bundled migrator loads up to V8")
     func bundledMigratorLoads() throws {
         let migrator = try Migrator.bundled()
-        #expect(migrator.targetVersion == 7)
+        #expect(migrator.targetVersion == 8)
+    }
+
+    @Test("V8 perf indexes are present after migration")
+    func v8PerfIndexes() throws {
+        let db = try PulseDatabase.inMemory()
+        let indexNames: [String] = try db.queue.read { db in
+            try String.fetchAll(db, sql: """
+                SELECT name FROM sqlite_master
+                WHERE type = 'index' AND name LIKE 'idx_%'
+                ORDER BY name
+                """)
+        }
+        // The two composite indexes V8 ships should exist on a
+        // freshly-migrated database; their presence is what the
+        // dashboard's hot read paths rely on for sub-millisecond
+        // category+ts seeks and per-display latest-row lookups.
+        #expect(indexNames.contains("idx_system_events_category_ts"))
+        #expect(indexNames.contains("idx_display_snapshots_display_id_ts"))
     }
 
     @Test("in-memory database migrated to head has core tables")
